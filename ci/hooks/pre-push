@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# pre-push 钩子：推送前执行编译+单测（MG 子集）。骨架期 SKIP 不拦截；zorcc 就绪后改 --strict。
+DIR="$(git rev-parse --show-toplevel)"
+exec "$DIR/ci/run_ci.sh"

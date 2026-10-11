@@ -1,0 +1,16 @@
+# 预备件：外部 CI 凭据获群主授权后启用（本期以 git 直连模式为主，本文件先备而不发）
+name: zor-ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  baseline:
+    runs-on: macos-14        # 与基准主机同架构(arm64)以保证基准可比性；Linux runner 待双平台校准后增补
+    steps:
+      - uses: actions/checkout@v4
+      - name: CI baseline (compile + unit-test)
+        run: bash ci/run_ci.sh --strict
+      - name: Benchmarks (nightly)
+        if: github.event_name == 'push'
+        run: bash ci/run_ci.sh --bench
