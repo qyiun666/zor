@@ -2,11 +2,16 @@
 
 用例为 0.1.x 编译门禁的单一执行载体（对齐 QA 门禁草案 MG/RG/BG 三层）。
 
-## 目录与命名
+## 目录契约（M-1 终审定论，唯一基准，核心工程师）
 
-- `specs/positive/`：正例，`r<N>-<序号>-<主题>.zor`（如 `r2-01-move-basic.zor`）
-- `specs/negative/`：负例，同名规则；负例必须编译期失败并输出行号+错误类型
-- `runners/`：用例运行脚本骨架（与 CI 流水线对接，工具链工程师维护）
+规范用例根目录为 **`tests/specs/`**，不存在第二种口径：
+
+- `tests/specs/positive/`：正例，命名 `r<N>-<序号>-<slug>.zor`（如 `r2-01-move-basic.zor`）
+- `tests/specs/negative/`：负例，命名 `r<N>-n<序号>-<slug>.zor`；必须编译期失败并输出 错误码+行:列+错误类型
+- `tests/specs/compare/`：AC-R2-4 的 Rust 同题对照源码
+- `tests/runners/run_specs.sh`：runner 契约入口，实际逻辑在 `ci/run_ci.sh`
+
+runner 匹配面：`ci/run_ci.sh` 常量 `TESTS_POS_DIR/TESTS_NEG_DIR` 单点定义（=tests/specs/*）；strict 下**负例数=0 即 FAIL**（防空套件假绿）。历史文档中 `specs/tests/…` 写法一律视为过时（PRD v1.1 勘误），不得进入任何脚本。
 
 ## 数量下限（PRD AC 摘录）
 

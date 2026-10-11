@@ -2,12 +2,14 @@
 
 四条规范初稿（R1–R4）合入即满足 0.1.0 首个 tag 条件（PRD §11）。
 
-| 文件 | 需求 | 关键 AC |
-|---|---|---|
-| `r1-type-system.md` | R1 最小类型系统 | AC-R1-1/2/3 |
-| `r2-ownership.md` | R2 所有权/借用子集 | AC-R2-1/2/3/4 |
-| `r3-concurrency.md` | R3 轻量并发（task+channel） | AC-R3-1/2/3/4 |
-| `r4-c-ffi.md` | R4 C FFI | AC-R4-1/2/3 |
+| 文件 | 需求 | 关键 AC | 状态 |
+|---|---|---|---|
+| `r1-type-system.md` | R1 最小类型系统 | AC-R1-1/2/3 | draft-0.1 初稿成文（V-2） |
+| `r2-ownership.md` | R2 所有权/借用子集 | AC-R2-1/2/3/4 | draft-0.1 初稿成文（V-2） |
+| `r3-concurrency.md` | R3 轻量并发（task+channel） | AC-R3-1/2/3/4 | 大纲（M2 前成文） |
+| `r4-c-ffi.md` | R4 C FFI | AC-R4-1/2/3 | 大纲（M2 前成文） |
+
+规范用例目录唯一基准见 `tests/README.md` 目录契约（M-1 终审：`tests/specs/`）。
 
 约定：
 - 每份 spec 含：形成规则/语义判定表、正负例测试用例映射（AC 编号）、未决 OQ 引用。
