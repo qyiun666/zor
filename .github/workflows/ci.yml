@@ -18,9 +18,13 @@ jobs:
     runs-on: macos-14        # 与基准主机同架构(arm64)保证基准可比；Linux 待双平台校准后增补
     steps:
       - uses: actions/checkout@v4
+      - name: Build zorcc (release)   # PR#5 合入后 compile 阶段注入口（seq=118 交接）
+        working-directory: compiler
+        run: cargo build --release
       - name: CI baseline
         env:
           MODE: ${{ github.event.inputs.mode || 'default' }}
+          ZORC_BIN: ${{ github.workspace }}/compiler/target/release/zorcc
         run: |
           case "$MODE" in
             strict) bash ci/run_ci.sh --strict ;;
