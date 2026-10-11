@@ -1,0 +1,10 @@
+// tests/specs/positive/r1-10-enum-tuple-variant.zor — AC-R1-2 正例（specs/r1-type-system.md §9）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：PRD AC-R1-2/AC-R1-3；strict 实弹门禁（D-028）。
+
+enum Shape { Circle(i64), Rect(i64, i64) }
+
+fn main() {
+    let c = Circle(3);
+    let r = Rect(2, 4);
+}

@@ -1,0 +1,14 @@
+// tests/specs/positive/r1-19-explicit-convert-fns.zor — AC-R1-2 正例（specs/r1-type-system.md §9）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：PRD AC-R1-2/AC-R1-3；strict 实弹门禁（D-028）。
+
+// 跨类型仅显式转换函数（R1 §5，禁止隐式数值转换的正面对偶）
+fn main() {
+    let a: i64 = 10;
+    let b = a.to_i32();
+    let c = b.to_i8();
+    let d = c.to_u8();
+    let e = a.to_u64();
+    let f = a.to_f64();
+    println(d); println(e); println(f);
+}
