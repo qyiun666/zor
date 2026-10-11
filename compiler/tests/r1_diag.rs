@@ -102,8 +102,9 @@ fn neg_e1501_ref_in_struct() {
 }
 
 #[test]
-fn neg_e1501_ref_return() {
-    assert!(has("fn f() -> &i32 { } fn main() { }", "E1501"));
+fn neg_e1502_ref_return() {
+    // R2 §4：返回引用归位 E1502（R1 期暂用 E1501，r2 批次按规范修正；E2401 别名不实现）
+    assert!(has("fn f() -> &i32 { } fn main() { }", "E1502"));
 }
 
 #[test]

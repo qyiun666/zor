@@ -1,0 +1,11 @@
+// r2-n07-return-ref.zor — AC-R2-2 负例（R2 §9 r2-n07）
+// 预期：E1502 返回类型含引用（R2 §4 禁返回引用；E2401 别名不实现，码表对齐 §2.3 择一已决）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R2-2；specs/r2-ownership.md §2/§8/§9；shared/ZOR-r2-E2xxx码表对齐-落码前置-v1.md；错误文案基线=门禁 T-4。
+
+fn leak(x: i64) -> &i64 { &x }
+
+fn main() {
+    let y: i64 = 1;
+    let r = leak(y);
+    println(*r);
+}

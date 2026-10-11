@@ -1,0 +1,12 @@
+// r2-n13-into-slot-then-use.zor — AC-R2-2 负例（R2 §9 r2-n13，R3 交叉）
+// 预期：E2101 移入容器槽位后本地再使用（R3 成文前按 R2 §1"绑定或容器槽位"移动点构造，码表对齐 §2.4）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R2-2；specs/r2-ownership.md §2/§8/§9；shared/ZOR-r2-E2xxx码表对齐-落码前置-v1.md；错误文案基线=门禁 T-4。
+
+struct Slot { owned: Box<i64> }
+
+fn main() {
+    let b = box 7;
+    let s = Slot { owned: b };
+    println(*b);
+    println(s.owned);
+}

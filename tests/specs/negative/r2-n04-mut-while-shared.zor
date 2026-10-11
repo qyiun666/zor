@@ -1,0 +1,11 @@
+// r2-n04-mut-while-shared.zor — AC-R2-2 负例（R2 §9 r2-n04）
+// 预期：E2202 共享/独占共存冲突（共享借用活跃时创建 &mut，R2 §2 判定表第 2 行；码表对齐 §2.1）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R2-2；specs/r2-ownership.md §2/§8/§9；shared/ZOR-r2-E2xxx码表对齐-落码前置-v1.md；错误文案基线=门禁 T-4。
+
+fn main() {
+    let x: i64 = 10;
+    let r1 = &x;
+    let r2 = &x;
+    let m = &mut x;
+    println(*r1); println(*r2); println(*m);
+}

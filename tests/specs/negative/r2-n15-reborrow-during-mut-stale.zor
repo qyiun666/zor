@@ -1,0 +1,12 @@
+// r2-n15-reborrow-during-mut-stale.zor — AC-R2-2 负例（R2 §9 r2-n15，§7 不可表达清单第 7 条近邻）
+// 预期：E2201 块尾失活近邻：&mut 最后使用后仍活跃时再创建共享借用（R2 §2/§7 第 8 条差异）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R2-2；specs/r2-ownership.md §2/§8/§9；shared/ZOR-r2-E2xxx码表对齐-落码前置-v1.md；错误文案基线=门禁 T-4。
+
+fn main() {
+    let x: i64 = 1;
+    let m = &mut x;
+    *m = 20;
+    let r = &x;
+    println(*r);
+    println(x);
+}

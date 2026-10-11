@@ -1,0 +1,13 @@
+// r2-n02-move-into-arg.zor — AC-R2-2 负例（R2 §9 r2-n02）
+// 预期：E2101 移动后使用（非 Copy struct 移入实参后本地再访问字段，R2 §1 移动点：实参传递）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R2-2；specs/r2-ownership.md §2/§8/§9；shared/ZOR-r2-E2xxx码表对齐-落码前置-v1.md；错误文案基线=门禁 T-4。
+
+struct Big { v: Box<i64> }
+
+fn consume(b: Big) { println(*b.v); }
+
+fn main() {
+    let g = Big { v: box 2 };
+    consume(g);
+    println(*g.v);
+}
