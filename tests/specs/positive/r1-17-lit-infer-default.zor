@@ -1,0 +1,16 @@
+// tests/specs/positive/r1-17-lit-infer-default.zor — AC-R1-2 正例（specs/r1-type-system.md §9）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：PRD AC-R1-2/AC-R1-3；strict 实弹门禁（D-028）。
+
+// 字面量推断默认：整型 i64/浮点 f64（R1 §5）
+fn consume(v: i64) { }
+
+fn main() {
+    let x = 1;
+    let y = 2;
+    let s = x + y;
+    let f = 1.5;
+    let g = f + f;
+    consume(x);
+    println(s); println(g);
+}

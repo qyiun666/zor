@@ -1,0 +1,11 @@
+// tests/specs/positive/r1-14-copy-prim-assign.zor — AC-R1-2 正例（specs/r1-type-system.md §9）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：PRD AC-R1-2/AC-R1-3；strict 实弹门禁（D-028）。
+
+// Copy 表行 1：prim 赋值即复制，原绑定继续可用
+fn main() {
+    let a: i64 = 5;
+    let b = a;
+    let c = a + b;
+    println(c);
+}

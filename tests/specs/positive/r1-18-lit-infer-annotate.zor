@@ -1,0 +1,11 @@
+// tests/specs/positive/r1-18-lit-infer-annotate.zor — AC-R1-2 正例（specs/r1-type-system.md §9）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：PRD AC-R1-2/AC-R1-3；strict 实弹门禁（D-028）。
+
+// 任一处显式标注即固定（R1 §5 单向收敛）
+fn main() {
+    let a: u16 = 3;
+    let b: f32 = 2.5;
+    let c: bool = false;
+    println(a); println(b); println(c);
+}

@@ -1,0 +1,14 @@
+// tests/specs/positive/r1-08-struct-multi-field.zor — AC-R1-2 正例（specs/r1-type-system.md §9）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：PRD AC-R1-2/AC-R1-3；strict 实弹门禁（D-028）。
+
+struct Point { x: i64, y: i64 }
+
+fn origin(p: Point) -> bool { p.x == 0 }
+
+fn main() {
+    let p = Point { x: 1, y: 2 };
+    let fx = p.x;
+    let b = origin(p);
+    println(fx); println(b);
+}

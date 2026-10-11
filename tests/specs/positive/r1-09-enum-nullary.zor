@@ -1,0 +1,11 @@
+// tests/specs/positive/r1-09-enum-nullary.zor — AC-R1-2 正例（specs/r1-type-system.md §9）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：PRD AC-R1-2/AC-R1-3；strict 实弹门禁（D-028）。
+
+// 0.1.x 无 payload 变体构造拼写=Name()（ zorcc 0.1.1 实现口径，纯拼写糖留 0.2.x OI 项）
+enum Color { Red(), Green(), Blue() }
+
+fn main() {
+    let a = Red();
+    let b = Green();
+}
