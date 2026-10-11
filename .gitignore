@@ -8,3 +8,5 @@ dist/
 .out
 .DS_Store
 .qoder*
+ci/logs/
+bench/results/
