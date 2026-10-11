@@ -1,0 +1,7 @@
+// r1-n01.zor — AC-R1-2 负例（specs/r1-type-system.md §9 r1-n01）
+// 预期：E1101 未知类型名（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R1-2；错误文案基线=门禁 T-4。
+
+fn f(x: Foo) { }
+
+fn main() { }
