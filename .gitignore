@@ -1,0 +1,10 @@
+target/
+build/
+dist/
+*.o
+*.a
+*.so
+*.dylib
+.out
+.DS_Store
+.qoder*
