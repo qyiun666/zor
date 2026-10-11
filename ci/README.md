@@ -12,3 +12,9 @@
 - `stage_cargo`：compiler/ 落地 Cargo 工程后自动接通（OQ-1 方案 B）
 - M-1：目录基准常量 `TESTS_POS_DIR/TESTS_NEG_DIR` 单点定义（当前=tests/specs/*，与骨架 3449ac0 一致，M-1 所述 specs/tests 不一致已在 PR#1 首版修正）；strict 下**负例数=0 即 FAIL**
 - `ci/setup-remote.sh`：SSH-over-443 通道固化，幂等可重跑
+
+## M1 前置（S-1/n_pos 对称 + 外部 CI 发布）
+- S-1：`shopt -s nullglob` + 双模式各侧用例数入证据日志；strict 下任一模式正例数=0 即 FAIL
+- n_pos 对称判据：strict 下正/负任一侧用例集为空即 FAIL（M-1 双侧对称）
+- 回归夹具：tests/specs/{positive,m1-s1-passthrough.zor|negative,m1-s1-negative.zor}（AC 用例批量落码前保持套件非空，不计入 AC-R1-2 计数）
+- 外部 CI（D-020）：workflow 发布——push/PR 默认模式；strict/bench 经 workflow_dispatch 演练；ci/logs 以 artifact 上传（30 天）
