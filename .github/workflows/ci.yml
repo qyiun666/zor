@@ -1,16 +1,36 @@
-# 预备件：外部 CI 凭据获群主授权后启用（本期以 git 直连模式为主，本文件先备而不发）
+# 外部 CI（D-020 授权启用｜原"备而不发"转正）
+# skeleton 期口径（CIQ-2）：push/PR 跑默认模式（工具缺失 SKIP 不假绿也不误红）；
+# strict 演练经 workflow_dispatch 手动触发（strict 切换在首个 AC 用例合入后，届时改默认）。
 name: zor-ci
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "运行模式"
+        type: choice
+        options: [default, strict, bench]
+        default: default
 jobs:
   baseline:
-    runs-on: macos-14        # 与基准主机同架构(arm64)以保证基准可比性；Linux runner 待双平台校准后增补
+    runs-on: macos-14        # 与基准主机同架构(arm64)保证基准可比；Linux 待双平台校准后增补
     steps:
       - uses: actions/checkout@v4
-      - name: CI baseline (compile + unit-test)
-        run: bash ci/run_ci.sh --strict
-      - name: Benchmarks (nightly)
-        if: github.event_name == 'push'
-        run: bash ci/run_ci.sh --bench
+      - name: CI baseline
+        env:
+          MODE: ${{ github.event.inputs.mode || 'default' }}
+        run: |
+          case "$MODE" in
+            strict) bash ci/run_ci.sh --strict ;;
+            bench)  bash ci/run_ci.sh --bench ;;
+            *)      bash ci/run_ci.sh ;;
+          esac
+      - name: Upload evidence (ci/logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci/logs/
+          retention-days: 30

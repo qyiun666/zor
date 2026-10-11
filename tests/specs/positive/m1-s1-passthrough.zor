@@ -1,0 +1,14 @@
+// tests/specs/positive/m1-s1-passthrough.zor — S-1 回归夹具（正例侧）
+// 用途：保证正例集在 AC 用例批量落码前非空，封堵 strict 双模式空循环旁路（D-017/D-018 S-1）。
+// 语义：合法 R1 最小程序，debug/release 双模式都必须编译成功（OQ-2 不影响本程序，无溢出敏感运算）。
+// 语法依据 specs/r1-type-system.md；zorcc 就绪前由 runner 骨架期 SKIP 处理，不计入 AC-R1-2 用例数。
+
+fn add(a: i64, b: i64) -> i64 {
+    a + b
+}
+
+fn main() {
+    let x: i64 = 2;
+    let y: i64 = 3;
+    let s = add(x, y);
+}
