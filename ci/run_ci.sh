@@ -52,7 +52,9 @@ compile_one() { # compile_one <file> <flags> <log> → 0/1
 stage_cargo() { # OQ-1 方案B：compiler/ 落地 Cargo 工程后接通；未落地前不入门禁判定
   local log; log="$(new_log cargo)"
   if [ -f compiler/Cargo.toml ] && command -v cargo >/dev/null 2>&1; then
-    if (cd compiler && cargo build --all-targets >>"$log" 2>&1 && cargo test >>"$log" 2>&1); then
+    # 子 shell cd compiler 后相对路径失效，重定向须用绝对路径（PR#6 修复）
+    local abs="$REPO_ROOT/$log"
+    if (cd compiler && cargo build --all-targets >>"$abs" 2>&1 && cargo test >>"$abs" 2>&1); then
       record cargo PASS 0 "$log"
     else record cargo FAIL 1 "$log"; fi
   else
