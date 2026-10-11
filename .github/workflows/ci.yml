@@ -1,6 +1,6 @@
 # 外部 CI（D-020 授权启用｜原"备而不发"转正）
-# skeleton 期口径（CIQ-2）：push/PR 跑默认模式（工具缺失 SKIP 不假绿也不误红）；
-# strict 演练经 workflow_dispatch 手动触发（strict 切换在首个 AC 用例合入后，届时改默认）。
+# CIQ-2 切换已落地（D-027 触发点=首个 AC 用例批 #7 合入）：push/PR 默认跑 strict（M1 门禁实弹化）；
+# SKIP 语义仅存于显式 default 模式（workflow_dispatch 可选，留作排障降级）；切换以 QA 复验记录为序。
 name: zor-ci
 on:
   pull_request:
@@ -11,8 +11,8 @@ on:
       mode:
         description: "运行模式"
         type: choice
-        options: [default, strict, bench]
-        default: default
+        options: [strict, default, bench]
+        default: strict
 jobs:
   baseline:
     runs-on: macos-14        # 与基准主机同架构(arm64)保证基准可比；Linux 待双平台校准后增补
@@ -23,7 +23,7 @@ jobs:
         run: cargo build --release
       - name: CI baseline
         env:
-          MODE: ${{ github.event.inputs.mode || 'default' }}
+          MODE: ${{ github.event.inputs.mode || 'strict' }}
           ZORC_BIN: ${{ github.workspace }}/compiler/target/release/zorcc
         run: |
           case "$MODE" in
