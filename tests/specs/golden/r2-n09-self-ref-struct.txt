@@ -1,0 +1,1 @@
+zorcc: E1501 tests/specs/negative/r2-n09-self-ref-struct.zor:5:21: 引用类型不得出现在容器位置（0.1.x 禁逃逸）

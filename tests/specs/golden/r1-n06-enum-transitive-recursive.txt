@@ -1,0 +1,2 @@
+zorcc: E1401 tests/specs/negative/r1-n06-enum-transitive-recursive.zor:5:10: enum 'A' 变体载荷递归引用自身（0.1.x 禁止，传递路径 ["A", "B", "A"]）
+zorcc: E1401 tests/specs/negative/r1-n06-enum-transitive-recursive.zor:6:10: enum 'B' 变体载荷递归引用自身（0.1.x 禁止，传递路径 ["B", "A", "B"]）

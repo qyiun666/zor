@@ -1,0 +1,1 @@
+zorcc: E1202 tests/specs/negative/m1-s1-negative.zor:7:18: 禁止隐式数值转换：浮点字面量 1.5 标注于整型 'i64'

@@ -1,0 +1,1 @@
+zorcc: E2101 tests/specs/negative/r2-n16-ffi-handoff-then-use.zor:9:14: 'b' 已移出（移动后使用，R2 §1）

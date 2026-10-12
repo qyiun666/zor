@@ -1,0 +1,1 @@
+zorcc: E2201 tests/specs/negative/r2-n06-shared-during-mut.zor:8:13: 'x' 正被独占借用，不可创建共享借用（R2 §2）

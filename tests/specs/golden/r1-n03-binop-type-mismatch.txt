@@ -1,0 +1,1 @@
+zorcc: E1201 tests/specs/negative/r1-n03-binop-type-mismatch.zor:8:15: 算术操作数类型必须相同：'i64' vs 'bool'（跨类型须显式 to_xxx）

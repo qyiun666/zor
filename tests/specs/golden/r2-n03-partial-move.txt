@@ -1,0 +1,1 @@
+zorcc: E2102 tests/specs/negative/r2-n03-partial-move.zor:13:13: 'o' 已部分移动，不可整体使用（R2 §1；仅可访问其余字段）

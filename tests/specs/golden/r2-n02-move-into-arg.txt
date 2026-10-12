@@ -1,0 +1,1 @@
+zorcc: E2101 tests/specs/negative/r2-n02-move-into-arg.zor:12:14: 'g' 已移出（移动后使用，R2 §1）

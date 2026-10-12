@@ -1,0 +1,1 @@
+zorcc: E1201 tests/specs/negative/r1-n09-tuple-arity-mismatch.zor:6:25: 类型不匹配：期望 '(i32, i32)'，实际 '(i64, i64, i64)'

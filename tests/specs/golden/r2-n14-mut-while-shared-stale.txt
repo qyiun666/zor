@@ -1,0 +1,1 @@
+zorcc: E2202 tests/specs/negative/r2-n14-mut-while-shared-stale.zor:9:13: 'x' 已有活跃借用，不可再创建 &mut（R2 §2）

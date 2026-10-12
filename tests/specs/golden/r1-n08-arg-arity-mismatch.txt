@@ -1,0 +1,1 @@
+zorcc: E1601 tests/specs/negative/r1-n08-arg-arity-mismatch.zor:8:18: 调用 'scale' 实参个数 2，签名要求 1

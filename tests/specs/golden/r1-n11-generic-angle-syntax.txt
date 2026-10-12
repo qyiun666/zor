@@ -1,0 +1,2 @@
+zorcc: E1501 tests/specs/negative/r1-n11-generic-angle-syntax.zor:5:12: 0.1.x 禁泛型尖括号
+zorcc: E1101 tests/specs/negative/r1-n11-generic-angle-syntax.zor:5:18: unknown type name 'T'
