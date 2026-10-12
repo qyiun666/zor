@@ -1,0 +1,1 @@
+zorcc: E1502 tests/specs/negative/r2-n07-return-ref.zor:5:20: 返回类型不得含引用（R2 §4 禁引用逃逸）

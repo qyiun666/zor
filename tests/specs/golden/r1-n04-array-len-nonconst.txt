@@ -1,0 +1,1 @@
+zorcc: E1301 tests/specs/negative/r1-n04-array-len-nonconst.zor:7:18: 数组长度必须是编译期整数字面量，found 'n'

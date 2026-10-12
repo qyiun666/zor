@@ -1,0 +1,1 @@
+zorcc: E2201 tests/specs/negative/r2-n15-reborrow-during-mut-stale.zor:9:13: 'x' 正被独占借用，不可创建共享借用（R2 §2）

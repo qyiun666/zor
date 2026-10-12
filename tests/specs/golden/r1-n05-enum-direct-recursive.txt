@@ -1,0 +1,1 @@
+zorcc: E1401 tests/specs/negative/r1-n05-enum-direct-recursive.zor:5:13: enum 'List' 变体载荷递归引用自身（0.1.x 禁止，传递路径 ["List", "List"]）

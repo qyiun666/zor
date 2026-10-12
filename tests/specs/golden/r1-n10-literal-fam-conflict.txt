@@ -1,0 +1,1 @@
+zorcc: E1202 tests/specs/negative/r1-n10-literal-fam-conflict.zor:6:22: 禁止隐式数值转换：整型字面量 1 标注于浮点型 'f64'

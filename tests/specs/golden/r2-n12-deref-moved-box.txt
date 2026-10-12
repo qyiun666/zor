@@ -1,0 +1,1 @@
+zorcc: E2101 tests/specs/negative/r2-n12-deref-moved-box.zor:8:14: 'b' 已移出（移动后使用，R2 §1）

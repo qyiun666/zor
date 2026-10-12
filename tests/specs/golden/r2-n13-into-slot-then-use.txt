@@ -1,0 +1,1 @@
+zorcc: E2101 tests/specs/negative/r2-n13-into-slot-then-use.zor:10:14: 'b' 已移出（移动后使用，R2 §1）
