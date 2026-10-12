@@ -49,6 +49,12 @@ fn pos_ref_params() {
     clean("fn show(v: &i64) { println(v); }\nfn main() { let n = 7; show(&n); }");
 }
 
+#[test]
+fn pos_struct_mixed_separators() {
+    // CO-8 过渡口径（spec §3 struct 条目，0.1.4 P2 入册文本）：`,` 规范形态 + `;` 兼容容忍形态同题混用
+    clean("struct Mix { a: i64, b: i64; c: i64 }\nfn main() { let m = Mix { a: 1, b: 2, c: 3 }; println(m.a); println(m.b); println(m.c); }");
+}
+
 // ———— 负例：逐码触发 ————
 
 #[test]
