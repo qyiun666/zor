@@ -54,6 +54,18 @@ fn pos_assign_move_between_bindings() {
     clean("fn main() { let a = box 1; let b = box 2; b = a; println(*b); }");
 }
 
+#[test]
+fn pos_field_auto_borrow_read_write() {
+    // §5/§44 字段糖：b.field 自动借用（只读=&、写=&mut），受 §2 判定表约束
+    clean("struct P { x: i64 }\nfn main() { let b = box P { x: 1 }; println(b.x); b.x = 2; println(b.x); }");
+}
+
+#[test]
+fn pos_full_lifecycle_construct_borrow_release() {
+    // §7 可表达全链：构造→借用→释放 一例（unbox 前置正常生命周期组合）
+    clean("struct P { x: i64 }\nfn read(x: &i64) -> i64 { *x }\nfn bump(x: &mut i64) { *x = 9 }\nfn main() { let b = box P { x: 3 }; let v = read(&b.x); println(v); bump(&mut b.x); println(b.x); unbox b; }");
+}
+
 // ———— R2 负例：16 条逐码首诊固化（与 tests/specs/negative/r2-n*.zor 同源构造） ————
 
 #[test]
