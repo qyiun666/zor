@@ -4,8 +4,8 @@
 
 | 文件 | 需求 | 关键 AC | 状态 |
 |---|---|---|---|
-| `r1-type-system.md` | R1 最小类型系统 | AC-R1-1/2/3 | draft-0.1 初稿成文（V-2） |
-| `r2-ownership.md` | R2 所有权/借用子集 | AC-R2-1/2/3/4 | draft-0.1 初稿成文（V-2） |
+| `r1-type-system.md` | R1 最小类型系统 | AC-R1-1/2/3 | 0.1.x 实施基线（原 draft-0.1；0.1.0 tag 前置项 V-2 已随实施转正，正/负例与 golden 门禁在 main） |
+| `r2-ownership.md` | R2 所有权/借用子集 | AC-R2-1/2/3/4 | 0.1.1 冻结基线（V-2 初稿，随 0.1.1 发布链定版） |
 | `r3-concurrency.md` | R3 轻量并发（task+channel） | AC-R3-1/2/3/4 | 大纲（M2 前成文） |
 | `r4-c-ffi.md` | R4 C FFI | AC-R4-1/2/3 | 大纲（M2 前成文） |
 
