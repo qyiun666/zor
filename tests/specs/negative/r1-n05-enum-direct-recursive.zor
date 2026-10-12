@@ -1,4 +1,4 @@
-// r1-n05.zor — AC-R1-2 负例（specs/r1-type-system.md §9 r1-n05）
+// r1-n05-enum-direct-recursive.zor — AC-R1-2 负例（specs/r1-type-system.md §9 r1-n05）
 // 预期：E1401 enum 直接递归变体（R1 §3）（debug/release 双模式均须编译期失败，退出码非零）
 // 判据来源：PRD AC-R1-2；错误文案基线=门禁 T-4。
 

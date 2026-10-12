@@ -1,4 +1,4 @@
-// r1-n10.zor — AC-R1-2 负例（specs/r1-type-system.md §9 r1-n10）
+// r1-n10-literal-fam-conflict.zor — AC-R1-2 负例（specs/r1-type-system.md §9 r1-n10）
 // 预期：E1202 字面量推断上下文冲突（同字面量被标注 f 族而值为整型字面量，R1 §5；QA 回写口径）（debug/release 双模式均须编译期失败，退出码非零）
 // 判据来源：PRD AC-R1-2；错误文案基线=门禁 T-4。
 
