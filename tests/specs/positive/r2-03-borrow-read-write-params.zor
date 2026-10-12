@@ -1,0 +1,15 @@
+// tests/specs/positive/r2-03-borrow-read-write-params.zor — AC-R2 语义正例（specs/r2-ownership.md §2）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：R2 §2 借用表（实参位匿名借用=瞬时，绑定句柄才持久）；单测同源 pos_borrow_read_write_params；0.1.2 首批（CO-5 补入）。
+
+fn read(x: &i64) -> i64 { *x }
+
+fn bump(x: &mut i64) { *x = 1 }
+
+fn main() {
+    let a: i64 = 5;
+    let v = read(&a);
+    println(v);
+    bump(&mut a);
+    println(a);
+}

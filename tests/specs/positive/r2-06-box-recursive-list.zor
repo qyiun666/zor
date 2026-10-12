@@ -1,0 +1,7 @@
+// tests/specs/positive/r2-06-box-recursive-list.zor — AC-R2 语义正例（specs/r2-ownership.md §7）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：R2 §7 可表达清单（Box 间址打断 E1401 类型依赖环）；单测同源 pos_box_recursive_list_breaks_cycle；0.1.2 首批（CO-5 补入）。
+
+struct Node { val: i64, next: Box<Node> }
+
+fn main() { }

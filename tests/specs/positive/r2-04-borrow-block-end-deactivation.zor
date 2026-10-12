@@ -1,0 +1,14 @@
+// tests/specs/positive/r2-04-borrow-block-end-deactivation.zor — AC-R2 语义正例（specs/r2-ownership.md §2）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：R2 §2 块尾失活（内层共享借用出块失效，外层可再独占）；单测同源 pos_borrow_block_end_deactivation；0.1.2 首批（CO-5 补入）。
+
+fn main() {
+    let x: i64 = 1;
+    {
+        let r = &x;
+        println(*r);
+    }
+    let m = &mut x;
+    *m = 2;
+    println(*m);
+}

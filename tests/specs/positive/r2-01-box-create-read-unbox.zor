@@ -1,0 +1,10 @@
+// tests/specs/positive/r2-01-box-create-read-unbox.zor — AC-R2 语义正例（specs/r2-ownership.md §5/§7）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：R2 §7 可表达清单；单测同源 pos_box_create_read_unbox（r2_diag.rs）；0.1.2 首批（CO-5 补入）。
+
+fn main() {
+    let b = box 1;
+    let v = *b;
+    println(v);
+    unbox b;
+}
