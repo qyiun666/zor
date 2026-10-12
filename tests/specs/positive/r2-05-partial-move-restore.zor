@@ -1,0 +1,16 @@
+// tests/specs/positive/r2-05-partial-move-restore.zor — AC-R2 语义正例（specs/r2-ownership.md §1）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：R2 §1 部分移动（字段移出后整体不可用，其余字段可用）；单测同源 pos_partial_move_then_restore_whole；0.1.2 首批（CO-5 补入）。
+
+struct Inner { v: Box<i64> }
+
+struct Outer { item: Inner, tag: i64 }
+
+fn main() {
+    let o = Outer { item: Inner { v: box 1 }, tag: 2 };
+    let x = o.item;
+    println(o.tag);
+    println(x);
+    let o2 = Outer { item: Inner { v: box 3 }, tag: 4 };
+    println(o2.tag);
+}

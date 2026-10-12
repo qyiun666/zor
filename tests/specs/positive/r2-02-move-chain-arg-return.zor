@@ -1,0 +1,15 @@
+// tests/specs/positive/r2-02-move-chain-arg-return.zor — AC-R2 语义正例（specs/r2-ownership.md §1）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：R2 §1 移动点（实参/返回）；单测同源 pos_move_chain_to_arg_and_return；0.1.2 首批（CO-5 补入）。
+
+fn take(v: Box<i64>) -> i64 {
+    let x = *v;
+    unbox v;
+    x
+}
+
+fn main() {
+    let b = box 5;
+    let r = take(b);
+    println(r);
+}

@@ -1,0 +1,10 @@
+// tests/specs/positive/r2-07-assign-move-between-bindings.zor — AC-R2 语义正例（specs/r2-ownership.md §1）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：R2 §1 移动点（赋值 b = a 移动后 a 失效，本例不再使用 a）；单测同源 pos_assign_move_between_bindings；0.1.2 首批（CO-5 补入）。
+
+fn main() {
+    let a = box 1;
+    let b = box 2;
+    b = a;
+    println(*b);
+}
