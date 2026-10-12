@@ -1,0 +1,12 @@
+// tests/specs/positive/r1-21-struct-mixed-separators.zor — AC-R1 行为钉住正例（specs/r1-type-system.md §3 struct 字段分隔符 CO-8 过渡口径）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：r1 spec struct 条目（0.1.4 P2 入册文本）：规范分隔符 `,`、`;` 为 0.1.x 兼容容忍形态、终审归 0.2.x 语法冻结（CO-8 溯源注记）；单测同源 pos_struct_mixed_separators（r1_diag.rs）；0.1.4 P3（行为钉住，与 parser.rs eat(Semi) || eat(Comma) 现行为对齐）。
+
+struct Mix { a: i64, b: i64; c: i64 }
+
+fn main() {
+    let m = Mix { a: 1, b: 2, c: 3 };
+    println(m.a);
+    println(m.b);
+    println(m.c);
+}
