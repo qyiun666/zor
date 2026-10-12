@@ -23,6 +23,8 @@ done
 # —— M-1 目录基准唯一定义处：核心工程师若定论为 specs/tests，仅改这两行（或注入同名环境变量）——
 TESTS_POS_DIR="${TESTS_POS_DIR:-tests/specs/positive}"
 TESTS_NEG_DIR="${TESTS_NEG_DIR:-tests/specs/negative}"
+# T-4 黄金比对（strict 扩项复验记录 §2：golden 名=负例 basename 换 .txt；模式无关单份）
+TESTS_GOLDEN_DIR="${TESTS_GOLDEN_DIR:-tests/specs/golden}"
 
 # —— OQ-2 双模式（debug=checked / release=wrap，flags 为 zorcc 落地的注入位）——
 DEBUG_FLAGS="${ZORC_DEBUG_FLAGS:--Zoverflow=check}"
@@ -120,6 +122,40 @@ stage_unit_test() {
   else record unit-test PASS 0 "$log"; fi
 }
 
+stage_golden() { # T-4 黄金比对（strict 扩项复验记录 §2.4：负例 exit+stderr==golden；正例 stderr 空即基线）
+  local log; log="$(new_log golden)"
+  if [ -z "$ZORC" ]; then
+    echo "zorcc 未安装：默认 SKIP（strict 判 FAIL）" > "$log"
+    [ "$STRICT" = 1 ] && record golden FAIL 1 "$log" || record golden SKIP 0 "$log"; return
+  fi
+  local -a neg_files=("$TESTS_NEG_DIR"/*.zor) pos_files=("$TESTS_POS_DIR"/*.zor)
+  local n_chk=0 n_pass=0 n_diff=0 n_missing=0 p_stderr_nonempty=0 rc
+  local tmpf; tmpf="$(mktemp)"; trap 'rm -f "$tmpf"' RETURN
+  for f in "${neg_files[@]}"; do
+    local b g; b="$(basename "$f" .zor)"; g="$TESTS_GOLDEN_DIR/$b.txt"
+    # shellcheck disable=SC2086
+    "$ZORC" $DEBUG_FLAGS "$f" >/dev/null 2>"$tmpf"; rc=$?
+    if [ ! -f "$g" ]; then
+      n_missing=$((n_missing+1)); echo "MISSING golden=$b.txt (exit=$rc)" >>"$log"; continue
+    fi
+    n_chk=$((n_chk+1))
+    if [ "$rc" -ne 1 ]; then n_diff=$((n_diff+1)); echo "EXIT_MISMATCH $b rc=$rc (期望1)" >>"$log"
+    elif cmp -s "$tmpf" "$g"; then n_pass=$((n_pass+1))
+    else n_diff=$((n_diff+1)); echo "STDERR_DIFF $b" >>"$log"; diff "$g" "$tmpf" | head -6 >>"$log"; fi
+  done
+  for f in "${pos_files[@]}"; do
+    # shellcheck disable=SC2086
+    "$ZORC" $DEBUG_FLAGS "$f" >/dev/null 2>"$tmpf" || true
+    [ -s "$tmpf" ] && p_stderr_nonempty=$((p_stderr_nonempty+1))
+  done
+  echo "负例=${#neg_files[@]} 比对=$n_chk 一致=$n_pass 差异=$n_diff golden缺失=$n_missing 正例stderr非空=$p_stderr_nonempty" >>"$log"
+  if [ "$n_diff" -gt 0 ] || [ "$p_stderr_nonempty" -gt 0 ]; then record golden FAIL 1 "$log"
+  elif [ "$STRICT" = 1 ] && { [ "$n_missing" -gt 0 ] || [ "$n_chk" -eq 0 ]; }; then
+    echo "strict 防空口径：golden缺失=$n_missing 比对数=$n_chk → FAIL（§2.1 缺失语义）" >>"$log"; record golden FAIL 1 "$log"
+  elif [ "$n_chk" -eq 0 ] || [ "$n_missing" -gt 0 ]; then record golden SKIP 0 "$log"
+  else record golden PASS 0 "$log"; fi
+}
+
 stage_bench() {
   local log; log="$(new_log bench)"
   if [ -x ci/bench/run_bench.sh ]; then
@@ -132,6 +168,7 @@ echo "[ci] run=$RUN_ID strict=$STRICT bench=$WITH_BENCH modes='$MODES' pos='$TES
 stage_cargo
 stage_compile
 stage_unit_test
+stage_golden
 [ "$WITH_BENCH" = 1 ] && stage_bench
 
 {

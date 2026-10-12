@@ -8,6 +8,7 @@
 
 - `tests/specs/positive/`：正例，命名 `r<N>-<序号>-<slug>.zor`（如 `r2-01-move-basic.zor`）
 - `tests/specs/negative/`：负例，命名 `r<N>-n<序号>-<slug>.zor`；必须编译期失败并输出 错误码+行:列+错误类型
+- `tests/specs/golden/`：T-4 黄金基线，命名 `<负例basename>.txt`（stderr 全文逐行，repo 根 cwd 捕获，模式无关单份；正例不落文件=空即基线；strict 下缺失即 FAIL。契约=strict 扩项复验记录 §2，捕获用 `ci/capture_golden.sh`）
 - `tests/specs/compare/`：AC-R2-4 的 Rust 同题对照源码
 - `tests/runners/run_specs.sh`：runner 契约入口，实际逻辑在 `ci/run_ci.sh`
 
