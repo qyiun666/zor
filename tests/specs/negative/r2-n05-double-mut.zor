@@ -1,0 +1,10 @@
+// r2-n05-double-mut.zor — AC-R2-2 负例（R2 §9 r2-n05）
+// 预期：E2202 独占借用期间再创建 &mut（双 &mut 别名，R2 §2 判定表第 3 行 / §7 不可表达清单第 6 条）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R2-2；specs/r2-ownership.md §2/§8/§9；shared/ZOR-r2-E2xxx码表对齐-落码前置-v1.md；错误文案基线=门禁 T-4。
+
+fn main() {
+    let x: i64 = 3;
+    let a = &mut x;
+    let b = &mut x;
+    println(*a); println(*b);
+}

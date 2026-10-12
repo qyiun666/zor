@@ -1,0 +1,11 @@
+// r2-n09-self-ref-struct.zor — AC-R2-2 负例（R2 §9 r2-n09）
+// 预期：E1501 自引用 struct（字段以 &自身 引用同类型，§7 不可表达清单第 3 条）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R2-2；specs/r2-ownership.md §2/§8/§9；shared/ZOR-r2-E2xxx码表对齐-落码前置-v1.md；错误文案基线=门禁 T-4。
+
+struct Link { next: &Link }
+
+fn main() {
+    let a: i64 = 1;
+    let l = Link { next: &a };
+    println(l);
+}

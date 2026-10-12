@@ -1,0 +1,14 @@
+// r2-n03-partial-move.zor — AC-R2-2 负例（R2 §9 r2-n03）
+// 预期：E2102 部分移动后整体使用（非 Copy 字段单独移出后 println(o)，R2 §1）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R2-2；specs/r2-ownership.md §2/§8/§9；shared/ZOR-r2-E2xxx码表对齐-落码前置-v1.md；错误文案基线=门禁 T-4。
+
+struct Inner { v: Box<i64> }
+struct Outer { item: Inner, tag: i64 }
+
+fn main() {
+    let o = Outer { item: Inner { v: box 1 }, tag: 2 };
+    let x = o.item;
+    println(o.tag);
+    println(x);
+    println(o);
+}

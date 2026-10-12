@@ -7,8 +7,13 @@ pub enum Ty {
     Arr(Box<Ty>, u64),
     Tuple(Vec<Ty>),
     Ref(Box<Ty>, bool), // (inner, is_mut)
+    BoxTy(Box<Ty>),     // R2 §5 内建堆句柄 Box<T>（具名内建，非泛型语法开放）
     Bad,
 }
+
+/// 类型标注位置（决定引用禁则诊断码：容器=E1501，返回值=E1502，R2 §4）
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum TyPos { Normal, Container, Return }
 
 impl Ty {
     pub fn unit() -> Ty { Ty::Prim("unit") }
@@ -24,6 +29,7 @@ impl Ty {
             Ty::Tuple(ts) => format!("({})", ts.iter().map(|t| t.display()).collect::<Vec<_>>().join(", ")),
             Ty::Ref(t, true) => format!("&mut {}", t.display()),
             Ty::Ref(t, false) => format!("&{}", t.display()),
+            Ty::BoxTy(t) => format!("Box<{}>", t.display()),
             Ty::Bad => "?".to_string(),
         }
     }
@@ -47,7 +53,10 @@ pub enum Ex {
     Record(String, Vec<(String, Ex)>, usize, usize),
     Tup(Vec<Ex>, usize, usize),
     ArrLit(Vec<Ex>, usize, usize),
-    Ref(Box<Ex>, bool, usize, usize), // &x / &mut x（R1 仅接受并记类型，R2 才查规则）
+    Ref(Box<Ex>, bool, usize, usize), // &x / &mut x（R1 仅接受并记类型，R2 查借用规则）
+    Box(Box<Ex>, usize, usize),       // box expr（R2 §5，移动入堆句柄）
+    Deref(Box<Ex>, usize, usize),     // *expr（R2 §5 解引用读写）
+    Unbox(String, usize, usize),      // unbox b（R2 §5 释放/交出所有权）
     Block(Blk),
 }
 
@@ -62,6 +71,7 @@ pub struct Blk {
 pub enum St {
     Let(String, Option<Ty>, Ex, usize, usize),
     LetDecl(String, Option<Ty>, usize, usize), // 无初始化：0.1.x 不允许 → E1601（由 check 报）
+    Assign(Ex, Ex, usize, usize),              // lhs = rhs;（R2 §1 移动点之一）
     Expr(Option<Ex>, usize, usize),
     If(Ex, Blk, Option<ElseTail>, usize, usize),
     While(Ex, Blk, usize, usize),
@@ -107,6 +117,8 @@ pub struct Parser {
     toks: Vec<(crate::lexer::Tok, usize, usize)>,
     pos: usize,
     pub diags: Vec<Diag>,
+    /// 条件表达式解析中=true：抑制 Path+LBrace 的 record 糖，避免吞掉 if/while 块头
+    no_record: bool,
 }
 
 use crate::lexer::Tok;
@@ -117,7 +129,7 @@ pub fn prim_names() -> Vec<&'static str> {
 
 impl Parser {
     pub fn new(toks: Vec<(Tok, usize, usize)>, diags: Vec<Diag>) -> Self {
-        Parser { toks, pos: 0, diags }
+        Parser { toks, pos: 0, diags, no_record: false }
     }
     fn peek(&self) -> &Tok { &self.toks[self.pos].0 }
     fn at(&self) -> (usize, usize) { (self.toks[self.pos].1, self.toks[self.pos].2) }
@@ -178,14 +190,14 @@ impl Parser {
             let (l, c) = self.at();
             let pname = match self.bump() { Tok::Ident(s) => s, t => { self.diag("E1101", format!("param name expected, found {:?}", t)); "_p".to_string() } };
             self.expect(&Tok::Colon, "':' after param name");
-            let ty = self.parse_ty(false);
+            let ty = self.parse_ty(TyPos::Normal);
             params.push((pname, ty, l, c));
             if !self.eat(&Tok::Comma) { break; }
         }
         self.expect(&Tok::RParen, "')' closing params");
         let ret = if self.eat(&Tok::FatArrow) {
             let (l, c) = self.at();
-            let t = self.parse_ty(true); // 返回位引用=禁则位（E1501 由 parse_ty 报，R2 E1502 后续接入）
+            let t = self.parse_ty(TyPos::Return); // 返回位引用=E1502（R2 §4）
             Some((t, l, c))
         } else { None };
         let body = self.parse_block();
@@ -202,7 +214,7 @@ impl Parser {
             let (l, c) = self.at();
             let fname = match self.bump() { Tok::Ident(s) => s, t => { self.diag("E1101", format!("field name expected, found {:?}", t)); "_f".to_string() } };
             self.expect(&Tok::Colon, "':' after field name");
-            let ty = self.parse_ty(true); // 容器位：引用→E1501
+            let ty = self.parse_ty(TyPos::Container); // 容器位：引用→E1501
             fields.push((fname, ty, l, c));
             // 0.1.x 语法未定死字段分隔符：';' 与 ',' 均接受（spec OI 项，黄金文件前定论）
             let sep = self.eat(&Tok::Semi) || self.eat(&Tok::Comma);
@@ -228,7 +240,7 @@ impl Parser {
             if self.eat(&Tok::LParen) {
                 while !matches!(self.peek(), Tok::RParen | Tok::Eof) {
                     let (pl, pc) = self.at();
-                    let ty = self.parse_ty(true); // 载荷=容器位
+                    let ty = self.parse_ty(TyPos::Container); // 载荷=容器位
                     payload.push((ty, pl, pc));
                     if !self.eat(&Tok::Comma) { break; }
                 }
@@ -255,26 +267,32 @@ impl Parser {
         }
     }
 
-    /// in_container=true：该位置禁引用类型（struct 字段/enum 载荷/数组元素/返回值）
-    fn parse_ty(&mut self, in_container: bool) -> Ty {
+    /// pos 决定禁则：Container=禁引用字段/载荷（E1501）；Return=禁返回引用（E1502）
+    fn parse_ty(&mut self, pos: TyPos) -> Ty {
         let (l, c) = self.at();
         match self.peek().clone() {
             Tok::Amp => {
                 self.bump();
                 let mut mutf = false;
                 if let Tok::Ident(s) = self.peek() { if s.as_str() == "mut" { self.bump(); mutf = true; } }
-                let inner = self.parse_ty(in_container);
-                if in_container {
-                    self.diag_at("E1501", l, c, "引用类型不得出现在容器/返回值位置（0.1.x 禁逃逸）");
-                    return Ty::Bad;
+                let inner = self.parse_ty(pos);
+                match pos {
+                    TyPos::Return => {
+                        self.diag_at("E1502", l, c, "返回类型不得含引用（R2 §4 禁引用逃逸）");
+                        Ty::Bad
+                    }
+                    TyPos::Container => {
+                        self.diag_at("E1501", l, c, "引用类型不得出现在容器位置（0.1.x 禁逃逸）");
+                        Ty::Bad
+                    }
+                    TyPos::Normal => Ty::Ref(Box::new(inner), mutf),
                 }
-                Ty::Ref(Box::new(inner), mutf)
             }
             Tok::Star => {
                 self.bump();
                 self.diag_at("E1501", l, c, "裸指针类型非法（FFI 仅 Handle<T>，0.1.x）");
                 if let Tok::Ident(s) = self.peek() { if s == "const" || s == "mut" { self.bump(); } }
-                let _ = self.parse_ty(in_container);
+                let _ = self.parse_ty(pos);
                 Ty::Bad
             }
             Tok::Apost => {
@@ -285,7 +303,7 @@ impl Parser {
             }
             Tok::LBracket => {
                 self.bump();
-                let elem = self.parse_ty(true); // 数组元素=容器位
+                let elem = self.parse_ty(TyPos::Container); // 数组元素=容器位
                 self.expect(&Tok::Semi, "';' in array type");
                 let (nl, nc) = self.at();
                 let n = match self.peek().clone() {
@@ -302,7 +320,7 @@ impl Parser {
                 if self.eat(&Tok::RParen) { return Ty::unit(); }
                 let mut ts = Vec::new();
                 loop {
-                    ts.push(self.parse_ty(in_container));
+                    ts.push(self.parse_ty(pos));
                     if !self.eat(&Tok::Comma) { break; }
                     if matches!(self.peek(), Tok::RParen) { break; }
                 }
@@ -312,6 +330,13 @@ impl Parser {
             Tok::Ident(name) => {
                 self.bump();
                 if matches!(self.peek(), Tok::Lt) {
+                    if name == "Box" {
+                        // R2 §5 内建堆句柄：唯一允许尖括号的具名类型（泛型语法仍不开放）
+                        self.bump(); // <
+                        let inner = self.parse_ty(TyPos::Container); // Box 内禁引用
+                        self.expect(&Tok::Gt, "'>' closing Box type");
+                        return Ty::BoxTy(Box::new(inner));
+                    }
                     self.diag_at("E1501", l, c, "0.1.x 无泛型类型参数（具名类型禁尖括号）");
                     self.skip_angle();
                 }
@@ -338,12 +363,18 @@ impl Parser {
         let mut blk = Blk { stmts: vec![], tail: None, span: (span.0, span.1) };
         while !matches!(self.peek(), Tok::RBrace | Tok::Eof) {
             let (l, c) = self.at();
+            // 裸块语句：{ ... }（R2 §2 失活边界/结构手段）
+            if matches!(self.peek(), Tok::LBrace) {
+                let inner = self.parse_block();
+                blk.stmts.push(St::Expr(Some(Ex::Block(inner)), l, c));
+                continue;
+            }
             if let Tok::Ident(k) = self.peek().clone() {
                 match k.as_str() {
                     "let" => {
                         self.bump();
                         let n = match self.bump() { Tok::Ident(s) => s, t => { self.diag_at("E1101", l, c, format!("let binding name expected, found {:?}", t)); "_".to_string() } };
-                        let ann = if self.eat(&Tok::Colon) { Some(self.parse_ty(false)) } else { None };
+                        let ann = if self.eat(&Tok::Colon) { Some(self.parse_ty(TyPos::Normal)) } else { None };
                         if self.eat(&Tok::Eq) {
                             let init = self.parse_expr();
                             if !self.eat(&Tok::Semi) { self.diag_at("E1101", l, c, "expected ';' after let"); }
@@ -356,7 +387,7 @@ impl Parser {
                     }
                     "if" => {
                         self.bump();
-                        let cond = self.parse_expr();
+                        let cond = self.parse_cond();
                         let then = self.parse_block();
                         let els = self.parse_else();
                         blk.stmts.push(St::If(cond, then, els, l, c));
@@ -364,7 +395,7 @@ impl Parser {
                     }
                     "while" => {
                         self.bump();
-                        let cond = self.parse_expr();
+                        let cond = self.parse_cond();
                         let body = self.parse_block();
                         if self.eat(&Tok::Semi) { /* 宽松 */ }
                         blk.stmts.push(St::While(cond, body, l, c));
@@ -374,6 +405,17 @@ impl Parser {
                 }
             }
             let e = self.parse_expr();
+            if matches!(self.peek(), Tok::Eq) {
+                // 赋值语句：lhs = rhs;（R2 §1 移动点；lhs 由 check 判定可放置）
+                self.bump();
+                let v = self.parse_expr();
+                // 块尾赋值可省分号（尾表达式形态：`fn bump(x: &mut i64) { *x = 1 }`）
+                if !self.eat(&Tok::Semi) && !matches!(self.peek(), Tok::RBrace | Tok::Eof) {
+                    self.diag_at("E1101", l, c, "expected ';' after assignment");
+                }
+                blk.stmts.push(St::Assign(e, v, l, c));
+                continue;
+            }
             let semied = self.eat(&Tok::Semi);
             if !semied {
                 // 表达式无分号且未到块尾 → 作为尾表达式
@@ -404,10 +446,19 @@ impl Parser {
 
     fn parse_if_stmt(&mut self, l: usize, c: usize) -> St {
         self.bump(); // if
-        let cond = self.parse_expr();
+        let cond = self.parse_cond();
         let then = self.parse_block();
         let els = self.parse_else();
         St::If(cond, then, els, l, c)
+    }
+
+    /// if/while 条件：表达式语法同 parse_expr，但 Path 后 `{` 不当 record 字面量
+    fn parse_cond(&mut self) -> Ex {
+        let saved = self.no_record;
+        self.no_record = true;
+        let e = self.parse_expr();
+        self.no_record = saved;
+        e
     }
 
     pub fn parse_expr(&mut self) -> Ex { self.p_or() }
@@ -451,12 +502,25 @@ impl Parser {
         match self.peek() {
             Tok::Minus => { self.bump(); Ex::Un("-".into(), Box::new(self.p_unary()), l, c) }
             Tok::Bang => { self.bump(); Ex::Un("!".into(), Box::new(self.p_unary()), l, c) }
+            Tok::Star => { self.bump(); Ex::Deref(Box::new(self.p_unary()), l, c) } // R2 §5 解引用
             Tok::Amp => {
                 self.bump();
                 let mut mutf = false;
                 if let Tok::Ident(s) = self.peek() { if s.as_str() == "mut" { self.bump(); mutf = true; } }
                 let inner = self.p_postfix();
                 Ex::Ref(Box::new(inner), mutf, l, c)
+            }
+            Tok::Ident(s) if s.as_str() == "box" => {
+                self.bump();
+                Ex::Box(Box::new(self.p_unary()), l, c) // R2 §5 前缀构造
+            }
+            Tok::Ident(s) if s.as_str() == "unbox" => {
+                self.bump();
+                let (nl, nc) = self.at();
+                match self.bump() {
+                    Tok::Ident(n) => Ex::Unbox(n, l, c), // R2 §5 释放/交出所有权
+                    t => { self.diag_at("E1101", nl, nc, format!("unbox 要求句柄名，found {:?}", t)); Ex::Unbox("_err".to_string(), l, c) }
+                }
             }
             _ => self.p_postfix(),
         }
@@ -500,6 +564,7 @@ impl Parser {
                     }
                 }
                 Tok::LBrace => {
+                    if self.no_record { break; }
                     if let Ex::Path(name, _, _) = &e {
                         let name = name.clone();
                         self.bump();

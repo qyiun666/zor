@@ -1,0 +1,12 @@
+// r2-n10-branch-move-use.zor — AC-R2-2 负例（R2 §9 r2-n10）
+// 预期：E2101 分支多路径移动后使用（一条路径移出、汇合后使用；0.1.x 保守块分析，R2 §3/§7 与码表对齐 n10 行）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R2-2；specs/r2-ownership.md §2/§8/§9；shared/ZOR-r2-E2xxx码表对齐-落码前置-v1.md；错误文案基线=门禁 T-4。
+
+fn take(v: Box<i64>) { }
+
+fn main() {
+    let b = box 1;
+    let flag = true;
+    if flag { take(b); }
+    println(*b);
+}

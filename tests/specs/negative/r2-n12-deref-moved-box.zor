@@ -1,0 +1,10 @@
+// r2-n12-deref-moved-box.zor — AC-R2-2 负例（R2 §9 r2-n12）
+// 预期：E2101 Box 移出后对原句柄解引用（R2 §1+§5）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R2-2；specs/r2-ownership.md §2/§8/§9；shared/ZOR-r2-E2xxx码表对齐-落码前置-v1.md；错误文案基线=门禁 T-4。
+
+fn main() {
+    let b = box 1;
+    let c = b;
+    println(*b);
+    println(*c);
+}
