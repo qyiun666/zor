@@ -55,6 +55,12 @@ fn pos_struct_mixed_separators() {
     clean("struct Mix { a: i64, b: i64; c: i64 }\nfn main() { let m = Mix { a: 1, b: 2, c: 3 }; println(m.a); println(m.b); println(m.c); }");
 }
 
+#[test]
+fn pos_r1_22_print_zero_arg() {
+    // 与 tests/specs/positive/r1-22-print-zero-arg.zor 同源；print() 零参合法 + print(x) 带参基线（spec §6）
+    clean("fn main() {\n    print();\n    print(1);\n}");
+}
+
 // ———— 负例：逐码触发 ————
 
 #[test]
@@ -133,6 +139,18 @@ fn neg_r1_n12_println_zero_arg() {
 fn neg_r1_n13_enum_bare_variant() {
     // 与 tests/specs/negative/r1-n13-enum-bare-variant.zor 同源；单诊断首诊固化 E1101（spec §3 构造仅限 Variant()）
     assert_eq!(codes("enum Color { Red(), Green() }\n\nfn main() {\n    let a = Red;\n}"), ["E1101"]);
+}
+
+#[test]
+fn neg_r1_n14_enum_nullary_with_args() {
+    // 与 tests/specs/negative/r1-n14-enum-nullary-with-args.zor 同源；单诊断首诊固化 E1601（spec §3 实参个数与空载荷不符）
+    assert_eq!(codes("enum Color { Red(), Green() }\n\nfn main() {\n    let a = Red(1);\n}"), ["E1601"]);
+}
+
+#[test]
+fn neg_r1_n15_shadow_println_arity() {
+    // 与 tests/specs/negative/r1-n15-shadow-println-arity.zor 同源；让位面 arity 单诊断首诊固化 E1601（spec §6 普通函数签名检查）
+    assert_eq!(codes("fn println(x: i32) { }\n\nfn main() {\n    println(1, 2);\n}"), ["E1601"]);
 }
 
 // ———— T-4 黄金文件格式锚点：zorcc: {E-code} {file}:{line}:{col}: {message} ————

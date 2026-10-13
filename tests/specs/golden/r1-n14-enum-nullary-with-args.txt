@@ -1,0 +1,1 @@
+zorcc: E1601 tests/specs/negative/r1-n14-enum-nullary-with-args.zor:8:16: 变体 'Red' 载荷 0，实参 1
