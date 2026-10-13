@@ -1,0 +1,9 @@
+// r1-n15-shadow-println-arity.zor — AC-R1-2 负例（specs/r1-type-system.md §6 内置 I/O 归口——同名让位面，0.1.5 P2 入册）
+// 预期：E1601 用户自定义同名 `println` 时内建特判让位，按普通函数签名检查实参个数（文案模板 `调用 '<name>' 实参个数 <got>，签名要求 <want>`，归一转写非逐字；实捕 golden 为逐字基线）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R1-2；specs/r1-type-system.md §6；错误文案基线=门禁 T-4。
+
+fn println(x: i32) { }
+
+fn main() {
+    println(1, 2);
+}

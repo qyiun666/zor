@@ -1,0 +1,8 @@
+// tests/specs/positive/r1-22-print-zero-arg.zor — AC-R1-2 正例（specs/r1-type-system.md §6 内置 I/O 归口）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断（空 stderr 基线）。
+// 判据来源：PRD AC-R1-2；specs/r1-type-system.md §6（`print` 零实参合法入册 + 各实参逐个类型检查无期望类型约束）；strict 实弹门禁（D-028）。
+
+fn main() {
+    print();
+    print(1);
+}

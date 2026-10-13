@@ -1,0 +1,9 @@
+// r1-n14-enum-nullary-with-args.zor — AC-R1-2 负例（specs/r1-type-system.md §3 无参变体构造形态，0.1.5 P3 入册）
+// 预期：E1601 实参个数与空载荷不符（文案模板 `变体 '<名>' 载荷 <n>，实参 <m>`，归一转写非逐字；实捕 golden 为逐字基线）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R1-2；specs/r1-type-system.md §3；错误文案基线=门禁 T-4。
+
+enum Color { Red(), Green() }
+
+fn main() {
+    let a = Red(1);
+}

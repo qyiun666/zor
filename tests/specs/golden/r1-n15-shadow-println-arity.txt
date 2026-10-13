@@ -1,0 +1,1 @@
+zorcc: E1601 tests/specs/negative/r1-n15-shadow-println-arity.zor:8:12: 调用 'println' 实参个数 2，签名要求 1
