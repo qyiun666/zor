@@ -1,0 +1,7 @@
+// tests/specs/positive/r2-12-box-return-expr-tail.zor — AC-R2 语义正例（specs/r2-ownership.md §7 Ex5）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：§7 覆盖勘定注记 Ex5（返回新分配 Box<T>，表达式尾形态——本语言无 return 关键字；0.1.9 件c 在档实跑探针 `fn make() -> Box<i64> { box 42 }` 双模式 exit=0 零诊断）；单测同源 pos_box_return_expr_tail；0.1.10 P2 钉定。
+
+fn make() -> Box<i64> { box 42 }
+
+fn main() { }

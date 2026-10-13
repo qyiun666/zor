@@ -66,6 +66,24 @@ fn pos_full_lifecycle_construct_borrow_release() {
     clean("struct P { x: i64 }\nfn read(x: &i64) -> i64 { *x }\nfn bump(x: &mut i64) { *x = 9 }\nfn main() { let b = box P { x: 3 }; let v = read(&b.x); println(v); bump(&mut b.x); println(b.x); unbox b; }");
 }
 
+#[test]
+fn pos_enum_box_self_cycle_indirection() {
+    // §7 Ex1 组合面：enum 变体载荷经 Box 间址自环，E1401 依赖环被间址打断（0.1.9 件c 在档实跑数=双模式 exit=0 零诊断；0.1.10 P2 钉定）
+    clean("enum List { Cons(Box<List>), Nil() }\nfn main() { }");
+}
+
+#[test]
+fn pos_enum_box_mutual_indirection() {
+    // §7 Ex1 组合面：两 enum 具名载荷经 Box 互递（0.1.9 件c 在档实跑数=双模式 exit=0 零诊断；0.1.10 P2 钉定）
+    clean("enum A { Bv(Box<B>) }\nenum B { Av(Box<A>) }\nfn main() { }");
+}
+
+#[test]
+fn pos_box_return_expr_tail() {
+    // §7 Ex5：返回新分配 Box<T>（表达式尾形态，本语言无 return 关键字；0.1.9 件c 在档探针实跑数=双模式 exit=0 零诊断；0.1.10 P2 钉定）
+    clean("fn make() -> Box<i64> { box 42 }\nfn main() { }");
+}
+
 // ———— R2 负例：16 条逐码首诊固化（与 tests/specs/negative/r2-n*.zor 同源构造） ————
 
 #[test]
