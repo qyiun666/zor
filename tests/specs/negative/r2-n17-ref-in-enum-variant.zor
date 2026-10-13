@@ -1,0 +1,8 @@
+// r2-n17-ref-in-enum-variant.zor — AC-R2-2 负例（In2 组合面：引用入 enum 变体载荷，R1 §3）
+// 预期：E1501 enum 变体载荷持引用（& 与 &mut 均禁，R1 §3 容器禁则）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：shared/ZOR-0.1.11-范围冻结-PM裁定-v1.md §二 In2；specs/r1-type-system.md §3；三方同数实跑门（核心 seq1528 / QA seq1535 / 文档 seq1532 探针 p1a/p1b）；错误文案基线=门禁 T-4。
+
+enum Wrap { Hold(&i64) }
+enum WrapM { HoldM(&mut i64) }
+
+fn main() { }

@@ -1,0 +1,8 @@
+// r2-n18-ref-in-array-element.zor — AC-R2-2 负例（In2 组合面：引用入数组元素标注位，R1 §3）
+// 预期：E1501 数组元素类型持引用（[&T; N] 与 [&mut T; N] 均禁，R1 §3 容器禁则）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：shared/ZOR-0.1.11-范围冻结-PM裁定-v1.md §二 In2；specs/r1-type-system.md §2/§3；三方同数实跑门（核心 seq1528 / QA seq1535 / 文档 seq1532 探针 p2a/p2b）；错误文案基线=门禁 T-4。
+
+fn take(a: [&i64; 2]) { }
+fn take_mut(a: [&mut i64; 2]) { }
+
+fn main() { }
