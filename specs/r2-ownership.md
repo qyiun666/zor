@@ -71,11 +71,11 @@
 
 | # | §7 条目 | §8 码 | §9 映射 | 目录/实跑证据 | 勘定结论 |
 |---|---|---|---|---|---|
-| Ex1 | 树/链式结构经 `Box` 递归堆 | E1401 环间断侧（§8 r1 码面） | §9 正例行「Box 递归堆（链表）」 | struct 字段形态已钉：`positive/r2-06-box-recursive-list.zor`（单测同源 `pos_box_recursive_list_breaks_cycle`）；enum 变体载荷 `Box` 间址组合面（`Cons(Box<List>)` 自环与两 enum `Box` 互递）：实跑零诊断放行（exit=0）、**无钉定正例**——原因：本版测试面零扩；触发条件：0.1.10 候补随核心会签与 QA 实跑数同批钉定 | 部分吻合（struct 形态已钉；enum×Box 组合面未落钉） |
+| Ex1 | 树/链式结构经 `Box` 递归堆 | E1401 环间断侧（§8 r1 码面） | §9 正例行「Box 递归堆（链表）」 | struct 字段形态已钉：`positive/r2-06-box-recursive-list.zor`（单测同源 `pos_box_recursive_list_breaks_cycle`）；enum 变体载荷 `Box` 间址组合面（`Cons(Box<List>)` 自环与两 enum `Box` 互递）：**0.1.10 已钉定**——`positive/r2-10-enum-box-self-cycle-indirection.zor` / `positive/r2-11-enum-box-mutual-indirection.zor`（单测同源 `pos_enum_box_self_cycle_indirection` / `pos_enum_box_mutual_indirection`；判据=三方在档实跑数双模式 exit=0 零诊断，0.1.10 P2 三件全钉零前移） | 吻合（struct 形态与 enum×Box 组合面均已钉定；0.1.9 勘定时为部分吻合） |
 | Ex2 | 函数内借用传参 | —（通过面） | §9 正例行「借用读/写」 | 已钉：`positive/r2-03-borrow-read-write-params.zor`（同面另 r2-08 字段自动借用、r2-09 全周期） | 吻合 |
 | Ex3 | move 语义的资源交接 | E2101 约束侧 | §9 正例行「移动链」 | 已钉：`positive/r2-02-move-chain-arg-return.zor`（同面另 r2-07 赋值移动） | 吻合 |
 | Ex4 | pipeline 跨 channel 移交所有权（R3） | E2101（§5 句柄 move 进 channel 行） | §9 正例行「管道式所有权交接（R3 交叉预备）」 | **未落钉**：目录 `positive/` 全列无该正例行对应拼写（无管道/channel 例）；原因：R3 未成文、D3 前无 channel 移交面；触发条件：R3 规则成文（D3 并发首演线）后随正例钉定 | 未落钉（如实记） |
-| Ex5 | 返回新分配 `Box<T>` | —（通过面） | §9 正例行未列具体文件名 | **未落钉**：目录无专项正例；实跑探针 `fn make() -> Box<i64> { box 42 }`（表达式尾形态，本语言无 return 关键字）零诊断放行（exit=0）；原因：本版测试面零扩；触发条件：0.1.10 候补随正例钉定 | 未落钉（如实记） |
+| Ex5 | 返回新分配 `Box<T>` | —（通过面） | §9 正例行未列具体文件名 | **0.1.10 已钉定**——`positive/r2-12-box-return-expr-tail.zor`（`fn make() -> Box<i64> { box 42 }` 表达式尾形态，本语言无 return 关键字；单测同源 `pos_box_return_expr_tail`；判据=0.1.9 件c 在档实跑探针三方双模式 exit=0 零诊断） | 吻合（0.1.9 勘定时为未落钉） |
 | In1 | 返回局部/借用值的引用 | E1502（§8 E2401 为择一实现别名，黄金文件取 E1502 侧） | §9 负例「借用返回」 | 已钉：`negative/r2-n07-return-ref.zor`；golden 实发 E1502 | 吻合 |
 | In2 | struct/enum/数组持有引用字段 | E1501 | §9 负例「引用入 struct」 | struct 面已钉：`negative/r2-n08-ref-in-struct.zor`（golden 实发 E1501；r1-n07 为同码同构钉定负例）；enum 变体/数组元素容器面禁则文字在册（r1 §3 引用类型行）而目录无专项钉定负例——**该容器两面未落钉**：原因：本版测试面零扩；触发条件：0.1.10 候补随条目钉定（入 E1501 判据面须与 §8 码表核对，本件不改码表面） | 部分吻合（struct 面钉定；enum/数组两面未落钉） |
 | In3 | 自引用 struct | E1501（构造路径另受 E1502 侧切断） | §9 负例「自引用构造」 | 已钉：`negative/r2-n09-self-ref-struct.zor`；golden 实发 E1501 | 吻合 |
@@ -85,9 +85,9 @@
 | In7 | 流敏感提前失活（0.1.x 块尾失活） | E2202/E2201（§2 判定表码） | §9 负例「块尾失活近邻×2（清单第 7 条）」 | 已钉：`negative/r2-n14-mut-while-shared-stale.zor`（golden E2202）、`r2-n15-reborrow-during-mut-stale.zor`（E2201）；件a 即本条目与 §2 判定表行索引的两端对位修正（第 8 条→第 7 条） | 吻合 |
 | KL1 | 循环引用 leak（已知限制） | —（禁入 negative，§7 本条目明载） | §9「循环引用 leak 场景不占负例序号」 | **未落钉**：本条目所载文档级正例 `r2-leak-note` 目录无文件；原因：运行链路未落地（§6 实现路径 OQ-1 方案 B 未接 CI，无基准/ASAN 报告面可挂），且 F-1 修订不进门禁失败面；触发条件：M1 起运行链路落地后以基准/ASAN 记录呈现，不预排 | 未落钉（如实记） |
 
-统计：吻合 8（Ex2/Ex3/In1/In3–In7）、部分吻合 2（Ex1：struct 形态已钉、enum×Box 组合面未落钉；In2：struct 面已钉、enum/数组容器两面未落钉）、未落钉 3（Ex4/Ex5/KL1，均含原因与触发条件）。合计 13 条目全覆盖。
+统计（0.1.10 P3 件b 按 P2 实际合入集=r2-10/11/12 三件全钉零前移同步）：吻合 10（Ex1/Ex2/Ex3/Ex5/In1/In3–In7）、部分吻合 1（In2：struct 面已钉、enum/数组容器两面未落钉，触发条件原文不动）、未落钉 2（Ex4/KL1，均含原因与触发条件）。合计 13 条目全覆盖。
 
-尾注（§〇-6 同型新发现，只记证据、零扩本件载荷）：R1 §9 负例范围行（「负例 r1-n01…r1-n11」起句）滞于目录实态——`negative/` 目录 r1 列实至 r1-n16，系本次三向核对顺带发现的同型漂移。处理：仅本行与交付帖记证据，不改 r1 §9 范围行；0.1.10 候补随条目勘定。
+尾注（§〇-6 同型新发现，只记证据、零扩本件载荷）：R1 §9 负例范围行（「负例 r1-n01…r1-n11」起句）滞于目录实态——`negative/` 目录 r1 列实至 r1-n16，系本次三向核对顺带发现的同型漂移。处理：0.1.9 当时仅本行与交付帖记证据、不改 r1 §9 范围行；0.1.10 P3 件a 已按目录实态同步该节两范围行（正例至 r1-01…r1-22、负例至 r1-n01…r1-n16，描述文字与历史注原样不虚构），本项出清。
 
 ## 8. 编译期诊断码表（负例判据载体）
 
