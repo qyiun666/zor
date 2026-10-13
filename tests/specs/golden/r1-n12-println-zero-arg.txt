@@ -1,0 +1,1 @@
+zorcc: E1601 tests/specs/negative/r1-n12-println-zero-arg.zor:6:12: println 至少一个参数
