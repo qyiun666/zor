@@ -1,0 +1,2 @@
+zorcc: E1501 tests/specs/negative/r2-n18-ref-in-array-element.zor:5:13: 引用类型不得出现在容器位置（0.1.x 禁逃逸）
+zorcc: E1501 tests/specs/negative/r2-n18-ref-in-array-element.zor:6:17: 引用类型不得出现在容器位置（0.1.x 禁逃逸）

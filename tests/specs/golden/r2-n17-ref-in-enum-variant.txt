@@ -1,0 +1,2 @@
+zorcc: E1501 tests/specs/negative/r2-n17-ref-in-enum-variant.zor:5:18: 引用类型不得出现在容器位置（0.1.x 禁逃逸）
+zorcc: E1501 tests/specs/negative/r2-n17-ref-in-enum-variant.zor:6:20: 引用类型不得出现在容器位置（0.1.x 禁逃逸）

@@ -84,7 +84,7 @@ fn pos_box_return_expr_tail() {
     clean("fn make() -> Box<i64> { box 42 }\nfn main() { }");
 }
 
-// ———— R2 负例：16 条逐码首诊固化（与 tests/specs/negative/r2-n*.zor 同源构造） ————
+// ———— R2 负例：18 条逐码首诊固化（与 tests/specs/negative/r2-n*.zor 同源构造） ————
 
 #[test]
 fn neg_r2_n01_move_then_use() {
@@ -168,6 +168,16 @@ fn neg_r2_n15_block_end_stale_shared() {
 #[test]
 fn neg_r2_n16_assign_handoff_then_use() {
     assert_eq!(first_code("fn main() { let b = box 9; let c = box 0; c = b; println(*b); println(*c); }"), "E2101");
+}
+
+#[test]
+fn neg_r2_n17_ref_in_enum_variant() {
+    assert_eq!(first_code("enum Wrap { Hold(&i64) }\nenum WrapM { HoldM(&mut i64) }\nfn main() { }"), "E1501");
+}
+
+#[test]
+fn neg_r2_n18_ref_in_array_element() {
+    assert_eq!(first_code("fn take(a: [&i64; 2]) { }\nfn take_mut(a: [&mut i64; 2]) { }\nfn main() { }"), "E1501");
 }
 
 // ———— 判定表补充边界 ————
