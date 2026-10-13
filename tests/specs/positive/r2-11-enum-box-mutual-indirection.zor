@@ -1,0 +1,8 @@
+// tests/specs/positive/r2-11-enum-box-mutual-indirection.zor — AC-R2 语义正例（specs/r2-ownership.md §7 Ex1 组合面）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：§7 覆盖勘定注记 Ex1（两 enum 具名载荷经 Box 互递；0.1.9 件c 在档实跑数=三方双模式 exit=0 零诊断）；单测同源 pos_enum_box_mutual_indirection；0.1.10 P2 钉定。
+
+enum A { Bv(Box<B>) }
+enum B { Av(Box<A>) }
+
+fn main() { }
