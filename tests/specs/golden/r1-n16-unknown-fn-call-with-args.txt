@@ -1,0 +1,1 @@
+zorcc: E1101 tests/specs/negative/r1-n16-unknown-fn-call-with-args.zor:6:16: unknown function or variant 'foo'
