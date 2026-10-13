@@ -123,6 +123,18 @@ fn neg_e1601_arity() {
     assert!(has("fn f(x: i32) { } fn main() { f(1, 2); }", "E1601"));
 }
 
+#[test]
+fn neg_r1_n12_println_zero_arg() {
+    // 与 tests/specs/negative/r1-n12-println-zero-arg.zor 同源；单诊断首诊固化 E1601（spec §6）
+    assert_eq!(codes("fn main() {\n    println();\n}"), ["E1601"]);
+}
+
+#[test]
+fn neg_r1_n13_enum_bare_variant() {
+    // 与 tests/specs/negative/r1-n13-enum-bare-variant.zor 同源；单诊断首诊固化 E1101（spec §3 构造仅限 Variant()）
+    assert_eq!(codes("enum Color { Red(), Green() }\n\nfn main() {\n    let a = Red;\n}"), ["E1101"]);
+}
+
 // ———— T-4 黄金文件格式锚点：zorcc: {E-code} {file}:{line}:{col}: {message} ————
 
 #[test]

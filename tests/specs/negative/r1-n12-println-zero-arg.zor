@@ -1,0 +1,7 @@
+// r1-n12-println-zero-arg.zor — AC-R1-2 负例（specs/r1-type-system.md §6 内置 I/O 归口，0.1.5 P2 入册）
+// 预期：E1601 println 零实参（诊断成文：`println 至少一个参数`；print 零实参合法不在本例）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R1-2；specs/r1-type-system.md §6；错误文案基线=门禁 T-4。
+
+fn main() {
+    println();
+}

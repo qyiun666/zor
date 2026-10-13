@@ -1,0 +1,1 @@
+zorcc: E1101 tests/specs/negative/r1-n13-enum-bare-variant.zor:8:13: unknown identifier 'Red'
