@@ -1,0 +1,7 @@
+// r1-n16-unknown-fn-call-with-args.zor — AC-R1-2 负例（specs/r1-type-system.md §3 函数与变体均未命中口径，0.1.8 P3 入册）
+// 预期：E1101 未声明函数带实参调用（函数与变体均未命中，文案逐字 `unknown function or variant 'foo'`）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：PRD AC-R1-2；specs/r1-type-system.md §3（第三在册承诺）+ §8 P2 入册句；错误文案基线=门禁 T-4。
+
+fn main() {
+    let r = foo(1, 2);
+}
