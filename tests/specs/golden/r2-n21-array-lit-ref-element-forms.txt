@@ -1,0 +1,5 @@
+zorcc: E1501 tests/specs/negative/r2-n21-array-lit-ref-element-forms.zor:8:13: 数组元素不得为引用类型
+zorcc: E1501 tests/specs/negative/r2-n21-array-lit-ref-element-forms.zor:9:14: 数组元素不得为引用类型
+zorcc: E1501 tests/specs/negative/r2-n21-array-lit-ref-element-forms.zor:10:13: 数组元素不得为引用类型
+zorcc: E1501 tests/specs/negative/r2-n21-array-lit-ref-element-forms.zor:11:13: 数组元素不得为引用类型
+zorcc: E1201 tests/specs/negative/r2-n21-array-lit-ref-element-forms.zor:11:18: 类型不匹配：期望 '&i64'，实际 'i64'
