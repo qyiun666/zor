@@ -1,0 +1,1 @@
+zorcc: E1501 tests/specs/negative/r2-n20-array-lit-ref-element.zor:8:13: 数组元素不得为引用类型

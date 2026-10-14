@@ -1,0 +1,9 @@
+// r2-n20-array-lit-ref-element.zor — AC-R2-2 负例（推导形态：数组字面量元素持引用入 let 绑定，无类型标注路径，R1 §3 容器禁则补可达性）
+// 预期：E1501 数组元素不得为引用类型（check.rs L175 在册串逐字复用；此前该形态静默通过=GAP-01 面A 实体证据）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：shared/ZOR-0.1.14-范围冻结-PM裁定-v1.md §二/§四 GAP-01；specs/r1-type-system.md §3；三方同数实跑门（核心 0.1.14 P2 实跑 / QA 判据位复跑 / 项目管理 seq2027 探针字节对平）；错误文案基线=门禁 T-4。
+
+fn main() {
+    let x: i64 = 1;
+    let y: i64 = 2;
+    let a = [&x, &y];
+}
