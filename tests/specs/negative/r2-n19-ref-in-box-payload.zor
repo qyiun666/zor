@@ -1,0 +1,8 @@
+// r2-n19-ref-in-box-payload.zor — AC-R2-2 负例（Box 内子位：引用入 Box 载荷，R1 §3 容器禁则）
+// 预期：E1501 Box 载荷持引用（Box<&T> 与 Box<&mut T> 两子形态同件双行钉，R1 §3）（debug/release 双模式均须编译期失败，退出码非零）
+// 判据来源：shared/ZOR-0.1.12-范围冻结-PM裁定-v1.md §二 P2；specs/r1-type-system.md §3；三方同数实跑门（核心 seq1676 / 文档 seq1680 / QA seq1682 探针 q1/q2，12 跑全拦下零反差）；错误文案基线=门禁 T-4。
+
+fn f(b: Box<&i64>) { }
+fn g(b: Box<&mut i64>) { }
+
+fn main() { }
