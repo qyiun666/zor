@@ -571,7 +571,8 @@ impl<'a> Ck<'a> {
                     let t = self.check_expr(x, Some(&first), env);
                     if !compatible(&first, &t) { self.mismatch(t_span(x), &first, &t); }
                 }
-                let _ = (*l, *c);
+                // GAP-01 补可达性：推导形态（无数组类型标注）的字面量元素类型入既有数组元素判定（文案=L175 在册串逐字）
+                if matches!(first, Ty::Ref(..)) { self.d("E1501", *l, *c, "数组元素不得为引用类型"); }
                 Ty::Arr(Box::new(first), es.len() as u64)
             }
             Ex::Block(blk) => {
