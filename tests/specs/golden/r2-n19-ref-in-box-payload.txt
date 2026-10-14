@@ -1,0 +1,2 @@
+zorcc: E1501 tests/specs/negative/r2-n19-ref-in-box-payload.zor:5:13: 引用类型不得出现在容器位置（0.1.x 禁逃逸）
+zorcc: E1501 tests/specs/negative/r2-n19-ref-in-box-payload.zor:6:13: 引用类型不得出现在容器位置（0.1.x 禁逃逸）
