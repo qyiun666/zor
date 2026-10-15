@@ -9,7 +9,7 @@
 - 本地复现前置（0.1.16 实测）：先 `cd compiler && cargo build --release`，再 `ZORC_BIN=<仓库绝对路径>/compiler/target/release/zorcc bash ci/run_ci.sh --strict`；不注入时 `ci/run_ci.sh:34` 回退 `zorcc`，PATH 无该二进制则 compile/unit-test/golden 判 FAIL（环境坑，非仓库缺陷），口径同 `.github/workflows/ci.yml`
 
 ## 段名清单（0.1.18 起；本件只枚举段名、不写段数计数句——计数句随版本腐烂）
-- `--strict` 常驻段名（`summary.txt` 行首列即段名，与 `record()` 同源）：`cargo`／`compile`／`unit-test`／`golden`／`code-table`
+- `--strict` 常驻段名（`summary.txt` 每行形如 `状态|段名|exit=N|log=路径`，首列为状态、第二列为段名）：`cargo`／`compile`／`unit-test`／`golden`／`code-table`
 - `code-table`（0.1.18 项 2 新增）：诊断码表不变式校验段，单一实现处＝`ci/run_ci.sh` 的 `stage_code_table`（规范文本不另抄期望表）；口径源＝`specs/r1-type-system.md` §8／§8b 与 `specs/r2-ownership.md` §8 各自的取径注记；判定项＝A1–A7＋A8b1＋HDR（A8a 搬运闸与 A8b2 新行出处闸须对 base 侧旧文核对，属升格窗一次性执行，不入本段常驻面）；strict 下 FAIL 计入 `overall`
 - `bench` 仅在 `--bench` 下追加，不属常驻段名
 - 历史口径出清：0.1.17 及以前在册的「四段全 PASS」句现存于 `CHANGELOG.md` 的 `[0.1.17]` 节（历史节，零触碰红线覆盖、不改），凡引段数一律绑所检 head ＋节名锚，**不得把该句读作现态**

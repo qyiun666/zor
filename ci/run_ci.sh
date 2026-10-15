@@ -167,6 +167,8 @@ stage_bench() {
 stage_code_table() { # 0.1.18 项2 诊断码表不变式 A1–A7（单一实现处＝本函数，规范文本不另抄期望表）
   # 取径（在册声明）：条目界=表结构，非全角 U+FF5C；节区间标题谓词分类（^## 8. 含「编译期」→声明集，^## 8b. 含「运行期」→DECLRT，
   # 其余→散文面入 A6 分子）；区间内按每行码位列首枚 E[0-9]{4} 取，禁对区间正文全文 grep。判定只用 0/非 0 与集合差，不含任何 rc=1 通过条件。
+  # 形制（判据位 seq205 §二／§三，本段照此写）：末式必以 record 落账（非纯 echo），否则红不置 overall 且 summary.txt 无该行；
+  # 调用行须为独立一行裸调用——record() 尾式在 status=PASS 时短路使本函数返回 1，取 $? 或接 &&／|| 会把 PASS 读成 FAIL。
   local log; log="$(new_log code-table)"
   if ! command -v awk >/dev/null 2>&1 || ! command -v grep >/dev/null 2>&1; then
     echo "awk/grep 缺失：本段不执行（--strict 判 FAIL，非 PASS）" > "$log"

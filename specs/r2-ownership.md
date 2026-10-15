@@ -95,6 +95,7 @@
 
 | 码位 | 定性 | 判据归口 | 承载件 |
 |---|---|---|---|
+| E1502 返回引用 | 实发 | R2 §4 禁止返回引用句、§7 In1 行 | tests/specs/golden/r2-n07-return-ref.txt＋实发点 compiler/src/parser.rs:281（主发，文案与 golden 首行逐字对合）／compiler/src/check.rs:71（兜底，文案次形，少「禁引用逃逸」四字） |
 | E2101 移动后使用 | 实发 | R2 §1 移动点清单、§5 句柄 move 行 | tests/specs/golden/r2-n01-move-then-use.txt（另有同目录 5 份：r2-n02-move-into-arg、r2-n10-branch-move-use、r2-n12-deref-moved-box、r2-n13-into-slot-then-use、r2-n16-ffi-handoff-then-use） |
 | E2102 部分移动后整体使用 | 实发 | R2 §2 判定表 | tests/specs/golden/r2-n03-partial-move.txt |
 | E2201 独占借用期间再借用 | 实发 | R2 §2 判定表 | tests/specs/golden/r2-n06-shared-during-mut.txt（另有同目录 1 份：r2-n15-reborrow-during-mut-stale） |
