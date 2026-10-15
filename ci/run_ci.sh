@@ -170,13 +170,12 @@ stage_code_table() { # 0.1.18 项2 诊断码表不变式 A1–A7（单一实现�
   # 形制（判据位 seq205 §二／§三，本段照此写）：末式必以 record 落账（非纯 echo），否则红不置 overall 且 summary.txt 无该行；
   # 调用行须为独立一行裸调用——record() 尾式在 status=PASS 时短路使本函数返回 1，取 $? 或接 &&／|| 会把 PASS 读成 FAIL。
   local log; log="$(new_log code-table)"
-  # 环境面钉定（0.1.18 执笔席自抓，判据位 seq295／裁口位 seq298 各自机次证实）：本机 awk（one-true-awk 20200816）在 UTF-8 locale 下按 collation 比较串，
-  # 使 $3=="实发" 对全部行恒真（同件 C 下 DECLEMIT=13／en_US.UTF-8 下=16）⇒ 判定随执行者环境漂移，故段内钉 LC_ALL=C，函数返回即复原、不外溢他段。
-  # 同长度的 CJK 越集定性值在该 locale 下与在册成员互为相等，会被分类式与闭集反查同时判为集内（假绿面，实测实例＝编期译，由裁口位 seq298 构造）；
-  # 非此一类者（保留X／尾随空格／QQ）仍被闭集一支抓取，故本注不作"恒绿/零判别力"表述。⇒ 本段阳性对照取径自此钉：注入值用编期译，不用保留X。
-  local outer_lc="${LC_ALL-UNSET}"  # 钉前先取外层原值（名字层），仅供日志双值自述；效应层另取 charmap
+  # 环境面钉定（0.1.18 执笔席自抓，判据位 seq295/seq304、裁口位 seq298、工具链 seq302 各自机次证实）：同件实测定性分类命中 C 下 DECLEMIT=13、en_US.UTF-8 下=16
+  # ⇒ 判定随执行者环境漂移，故段内钉 LC_ALL=C，函数返回即复原、不外溢他段（成因句三席定形为"删"，本注只留两枚实测值，不写可误读的机制表述）。
+  # 本段阳性对照注入值自此钉＝编期译（修前该支放绿／修后报红＝两态区分性对照），不用 保留X（两态同色，只算回归位）——裁口位 seq298 §一-3／判据位 seq304 §三。
+  local outer_lc="${LC_ALL-UNSET}"  # 取序须在钉定之前：local LC_ALL=C 之后同名变量已读回 C，放反则本行恒印 C 且无任何红信号（工具链 seq302 §三／判据位 seq304 §四）
   local LC_ALL=C; export LC_ALL
-  echo "[code-table] 环境自述 外层LC_ALL=$outer_lc 段内钉=C（本行走 stdout，不入 code-table.log，以免两式对平的逐字节比对被外层名污染）"
+  echo "[code-table] 环境自述 外层LC_ALL=$outer_lc 段内钉=C（此行走 stdout、不入 code-table.log：入则两式对平的逐字节 SAME 必破，与裁口位 seq290 ④ 互斥）"
   if ! command -v awk >/dev/null 2>&1 || ! command -v grep >/dev/null 2>&1; then
     echo "awk/grep 缺失：本段不执行（--strict 判 FAIL，非 PASS）" > "$log"
     [ "$STRICT" = 1 ] && record code-table FAIL 1 "$log" || record code-table SKIP 0 "$log"; return
@@ -237,7 +236,7 @@ stage_code_table() { # 0.1.18 项2 诊断码表不变式 A1–A7（单一实现�
   # A8b1＝新行出处闸的常驻半边（判据归口列非空）；另半边 A8b2 与搬运闸 A8a 须对 base 侧旧文核对，属升格窗一次性执行
   awk -F'\t' 'NF < 4 || $4 == "" { print $2 }' "$td/rows" > "$td/v_a8b1"
   {
-    echo "[code-table] 取径=表结构（首格首枚 E[0-9]{4}），节区间标题谓词分类；口径源=specs/r1-type-system.md §8/§8b 与 specs/r2-ownership.md §8 取径注记；环境=段内钉 LC_ALL=C，效应层实测 charmap=$(locale charmap 2>/dev/null || echo UNKNOWN)（与所钉一致即合格，不要求为 UTF-8）；外层 LC_ALL 名值只随本段 stdout 自述行出、不入本日志——入则两式对平的逐字节比对必不等，与裁口位 seq290 ④ 互斥。见函数头注：one-true-awk 在 UTF-8 下按 collation 比较串会令非 ASCII 等值恒真"
+    echo "[code-table] 取径=表结构（首格首枚 E[0-9]{4}），节区间标题谓词分类；口径源=specs/r1-type-system.md §8/§8b 与 specs/r2-ownership.md §8 取径注记；环境=段内钉 LC_ALL=C（外层原值只随本段 stdout 自述行出、不入本日志，入则两式对平逐字节 SAME 必破）、效应层实测 charmap=$(locale charmap 2>/dev/null || echo UNKNOWN)（与所钉一致即合格，不要求为 UTF-8）"
     printf '[code-table] 声明行=%s 去重=%s DECLEMIT=%s DECLRES=%s DECLALIAS=%s DECLRT=%s EMIT=%s GOLDEN=%s 散文码位=%s\n' \
       "$n_row" "$n_uniq" "$(grep -c '' "$td/decl_emit" || true)" "$(grep -c '' "$td/decl_res" || true)" \
       "$(grep -c '' "$td/decl_alias" || true)" "$(grep -c '' "$td/decl_rt" || true)" \
