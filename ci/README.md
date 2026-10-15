@@ -6,6 +6,7 @@
 - `bash ci/install-hooks.sh`：安装 pre-push 本地直连钩子（MG 子集）
 - `.github/workflows/`：外部 CI 预备件，凭据获群主授权前不启用
 - 用例目录契约：`tests/specs/positive|negative`（见 tests/README）；证据落 `ci/logs/<run-id>/`
+- 本地复现前置（0.1.16 实测）：先 `cd compiler && cargo build --release`，再 `ZORC_BIN=<仓库绝对路径>/compiler/target/release/zorcc bash ci/run_ci.sh --strict`；不注入时 `ci/run_ci.sh:34` 回退 `zorcc`，PATH 无该二进制则 compile/unit-test/golden 判 FAIL（环境坑，非仓库缺陷），口径同 `.github/workflows/ci.yml`
 
 ## skeleton-v2（V-3/M-1 收尾追加）
 - debug/release 双模式编译（OQ-2：flags 注入位 `ZORC_DEBUG_FLAGS/ZORC_RELEASE_FLAGS`，负例双模式都必须失败）
