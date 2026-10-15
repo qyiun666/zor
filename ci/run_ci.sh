@@ -172,7 +172,7 @@ stage_code_table() { # 0.1.18 项2 诊断码表不变式 A1–A7（单一实现�
   local log; log="$(new_log code-table)"
   # 环境面钉定（0.1.18 执笔席自抓，判据位 seq295/seq304、裁口位 seq298、工具链 seq302 各自机次证实）：同件实测定性分类命中 C 下 DECLEMIT=13、en_US.UTF-8 下=16
   # ⇒ 判定随执行者环境漂移，故段内钉 LC_ALL=C，函数返回即复原、不外溢他段（成因句三席定形为"删"，本注只留两枚实测值，不写可误读的机制表述）。
-  # 本段阳性对照注入值自此钉＝编期译（修前该支放绿／修后报红＝两态区分性对照），不用 保留X（两态同色，只算回归位）——裁口位 seq298 §一-3／判据位 seq304 §三。
+  # 对照注入值＝编期译（两态区分性对照；纪律正本见 B 件／七款 v1；判据源 裁口位 seq298 §一-3／判据位 seq304 §三），不用 保留X（两态同色，只算回归位）。
   local outer_lc="${LC_ALL-UNSET}"  # 取序须在钉定之前：local LC_ALL=C 之后同名变量已读回 C，放反则本行恒印 C 且无任何红信号（工具链 seq302 §三／判据位 seq304 §四）
   local LC_ALL=C; export LC_ALL
   echo "[code-table] 环境自述 外层LC_ALL=$outer_lc 段内钉=C（此行走 stdout、不入 code-table.log：入则两式对平的逐字节 SAME 必破，与裁口位 seq290 ④ 互斥）"
