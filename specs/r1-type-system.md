@@ -68,12 +68,23 @@ T ::= prim | [T; N] | (T1, ..., Tk), k ≥ 0 | struct | enum | &T | &mut T | fn(
 - 除零：debug/release 一致，运行期终止错误。
 - `f32/f64` 不适用溢出语义；IEEE754 行为直通（NaN 不视为错误）。
 - 终审口径 M3 落定（D-012）；本节措辞已按 debug checked / release wrap 成文，若终审变更须同步升 draft-0.2 并触发 T-5 用例修订。
+- 运行期码位登记见 §8b（新增节），该表 0.2.x 起实发，不入 0.1.x 编译期声明集与 T-4 基线域。
 
 ## 8. 编译期诊断要求（负例判据载体，AC-R1-2）
 
-每个类型错误必须输出：`错误码(E1xxx) + 源文件:行:列 + 错误类型名 + 一句事实描述`。最小码表：
+每个类型错误必须输出：`错误码(E1xxx) + 源文件:行:列 + 错误类型名 + 一句事实描述`。最小码表（0.1.18 起为每码一行四列表）：
 
-E1101 未知类型名｜E1201 类型不匹配｜E1202 隐式转换禁止｜E1301 数组长度非编译期常量｜E1401 enum 递归变体｜E1501 引用类型不合规出现位置｜E1601 函数签名/实参不一致。
+| 码位 | 定性 | 判据归口 | 承载件 |
+|---|---|---|---|
+| E1101 未知类型名 | 实发 | R1 §3 分隔符句与名字解析顺序句、§6 内置 I/O 句、§8 E1101 覆盖面消歧段 | tests/specs/golden/r1-n01-unknown-type.txt（另有同目录 3 份：r1-n11-generic-angle-syntax、r1-n13-enum-bare-variant、r1-n16-unknown-fn-call-with-args） |
+| E1201 类型不匹配 | 实发 | R1 §4 禁止隐式数值转换句与推断收敛句 | tests/specs/golden/r1-n02-cross-width-assign.txt（另有同目录 3 份：r1-n03-binop-type-mismatch、r1-n09-tuple-arity-mismatch、r2-n21-array-lit-ref-element-forms） |
+| E1202 隐式转换禁止 | 实发 | R1 §4 跨类型须显式转换函数句 | tests/specs/golden/m1-s1-negative.txt（另有同目录 1 份：r1-n10-literal-fam-conflict） |
+| E1301 数组长度非编译期常量 | 实发 | R1 §3 固定长度数组句（N 为编译期字面量整型） | tests/specs/golden/r1-n04-array-len-nonconst.txt |
+| E1401 enum 递归变体 | 实发 | R1 §3 enum 递归禁止句 | tests/specs/golden/r1-n05-enum-direct-recursive.txt（另有同目录 1 份：r1-n06-enum-transitive-recursive） |
+| E1501 引用类型不合规出现位置 | 实发 | R1 §3 引用类型条目、§8 E1501 释义扩写段 10 行 | tests/specs/golden/r1-n07-ref-in-struct.txt（另有同目录 8 份：r1-n11-generic-angle-syntax、r2-n08-ref-in-struct、r2-n09-self-ref-struct、r2-n17-ref-in-enum-variant、r2-n18-ref-in-array-element、r2-n19-ref-in-box-payload、r2-n20-array-lit-ref-element、r2-n21-array-lit-ref-element-forms） |
+| E1601 函数签名/实参不一致 | 实发 | R1 §3 无参变体构造实参句、§6 内置 I/O 诊断句 | tests/specs/golden/r1-n08-arg-arity-mismatch.txt（另有同目录 3 份：r1-n12-println-zero-arg、r1-n14-enum-nullary-with-args、r1-n15-shadow-println-arity） |
+
+取径注记（0.1.18 形制升格；本条只记取径，不新增/不注销任何错误码、不改任何描述串）：本节条目界＝**表结构**（每码一行，`码位`列格内首枚 `E[0-9]{4}` 为码位、其后至格尾为该码描述串），**不是**全角 `｜`（U+FF5C）字符约定；U+FF5C 仅在 0.1.17 及以前的单行列表形中充当条目界，作历史锚记于此，两种取径不得混用。节区间（`^## 8\.` 起、`^## 9\.` 止）只界定"从哪一节取"，区间内仍须按每行 `码位` 列首枚取，**禁止对区间正文全文 grep**（本节内 §8 释义扩写表与表后各注记行同落该区间，全量 grep 会同码两收）。描述串的语义承载字面与本表升格前的单行列表逐字一致，由升格窗的一次性搬运闸核对。
 
 E1101 覆盖面消歧（0.1.x 实施基线；本条款为释义说明，不新增/不注销任何错误码）：E1101 为跨 lexer/parser/check 三层共享的标识符/解析失败码——码表短名"未知类型名"仅为速记不实，其实发覆盖面至少含三层形态：lexer 层标识符未解析、parser 层期望 token 未命中（含 §3 struct 字段分隔符行 `expected ';' or ',' after field, found <token>`）、check 层名字求解未命中；逐层实发点全量编目留 0.2.x 语法冻结窗口，不入本版（消歧不注销）。check 层调用点口径入册：函数与变体均未命中的调用报 E1101，文案模板 `unknown function or variant '<名>'`（与 §3 名字解析顺序句的在册承诺句同串），与 check.rs 实发点源字面 `format!("unknown function or variant '{}'", n)` 字节级对合——该源字面的渲染形态即 `unknown function or variant '<名>'`，双向逐字对源。
 
@@ -105,6 +116,17 @@ E1501 释义扩写（0.1.x 实施基线；本表为释义说明，不新增/不�
 可达性注记（0.1.15 随实同步）：**E2202 对「数组字面量内联双 `&mut`」形态不发**——`[&mut x, &mut x]` 实测仅发 #8 一行（两模式、rc=1），而同变量预绑句柄形实测为 E2202 在前、#8 在后；该形态**非静默逃逸**（rc=1 由 #8 兜住），属诊断归属残差。是否扩至逐元素判定、是否补发 E2202 均另窗勘定，本窗不改任何检查行为；规格与账本面不得表述「同形态内 E2202 共发／级联」。
 
 错误文案为黄金文件基线（门禁 T-4），改动走 PR+QA 评审。
+
+## 8b. 运行期诊断码位登记（规范登记、未实发）
+
+本表为**规范登记、未实发**；0.2.x 前不得据"断言 4 全绿"推出任何越界已被拦的结论。本节标题不含「编译期」，自成运行期集合（`DECLRT`），与 §8 编译期声明集互斥；两枚号位不入 §8 表、不入 T-4 编译期基线域、不入 golden 断言面。号位所指行为的语义字面逐字沿用 §7 在册两句（`:67` 溢出句、`:68` 除零句），本节不新增任何语义承诺。
+
+| 码位 | 定性 | 判据归口 | 承载件 |
+|---|---|---|---|
+| E3001 整型算术溢出 | 运行期 | R1 §7 溢出句（debug 构建 checked，溢出=运行时终止错误；release 构建 wrap） | —（0.1.x 无运行链路，无承载件；0.2.x 起实发后归 T-5 行为用例面） |
+| E3002 除零 | 运行期 | R1 §7 除零句（debug/release 一致，运行期终止错误） | —（同上） |
+
+取径注记：本节同 §8 取径口径（条目界＝表结构，`码位`列格内首枚 `E[0-9]{4}` 为码位、其后至格尾为描述串）；本节行不参与 §8 的 `DECLEMIT`／`DECLALIAS`／`DECLRES` 集合运算，只入 `DECLRT`。
 
 ## 9. 测试用例映射（AC-R1-2：≥20 正 + ≥10 负）
 

@@ -91,7 +91,20 @@
 
 ## 8. 编译期诊断码表（负例判据载体）
 
-E2101 移动后使用｜E2102 部分移动后整体使用｜E2201 独占借用期间再借用｜E2202 共享/独占共存冲突｜E2301 double free/unbox 后再用｜E2302 悬垂引用逃逸（结构上已由禁则覆盖，保留码位防御实现漏洞）｜E2401 返回引用（=E1502 别名码，择一实现，黄金文件固定）。
+最小码表（0.1.18 起为每码一行四列表）：
+
+| 码位 | 定性 | 判据归口 | 承载件 |
+|---|---|---|---|
+| E1502 返回引用 | 实发 | R2 §4 禁止返回引用句、§7 In1 行 | tests/specs/golden/r2-n07-return-ref.txt＋实发点 compiler/src/parser.rs:281（主发，文案与 golden 首行逐字对合）／compiler/src/check.rs:71（兜底，文案次形，少「禁引用逃逸」四字） |
+| E2101 移动后使用 | 实发 | R2 §1 移动点清单、§5 句柄 move 行 | tests/specs/golden/r2-n01-move-then-use.txt（另有同目录 5 份：r2-n02-move-into-arg、r2-n10-branch-move-use、r2-n12-deref-moved-box、r2-n13-into-slot-then-use、r2-n16-ffi-handoff-then-use） |
+| E2102 部分移动后整体使用 | 实发 | R2 §2 判定表 | tests/specs/golden/r2-n03-partial-move.txt |
+| E2201 独占借用期间再借用 | 实发 | R2 §2 判定表 | tests/specs/golden/r2-n06-shared-during-mut.txt（另有同目录 1 份：r2-n15-reborrow-during-mut-stale） |
+| E2202 共享/独占共存冲突 | 实发 | R2 §2 判定表 | tests/specs/golden/r2-n04-mut-while-shared.txt（另有同目录 2 份：r2-n05-double-mut、r2-n14-mut-while-shared-stale） |
+| E2301 double free/unbox 后再用 | 实发 | R2 §3 释放点、§5 unbox | tests/specs/golden/r2-n11-use-after-unbox.txt |
+| E2302 悬垂引用逃逸（结构上已由禁则覆盖，保留码位防御实现漏洞） | 保留 | R2 §1 禁逃逸句、§7 In1／In2 面 | —（无承载件：本码 0.1.x 不实发，定性=保留） |
+| E2401 返回引用（=E1502 别名码，择一实现，黄金文件固定） | 别名→E1502 | R2 §4 禁止返回引用句、§7 In1 行 | —（别名不独立承载；黄金文件取 E1502 侧＝tests/specs/golden/r2-n07-return-ref.txt） |
+
+取径注记（0.1.18 形制升格；本条只记取径，不新增/不注销任何错误码、不改任何描述串与 §7 In1 行）：本节条目界＝**表结构**（每码一行，`码位`列格内首枚 `E[0-9]{4}` 为码位、其后至格尾为该码描述串），**不是**全角 `｜`（U+FF5C）字符约定；U+FF5C 仅在 0.1.17 及以前的单行列表形中充当条目界，作历史锚记于此，两种取径不得混用。节区间（`^## 8\.` 起、`^## 9\.` 止）只界定"从哪一节取"，区间内仍须按每行 `码位` 列首枚取，禁止对区间正文全文 grep。`定性`列取闭集四值（实发／保留／别名→<码>／运行期），不靠解析中文括注取得；描述串的语义承载字面与本表升格前的单行列表逐字一致，由升格窗的一次性搬运闸核对。
 
 ## 9. 测试用例映射（AC-R2-2：≥15 负例；目录基准 tests/specs/，M-1 定论）
 
