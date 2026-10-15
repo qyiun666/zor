@@ -164,11 +164,100 @@ stage_bench() {
   else record bench SKIP 0 "$log"; fi
 }
 
+stage_code_table() { # 0.1.18 项2 诊断码表不变式 A1–A7（单一实现处＝本函数，规范文本不另抄期望表）
+  # 取径（在册声明）：条目界=表结构，非全角 U+FF5C；节区间标题谓词分类（^## 8. 含「编译期」→声明集，^## 8b. 含「运行期」→DECLRT，
+  # 其余→散文面入 A6 分子）；区间内按每行码位列首枚 E[0-9]{4} 取，禁对区间正文全文 grep。判定只用 0/非 0 与集合差，不含任何 rc=1 通过条件。
+  local log; log="$(new_log code-table)"
+  if ! command -v awk >/dev/null 2>&1 || ! command -v grep >/dev/null 2>&1; then
+    echo "awk/grep 缺失：本段不执行（--strict 判 FAIL，非 PASS）" > "$log"
+    [ "$STRICT" = 1 ] && record code-table FAIL 1 "$log" || record code-table SKIP 0 "$log"; return
+  fi
+  local td; td="$(mktemp -d)"; trap 'rm -rf "$td"' RETURN
+  local -a SP=(specs/r1-type-system.md specs/r2-ownership.md)
+  local f rc_v=0
+  for f in "${SP[@]}"; do
+    [ -f "$f" ] || { echo "MISSING specs 件=$f" >>"$log"; record code-table FAIL 1 "$log"; return; }
+    awk -v ROWS="$td/rows" -v OTH="$td/other" '
+      BEGIN { s = "other" }
+      function codes(line, out,   r) {
+        r = line
+        while (match(r, /E[0-9][0-9][0-9][0-9]/)) { print substr(r, RSTART, 5) >> out; r = substr(r, RSTART + 5) }
+      }
+      /^## / {
+        s = "other"; t = substr($0, 4)
+        if (t ~ /^8(\.|b)/) { if (t ~ /编译期/) s = "decl"; else if (t ~ /运行期/) s = "rt" }
+        next
+      }
+      /^\|/ && (s == "decl" || s == "rt") {
+        cell = $0; n = split(cell, a, /\|/)
+        if (n < 3) next
+        c = a[2]; gsub(/^[ \t]+|[ \t]+$/, "", c)
+        if (match(c, /E[0-9][0-9][0-9][0-9]/) == 0) next
+        q = a[3]; gsub(/^[ \t]+|[ \t]+$/, "", q)
+        r = a[4]; gsub(/^[ \t]+|[ \t]+$/, "", r)
+        print s "\t" substr(c, RSTART, 5) "\t" q "\t" r >> ROWS
+        next
+      }
+      { if (s == "other") codes($0, OTH) }
+    ' "$f"
+  done
+  touch "$td/rows" "$td/other"
+  awk -F'\t' '$3 == "实发"  { print $2 }' "$td/rows" | sort -u > "$td/decl_emit"
+  awk -F'\t' '$3 == "保留"  { print $2 }' "$td/rows" | sort -u > "$td/decl_res"
+  awk -F'\t' '$3 ~ /^别名→/ { print $2 }' "$td/rows" | sort -u > "$td/decl_alias"
+  awk -F'\t' '$1 == "rt"    { print $2 }' "$td/rows" | sort -u > "$td/decl_rt"
+  awk -F'\t' '$3 ~ /^别名→/ && match($3, /E[0-9][0-9][0-9][0-9]/) { print substr($3, RSTART, 5) }' "$td/rows" | sort -u > "$td/alias_tgt"
+  awk -F'\t' '$3 != "实发" && $3 != "保留" && $3 != "运行期" && $3 !~ /^别名→/ { print $2 "=" $3 }' "$td/rows" > "$td/bad_qual"
+  cat "$td/decl_emit" "$td/decl_res" "$td/decl_alias" "$td/decl_rt" | sort -u > "$td/decl_all"
+  grep -hoE "E[0-9]{4}" compiler/src/*.rs      | sort -u > "$td/emit"
+  grep -hoE "E[0-9]{4}" tests/specs/golden/*.txt | sort -u > "$td/golden"
+  sort -u "$td/other" > "$td/other_u"
+  cat "$td/decl_emit" "$td/decl_alias" "$td/decl_res" | sort -u > "$td/decl_ct"
+  comm -23 "$td/decl_emit" "$td/emit"        > "$td/v_a1"
+  comm -23 "$td/emit" "$td/decl_ct"          > "$td/v_a2"
+  comm -23 "$td/alias_tgt" "$td/emit"        > "$td/v_a3"
+  cat "$td/emit" "$td/golden" | sort -u      > "$td/emit_gld"
+  comm -12 "$td/decl_rt" "$td/emit_gld"      > "$td/v_a4"
+  comm -23 "$td/other_u" "$td/decl_all"      > "$td/v_a6"
+  cat "$td/decl_res" "$td/decl_rt" | sort -u > "$td/res_rt"
+  comm -12 "$td/res_rt" "$td/emit"           > "$td/v_a7"
+  local n_row n_uniq; n_row=$(grep -c '' "$td/rows" || true); n_uniq=$(cut -f2 "$td/rows" | sort -u | grep -c '' || true)
+  if [ "$n_row" = "$n_uniq" ]; then : > "$td/v_a5"; else printf '码位列总行=%s 去重枚数=%s\n' "$n_row" "$n_uniq" > "$td/v_a5"; fi
+  # HDR＝§8b 表头诚实句在位（冻结件 §五-3 强制句的常驻对应形；不依赖历史文本）
+  if grep -q '规范登记、未实发' specs/r1-type-system.md; then : > "$td/v_hdr"; else printf '§8b 缺"规范登记、未实发"表头句\n' > "$td/v_hdr"; fi
+  # A8b1＝新行出处闸的常驻半边（判据归口列非空）；另半边 A8b2 与搬运闸 A8a 须对 base 侧旧文核对，属升格窗一次性执行
+  awk -F'\t' 'NF < 4 || $4 == "" { print $2 }' "$td/rows" > "$td/v_a8b1"
+  {
+    echo "[code-table] 取径=表结构（首格首枚 E[0-9]{4}），节区间标题谓词分类；口径源=specs/r1-type-system.md §8/§8b 与 specs/r2-ownership.md §8 取径注记"
+    printf '[code-table] 声明行=%s 去重=%s DECLEMIT=%s DECLRES=%s DECLALIAS=%s DECLRT=%s EMIT=%s GOLDEN=%s 散文码位=%s\n' \
+      "$n_row" "$n_uniq" "$(grep -c '' "$td/decl_emit" || true)" "$(grep -c '' "$td/decl_res" || true)" \
+      "$(grep -c '' "$td/decl_alias" || true)" "$(grep -c '' "$td/decl_rt" || true)" \
+      "$(grep -c '' "$td/emit" || true)" "$(grep -c '' "$td/golden" || true)" "$(grep -c '' "$td/other_u" || true)"
+  } >> "$log"
+  local a la
+  for a in A1 A2 A3 A4 A5 A6 A7 A8b1 HDR; do
+    la="$(printf '%s' "$a" | tr 'A-Z' 'a-z')"
+    if [ -s "$td/v_$la" ]; then
+      printf '[code-table] %s 违规=FAIL\n' "$a" >> "$log"
+      sed 's/^/    /' "$td/v_$la" >> "$log"; rc_v=1
+    else
+      printf '[code-table] %s 违规=0 PASS\n' "$a" >> "$log"
+    fi
+  done
+  if [ -s "$td/bad_qual" ]; then
+    printf '[code-table] 定性列越闭集=FAIL（闭集=实发/保留/别名→<码>/运行期）\n' >> "$log"
+    sed 's/^/    /' "$td/bad_qual" >> "$log"; rc_v=1
+  else printf '[code-table] 定性列闭集=PASS\n' >> "$log"; fi
+  if [ "$rc_v" = 0 ]; then echo "[code-table] 判定=PASS" >> "$log"; record code-table PASS 0 "$log"
+  else echo "[code-table] 判定=FAIL" >> "$log"; record code-table FAIL 1 "$log"; fi
+}
+
 echo "[ci] run=$RUN_ID strict=$STRICT bench=$WITH_BENCH modes='$MODES' pos='$TESTS_POS_DIR' neg='$TESTS_NEG_DIR'"
 stage_cargo
 stage_compile
 stage_unit_test
 stage_golden
+stage_code_table
 [ "$WITH_BENCH" = 1 ] && stage_bench
 
 {
