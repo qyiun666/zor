@@ -123,6 +123,7 @@ stage_unit_test() {
 }
 
 stage_golden() { # T-4 黄金比对（strict 扩项复验记录 §2.4：负例 exit+stderr==golden；正例 stderr 空即基线）
+  # 0.1.19 口径分列注记：捕获面（ci/capture_golden.sh）＝stdout+stderr 合并流写入基线；本段比对面＝stderr 单流逐字节对平（正例 stdout 既不捕获也不比＝读数缺口）。
   local log; log="$(new_log golden)"
   if [ -z "$ZORC" ]; then
     echo "zorcc 未安装：默认 SKIP（strict 判 FAIL）" > "$log"
@@ -130,6 +131,7 @@ stage_golden() { # T-4 黄金比对（strict 扩项复验记录 §2.4：负例 e
   fi
   local -a neg_files=("$TESTS_NEG_DIR"/*.zor) pos_files=("$TESTS_POS_DIR"/*.zor)
   local n_chk=0 n_pass=0 n_diff=0 n_missing=0 p_stderr_nonempty=0 rc
+  local n_pos_rc=0 n_golden_empty=0
   local tmpf; tmpf="$(mktemp)"; trap 'rm -f "$tmpf"' RETURN
   for f in "${neg_files[@]}"; do
     local b g; b="$(basename "$f" .zor)"; g="$TESTS_GOLDEN_DIR/$b.txt"
@@ -139,17 +141,18 @@ stage_golden() { # T-4 黄金比对（strict 扩项复验记录 §2.4：负例 e
       n_missing=$((n_missing+1)); echo "MISSING golden=$b.txt (exit=$rc)" >>"$log"; continue
     fi
     n_chk=$((n_chk+1))
+    [ -s "$g" ] || n_golden_empty=$((n_golden_empty+1))
     if [ "$rc" -ne 1 ]; then n_diff=$((n_diff+1)); echo "EXIT_MISMATCH $b rc=$rc (期望1)" >>"$log"
     elif cmp -s "$tmpf" "$g"; then n_pass=$((n_pass+1))
     else n_diff=$((n_diff+1)); echo "STDERR_DIFF $b" >>"$log"; diff "$g" "$tmpf" | head -6 >>"$log"; fi
   done
   for f in "${pos_files[@]}"; do
     # shellcheck disable=SC2086
-    "$ZORC" $DEBUG_FLAGS "$f" >/dev/null 2>"$tmpf" || true
+    "$ZORC" $DEBUG_FLAGS "$f" >/dev/null 2>"$tmpf" || n_pos_rc=$((n_pos_rc+1))
     [ -s "$tmpf" ] && p_stderr_nonempty=$((p_stderr_nonempty+1))
   done
-  echo "负例=${#neg_files[@]} 比对=$n_chk 一致=$n_pass 差异=$n_diff golden缺失=$n_missing 正例stderr非空=$p_stderr_nonempty" >>"$log"
-  if [ "$n_diff" -gt 0 ] || [ "$p_stderr_nonempty" -gt 0 ]; then record golden FAIL 1 "$log"
+  echo "负例=${#neg_files[@]} 比对=$n_chk 一致=$n_pass 差异=$n_diff golden缺失=$n_missing 正例stderr非空=$p_stderr_nonempty 正例退出非零=$n_pos_rc golden基线空件=$n_golden_empty" >>"$log"
+  if [ "$n_diff" -gt 0 ] || [ "$p_stderr_nonempty" -gt 0 ] || [ "$n_pos_rc" -gt 0 ] || [ "$n_golden_empty" -gt 0 ]; then record golden FAIL 1 "$log"
   elif [ "$STRICT" = 1 ] && { [ "$n_missing" -gt 0 ] || [ "$n_chk" -eq 0 ]; }; then
     echo "strict 防空口径：golden缺失=$n_missing 比对数=$n_chk → FAIL（§2.1 缺失语义）" >>"$log"; record golden FAIL 1 "$log"
   elif [ "$n_chk" -eq 0 ] || [ "$n_missing" -gt 0 ]; then record golden SKIP 0 "$log"
@@ -272,5 +275,6 @@ stage_code_table
   echo "--- stage summary ($RUN_ID) ---"
   for s in "${summary[@]}"; do echo "$s"; done
 } | tee "$LOG_DIR/summary.txt"
+n_skip="$(printf '%s\n' "${summary[@]}" | grep -c '^SKIP|' || true)"; [ "$STRICT" != 1 ] && [ "$n_skip" -gt 0 ] && echo "[ci][警告] 非 strict 且 SKIP=$n_skip：存在被跳过的判定面，绿≠全绿（告警行不入任何 log、不改 rc 语义与 summary 段数）"
 echo "[ci] 证据目录: $LOG_DIR"
 exit "$overall"
