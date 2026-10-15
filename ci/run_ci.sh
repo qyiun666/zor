@@ -170,6 +170,10 @@ stage_code_table() { # 0.1.18 项2 诊断码表不变式 A1–A7（单一实现�
   # 形制（判据位 seq205 §二／§三，本段照此写）：末式必以 record 落账（非纯 echo），否则红不置 overall 且 summary.txt 无该行；
   # 调用行须为独立一行裸调用——record() 尾式在 status=PASS 时短路使本函数返回 1，取 $? 或接 &&／|| 会把 PASS 读成 FAIL。
   local log; log="$(new_log code-table)"
+  # 环境面钉定（0.1.18 执笔席自抓）：本机 awk（one-true-awk 20200816）在 UTF-8 locale 下按 collation 比较串，
+  # 使 $3=="实发" 对全部行恒真（实测同件 C 下 DECLEMIT=13、en_US.UTF-8 下=16）⇒ 本段判定会随执行者环境漂移，
+  # 且定性闭集校验在该 locale 下恒绿（零判别力＝假绿）。故段内钉 LC_ALL=C，函数返回即复原、不外溢他段。
+  local LC_ALL=C; export LC_ALL
   if ! command -v awk >/dev/null 2>&1 || ! command -v grep >/dev/null 2>&1; then
     echo "awk/grep 缺失：本段不执行（--strict 判 FAIL，非 PASS）" > "$log"
     [ "$STRICT" = 1 ] && record code-table FAIL 1 "$log" || record code-table SKIP 0 "$log"; return
@@ -230,7 +234,7 @@ stage_code_table() { # 0.1.18 项2 诊断码表不变式 A1–A7（单一实现�
   # A8b1＝新行出处闸的常驻半边（判据归口列非空）；另半边 A8b2 与搬运闸 A8a 须对 base 侧旧文核对，属升格窗一次性执行
   awk -F'\t' 'NF < 4 || $4 == "" { print $2 }' "$td/rows" > "$td/v_a8b1"
   {
-    echo "[code-table] 取径=表结构（首格首枚 E[0-9]{4}），节区间标题谓词分类；口径源=specs/r1-type-system.md §8/§8b 与 specs/r2-ownership.md §8 取径注记"
+    echo "[code-table] 取径=表结构（首格首枚 E[0-9]{4}），节区间标题谓词分类；口径源=specs/r1-type-system.md §8/§8b 与 specs/r2-ownership.md §8 取径注记；环境=段内钉 LC_ALL=C（awk 串比较在 UTF-8 locale 下按 collation 会恒真，见函数头注）"
     printf '[code-table] 声明行=%s 去重=%s DECLEMIT=%s DECLRES=%s DECLALIAS=%s DECLRT=%s EMIT=%s GOLDEN=%s 散文码位=%s\n' \
       "$n_row" "$n_uniq" "$(grep -c '' "$td/decl_emit" || true)" "$(grep -c '' "$td/decl_res" || true)" \
       "$(grep -c '' "$td/decl_alias" || true)" "$(grep -c '' "$td/decl_rt" || true)" \
