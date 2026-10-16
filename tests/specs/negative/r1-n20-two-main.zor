@@ -1,0 +1,7 @@
+// r1-n20-two-main.zor — AC-R1-2 负例（specs/r1-type-system.md §6 定义名重复句的 `main` 半句，0.1.21 项5b 配对件）
+// 预期：E1701 定义名重复（名为 `main` 的函数并存两枚，第二枚报点在其定义关键字位；R1 §6 main 至多一枚）
+// 判据来源：PRD AC-R1-2；错误文案基线=门禁 T-4。基线件由 ci/capture_golden.sh 实测捕获产出，非手写。
+
+fn main() { }
+
+fn main() { }

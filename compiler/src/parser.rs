@@ -205,6 +205,7 @@ impl Parser {
     }
 
     fn parse_struct(&mut self) -> StructDecl {
+        let span = self.at();
         self.bump(); // struct
         let name = match self.bump() { Tok::Ident(s) => s, _ => { self.diag("E1101", "struct name expected"); "_err".to_string() } };
         if matches!(self.peek(), Tok::Lt) { self.diag("E1501", "0.1.x 禁泛型尖括号"); self.skip_angle(); }
@@ -223,7 +224,7 @@ impl Parser {
             }
         }
         self.expect(&Tok::RBrace, "'}' closing struct");
-        StructDecl { name, fields, span: (0, 0) }
+        StructDecl { name, fields, span }
     }
 
     fn parse_enum(&mut self) -> EnumDecl {

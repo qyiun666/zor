@@ -4,6 +4,12 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.1.x 顺序递进规则（见 README「版本规则」）。
 
+## [0.1.21] - 2026-10-16
+
+### Fixed
+- 修复 `struct` 定义名重复的报点形（四形统一取定义关键字位）：`compiler/src/parser.rs` 的 `parse_struct` 补齐与 `parse_fn`／`parse_enum` 同形的一行取位，`StructDecl.span` 不再硬写 `(0, 0)`；`compiler/src/check.rs` 的 `struct` 支路随之简化，「首字段位代报」与零字段形态落 `0:0` 的兜底支路同删。`E1701` 短名与定性不变，诊断文案除坐标外逐字不动。语言接受面零变动：本版不新增语言判定、不新增错误码、不扩 `.zor` 语法与类型宽度，`main` 的存在性与签名形态仍不在判据内（归 0.1.22 项 6）；`zorcc` 仍为纯编译前端。 规范面随标一句（无新增承诺）：`specs/r1-type-system.md` §6 定义名重复句的报点子句改为「四形皆报该定义的关键字位」，同时移除「`struct` 报其首字段位…随 parser 扩面另窗收」那枚残差表述；§8 码表行的文案与归口列不动。
+- 测试面与回归读数：补三对配对件 `tests/specs/negative/r1-n18-dup-struct.zor`／`r1-n19-dup-enum.zor`／`r1-n20-two-main.zor`（各配同目录 `golden` 基线一枚，基线一律由 `ci/capture_golden.sh` 实测捕获产出、非手写），使 `E1701` 的四形各得一枚回归位；本版唯一预期漂移＝golden 枚数 39→42，`EMIT==GOLDEN` 仍＝14（三对新件同码，去重侧不动），既有 39 件基线在报点形改动后逐字节零变。窗内次序律＝`span` 修复必先于基线捕获（golden 文案内嵌报点坐标）。
+
 ## [0.1.20] - 2026-10-16
 
 ### Added

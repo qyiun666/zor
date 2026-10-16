@@ -713,13 +713,13 @@ impl<'a> Ck<'a> {
     /// 第二次及其后的每一枚报 E1701（首现不报）。四类形制＝重复 `fn`／重复 `struct`／重复 `enum`／多枚 `fn main`，
     /// 其中多枚 `main` 由 fn 域收（名为 main 的函数至多一枚）；`main` 的存在性与签名形态归 0.1.22 项 6，本处不判。
     /// 三类各自成集、互不查：跨类同名（`struct Foo`＋`enum Foo`）在 0.1.x 未作判定（R1 §6 跨类注记句），本窗不拦。
-    /// struct 报点取该定义首字段位——parser 的 StructDecl.span 为 `(0, 0)`（parser.rs:226 在册现值），
-    /// 名位精确化需扩 parser 侧 span，而 `parser.rs` 在本窗名册禁面内，故零字段 struct 的重复现报 `0:0`（残差随实记）。
+    /// 四形报点＝该定义的关键字位（0.1.21 项5b 甲案）：`fn`／`struct`／`enum` 各取其 span，多枚 `main` 由 fn 域收；
+    /// `StructDecl.span` 由 parse_struct 现取（与 `parse_fn`／`parse_enum` 同形补齐），故零字段 struct 亦无兜底支路。
     fn check_def_names(&mut self) {
         let prog = self.prog;
         let groups: [(&str, Vec<(String, (usize, usize))>); 3] = [
             ("fn", prog.fns.iter().map(|f| (f.name.clone(), f.span)).collect()),
-            ("struct", prog.structs.iter().map(|s| (s.name.clone(), s.fields.first().map(|f| (f.2, f.3)).unwrap_or((0, 0)))).collect()),
+            ("struct", prog.structs.iter().map(|s| (s.name.clone(), s.span)).collect()),
             ("enum", prog.enums.iter().map(|e| (e.name.clone(), e.span)).collect()),
         ];
         let mut seen: HashMap<(&str, String), (usize, usize)> = HashMap::new();

@@ -1,0 +1,1 @@
+zorcc: E1701 tests/specs/negative/r1-n20-two-main.zor:7:1: fn 'main' 定义名重复（同域同名同类的具名定义至多一枚，R1 §6 定义名重复句；首现 5:1）
