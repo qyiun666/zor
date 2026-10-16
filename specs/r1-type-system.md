@@ -61,7 +61,7 @@ T ::= prim | [T; N] | (T1, ..., Tk), k ≥ 0 | struct | enum | &T | &mut T | fn(
   - 生效条件：仅当用户**未定义**同名函数时，此二名按内建特判调用（特判条件源码字面 `(n.as_str() == "println" || n.as_str() == "print") && !self.fns.contains_key(n)`）；用户自定义同名 `println`/`print` 时特判让位，按普通函数签名检查（含实参个数不符 E1601，文案模板 `调用 '<name>' 实参个数 <got>，签名要求 <want>`）。
   - 实参与返回：各实参逐个做类型检查（无期望类型约束）；不提供格式串/参数格式化承诺（0.1.x 无任何格式化语义）。调用表达式类型为 `unit`。
   - 诊断：`println` 零实参报 E1601，文案逐字 `println 至少一个参数`（即"至少一参"语义入册）；`print` 零实参合法。
-- **定义名重复句（0.1.20 实发禁令句；本句为上行"名字作用域=模块级唯一"在册句的实发判据扩写，非新增承诺）**：同一模块命名域内，同名且**同类**的具名定义（`fn`／`struct`／`enum` 三类各成一域）至多一枚——第二次及其后的每一枚同名同类定义必须报 `E1701 定义名重复`，位置报在该重复定义处（`fn`／`enum` 报定义关键字位；`struct` 报其首字段位，因 0.1.x 的 struct 名位在 AST 无 span，精确到名位随 parser 扩面另窗收）。`main` 同受本句约束：名为 `main` 的函数至多一枚；本句只判枚数超限，`main` 的存在性与签名形态不在本句辖界（另窗判）。
+- **定义名重复句（0.1.20 实发禁令句；本句为上行"名字作用域=模块级唯一"在册句的实发判据扩写，非新增承诺）**：同一模块命名域内，同名且**同类**的具名定义（`fn`／`struct`／`enum` 三类各成一域）至多一枚——第二次及其后的每一枚同名同类定义必须报 `E1701 定义名重复`，位置报在该重复定义处（四形皆报该定义的关键字位：`fn`／`struct`／`enum` 各取其定义起点，多枚 `main` 由 fn 域收；0.1.21 甲案随标，struct 名位无独立 span，报点不落名 token）。`main` 同受本句约束：名为 `main` 的函数至多一枚；本句只判枚数超限，`main` 的存在性与签名形态不在本句辖界（另窗判）。
 - 跨类同名（如 `struct Foo` 与 `enum Foo` 并存）在 0.1.x **未作判定**，既非允许亦非禁止：不得据"未拦"读成已裁定合法，亦不得据上句读成已禁止；是否分域共存属语言政策选择，另窗裁定并附使用方影响面。（本条为说明形注记，不设立任何码位。）
 
 ## 7. 溢出与边界行为（Edge cases，PRD v1.1 勘误归本节）
@@ -85,7 +85,7 @@ T ::= prim | [T; N] | (T1, ..., Tk), k ≥ 0 | struct | enum | &T | &mut T | fn(
 | E1401 enum 递归变体 | 实发 | R1 §3 enum 递归禁止句 | tests/specs/golden/r1-n05-enum-direct-recursive.txt（另有同目录 1 份：r1-n06-enum-transitive-recursive） |
 | E1501 引用类型不合规出现位置 | 实发 | R1 §3 引用类型条目、§8 E1501 释义扩写段 10 行 | tests/specs/golden/r1-n07-ref-in-struct.txt（另有同目录 8 份：r1-n11-generic-angle-syntax、r2-n08-ref-in-struct、r2-n09-self-ref-struct、r2-n17-ref-in-enum-variant、r2-n18-ref-in-array-element、r2-n19-ref-in-box-payload、r2-n20-array-lit-ref-element、r2-n21-array-lit-ref-element-forms） |
 | E1601 函数签名/实参不一致 | 实发 | R1 §3 无参变体构造实参句、§6 内置 I/O 诊断句 | tests/specs/golden/r1-n08-arg-arity-mismatch.txt（另有同目录 3 份：r1-n12-println-zero-arg、r1-n14-enum-nullary-with-args、r1-n15-shadow-println-arity） |
-| E1701 定义名重复 | 实发 | R1 §6 定义名重复句（0.1.20 实发禁令句；即 §6「名字作用域=模块级唯一」在册句的判据扩写，含 `main` 至多一枚半句） | tests/specs/golden/r1-n17-duplicate-def-name.txt（另有同目录 0 份） |
+| E1701 定义名重复 | 实发 | R1 §6 定义名重复句（0.1.20 实发禁令句；即 §6「名字作用域=模块级唯一」在册句的判据扩写，含 `main` 至多一枚半句） | tests/specs/golden/r1-n17-duplicate-def-name.txt（另有同目录 3 份：r1-n18-dup-struct、r1-n19-dup-enum、r1-n20-two-main） |
 
 取径注记（0.1.18 形制升格；本条只记取径，不新增/不注销任何错误码、不改任何描述串）：本节条目界＝**表结构**（每码一行，`码位`列格内首枚 `E[0-9]{4}` 为码位、其后至格尾为该码描述串），**不是**全角 `｜`（U+FF5C）字符约定；U+FF5C 仅在 0.1.17 及以前的单行列表形中充当条目界，作历史锚记于此，两种取径不得混用。节区间（`^## 8\.` 起、`^## 9\.` 止）只界定"从哪一节取"，区间内仍须按每行 `码位` 列首枚取，**禁止对区间正文全文 grep**（本节内 §8 释义扩写表与表后各注记行同落该区间，全量 grep 会同码两收）。描述串的语义承载字面与本表升格前的单行列表逐字一致，由升格窗的一次性搬运闸核对。
 
