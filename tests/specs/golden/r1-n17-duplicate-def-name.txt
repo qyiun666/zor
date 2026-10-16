@@ -1,0 +1,1 @@
+zorcc: E1701 tests/specs/negative/r1-n17-duplicate-def-name.zor:7:1: fn 'dup' 定义名重复（同域同名同类的具名定义至多一枚，R1 §6 定义名重复句；首现 5:1）
