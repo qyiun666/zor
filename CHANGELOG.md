@@ -4,6 +4,12 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.1.x 顺序递进规则（见 README「版本规则」）。
 
+## [0.1.20] - 2026-10-16
+
+### Added
+- 新增语言判定=定义名重复（0.1.20 项 5a）。本版性质=**语言判定面扩一枚禁令**，与 0.1.17／0.1.18／0.1.19 三版的「门禁与规范面收口、语言宽度零变动」不同：`.zor` 源码面的接受面未扩、拦截面自本版起对「同名同类定义」收窄；本版仍为**内部验证里程碑、非可用语言版本**，`zorcc` 仍为纯编译前端（零代码生成／零产物／零运行链路），本节不含任何运行期判据，`E3001`／`E3002` 仍为**规范登记、未实发**，`E1701` 在「码表对外页」未启动期间只作**仓内登记**，本版不构成任何可安装或可发布承诺。`compiler/src/check.rs` 新增 `check_def_names()`（唯一实现落点，由 `run()` 步 0 先于登记调用），同一模块命名域内**同名且同类**的具名定义（`fn`／`struct`／`enum` 三类各成一域）第二次及其后的每一枚报 `E1701 定义名重复`，位置报在该重复定义处；多枚 `fn main` 由 fn 域收（名为 `main` 的函数至多一枚，`main` 的存在性与签名形态不在本句辖界）。四形行为本窗全部实装，配对输出基线只落重复 `fn` 一枚：`tests/specs/negative/r1-n17-duplicate-def-name.zor`＋`tests/specs/golden/r1-n17-duplicate-def-name.txt`（基线由 `ci/capture_golden.sh` 以本支 release 二进制实测捕获产出，非手写；捕获脚本零改动）。**跨类同名（`struct Foo`＋`enum Foo`）本版未作判定**，实测与 0.1.19 同为 rc=0（既非允许亦非禁止，见 `specs/r1-type-system.md` §6 跨类注记句）。退出码语义零扩面：新失败=语言诊断，独占 rc=1；CLI 误用 rc=2 面未触。
+- 规范面同步（规范句先于码落）：`specs/r1-type-system.md` §6 新增**定义名重复句**（在册句「名字作用域=模块级唯一」的实发判据扩写，含 `main` 至多一枚半句）与其后的跨类未定注记（说明形，不设立任何码位），§8 码表其后新增 `E1701 定义名重复` 一行（定性=实发，判据归口列指向 §6 该句、非空）。码表不变式实测值（本席双拍现取，同一 `--strict` 段面）：@base（合入点 `432630795a42e2580688c4debdd5e966a8c17065` 件身）`声明行=17 去重=17 DECLEMIT=13 DECLRES=1 DECLALIAS=1 DECLRT=2 EMIT=13 GOLDEN=13 散文码位=10`；@head `18/18/14/1/1/2/14/14/11`——五枚 +1 依次为声明行、去重、DECLEMIT、EMIT、GOLDEN，`散文码位` +1 的来源是 §6 禁令句内那枚码位字面（A6 违规=0），DECLRES／DECLALIAS／DECLRT 零变；A1–A7＋A8b1＋HDR＋定性闭集 @head 全部违规=0。`ci/run_ci.sh` 与 `ci/capture_golden.sh` **零字节改动**（`stage_code_table` 计数为动态集合、`stage_golden` 负例面为 glob 自动发现，故 +1 码 +1 基线在现有形制下自动成立），三枚在册等值锚 `cmp -s`＠L146／`-ne`＠L145／`exit 2`＠L11,L19 未位移。版本身份锚与回归读数：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.1.19` 直锚 `0.1.20`（lock 由 cargo 同步、非手写；全库带引号的版本字面量恰此 2 枚），`zorcc --version` 实测 `zorcc 0.1.20`。`cargo test` passed 之和 **72 → 72**（分段 0／7／28／37／0，failed 0、rc=0；本窗名册未含 `compiler/tests`，故新增判定的行为覆盖由新增负例对＋仓外四形探针承担，未新增 Rust 单测＝如实记，非降向）。`ZORC_BIN=<本支 release 二进制> bash ci/run_ci.sh --strict` @head 双 locale（`LC_ALL=C`／`en_US.UTF-8`）各 rc=0、五段全 PASS，两段 `code-table.log` 逐字节 SAME；golden 面 @head 负例=39／比对=39／一致=39／差异=0／缺失=0，正例=35／失败=0／stderr 非空=0，既有 38 枚输出基线重捕后逐字节零变（`git diff --stat -- tests/specs/golden` 空集）。本版延续「凡发版，链内含 bump 至当版号」固定载荷位例行执行（0.1.19→0.1.20 顺序直锚，无欠账叙事）。
+
 ## [0.1.19] - 2026-10-16
 
 ### Added

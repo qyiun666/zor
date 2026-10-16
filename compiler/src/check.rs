@@ -38,6 +38,8 @@ impl<'a> Ck<'a> {
     }
 
     pub fn run(mut self) -> Vec<Diag> {
+        // 0. 定义名域检查（R1 §6 定义名重复句 → E1701，0.1.20 项5a）：先于登记跑；重复不改变后续登记形制（后定义覆盖前定义＝BASE 现态零变）
+        self.check_def_names();
         // 1. 注册具名类型/函数
         for s in &self.prog.structs {
             self.structs.insert(s.name.clone(), vec![]);
@@ -703,6 +705,31 @@ impl<'a> Ck<'a> {
                     self.d("E1201", l, c, format!("算术运算 '{}' 不支持类型 '{}'", op, t.display()));
                 }
                 t
+            }
+        }
+    }
+
+    /// R1 §6 定义名重复句（0.1.20 项5a 实发点）：同一模块命名域内，同名且同类的具名定义至多一枚，
+    /// 第二次及其后的每一枚报 E1701（首现不报）。四类形制＝重复 `fn`／重复 `struct`／重复 `enum`／多枚 `fn main`，
+    /// 其中多枚 `main` 由 fn 域收（名为 main 的函数至多一枚）；`main` 的存在性与签名形态归 0.1.22 项 6，本处不判。
+    /// 三类各自成集、互不查：跨类同名（`struct Foo`＋`enum Foo`）在 0.1.x 未作判定（R1 §6 跨类注记句），本窗不拦。
+    /// struct 报点取该定义首字段位——parser 的 StructDecl.span 为 `(0, 0)`（parser.rs:226 在册现值），
+    /// 名位精确化需扩 parser 侧 span，而 `parser.rs` 在本窗名册禁面内，故零字段 struct 的重复现报 `0:0`（残差随实记）。
+    fn check_def_names(&mut self) {
+        let prog = self.prog;
+        let groups: [(&str, Vec<(String, (usize, usize))>); 3] = [
+            ("fn", prog.fns.iter().map(|f| (f.name.clone(), f.span)).collect()),
+            ("struct", prog.structs.iter().map(|s| (s.name.clone(), s.fields.first().map(|f| (f.2, f.3)).unwrap_or((0, 0)))).collect()),
+            ("enum", prog.enums.iter().map(|e| (e.name.clone(), e.span)).collect()),
+        ];
+        let mut seen: HashMap<(&str, String), (usize, usize)> = HashMap::new();
+        for (kind, items) in groups {
+            for (name, (l, c)) in items {
+                let first = seen.get(&(kind, name.clone())).copied();
+                match first {
+                    Some((fl, fc)) => self.d("E1701", l, c, format!("{} '{}' 定义名重复（同域同名同类的具名定义至多一枚，R1 §6 定义名重复句；首现 {}:{}）", kind, name, fl, fc)),
+                    None => { seen.insert((kind, name.clone()), (l, c)); }
+                }
             }
         }
     }
