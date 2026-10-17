@@ -734,6 +734,18 @@ impl<'a> Ck<'a> {
                 }
             }
         }
+        // 0.1.23 项7 乙制（禁止同命名域，R1 §6 跨类同名禁令句 → E1704）：同名而异类的具名定义并存＝后定义者那一枚报。
+        // 上行原注「跨类同名…本窗不拦」自本面作废＝前形留档、逐字不回改（本窗 del 上界一枚已整枚归 r1 §6 L65 的整句替换）。
+        // 取上支 seen（每类首现枚）入跨域比较＝同名同类枚已归 E1701，两码不叠报；报点＝后定义者关键字位（与 E1701 同位制，0.1.21 甲案随标沿用）。
+        let mut cross: Vec<(&str, String, (usize, usize))> = seen.into_iter().map(|((k, n), s)| (k, n, s)).collect();
+        cross.sort_by_key(|(_, _, (l, c))| (*l, *c));
+        let mut by_name: HashMap<String, (&str, (usize, usize))> = HashMap::new();
+        for (kind, name, (l, c)) in cross {
+            let prev = by_name.get(&name).copied();
+            if let Some((fk, (fl, fc))) = prev {
+                if fk != kind { self.d("E1704", l, c, format!("{} '{}' 与 {} '{}' 跨类定义名冲突（同一模块命名域内禁止异类同名，R1 §6 跨类同名禁令句；先现 {}:{}）", kind, name, fk, name, fl, fc)); }
+            } else { by_name.insert(name, (kind, (l, c))); }
+        }
     }
 
     /// R1 §6 入口契约句·存在性半句（0.1.22 项6 实发点）：一个编译单元（0.1.x 单档即程序，无多文件链接）内
