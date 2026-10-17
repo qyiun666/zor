@@ -1,0 +1,1 @@
+zorcc: E1704 tests/specs/negative/r1-n23-cross-kind-same-name.zor:8:1: enum 'Foo' 与 struct 'Foo' 跨类定义名冲突（同一模块命名域内禁止异类同名，R1 §6 跨类同名禁令句；先现 6:1）
