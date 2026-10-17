@@ -1,0 +1,1 @@
+zorcc: E1703 tests/specs/negative/r1-n22-main-ret-int.zor:5:14: fn 'main' 签名形不合（程序入口返回类型须为 unit，R1 §6 入口契约句；实见 'i64'）

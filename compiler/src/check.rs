@@ -38,8 +38,10 @@ impl<'a> Ck<'a> {
     }
 
     pub fn run(mut self) -> Vec<Diag> {
+        self.check_entry_presence(); // 入口存在性先于定义名域（0.1.22 项6 入口契约句 → E1702）
         // 0. 定义名域检查（R1 §6 定义名重复句 → E1701，0.1.20 项5a）：先于登记跑；重复不改变后续登记形制（后定义覆盖前定义＝BASE 现态零变）
         self.check_def_names();
+        self.check_entry_signature(); // 入口签名形后于唯一性、只判首现那枚（0.1.22 项6 入口契约句 → E1703）
         // 1. 注册具名类型/函数
         for s in &self.prog.structs {
             self.structs.insert(s.name.clone(), vec![]);
@@ -711,7 +713,7 @@ impl<'a> Ck<'a> {
 
     /// R1 §6 定义名重复句（0.1.20 项5a 实发点）：同一模块命名域内，同名且同类的具名定义至多一枚，
     /// 第二次及其后的每一枚报 E1701（首现不报）。四类形制＝重复 `fn`／重复 `struct`／重复 `enum`／多枚 `fn main`，
-    /// 其中多枚 `main` 由 fn 域收（名为 main 的函数至多一枚）；`main` 的存在性与签名形态归 0.1.22 项 6，本处不判。
+    /// 其中多枚 `main` 由 fn 域收（名为 main 的函数至多一枚）；`main` 的存在性与签名形态归 0.1.22 项 6 入口契约句，该两判自 0.1.22 起已由 `check_entry_presence()`／`check_entry_signature()` 实发（实态句，非待销缺口），本函数只收枚数超限那一枚。
     /// 三类各自成集、互不查：跨类同名（`struct Foo`＋`enum Foo`）在 0.1.x 未作判定（R1 §6 跨类注记句），本窗不拦。
     /// 四形报点＝该定义的关键字位（0.1.21 项5b 甲案）：`fn`／`struct`／`enum` 各取其 span，多枚 `main` 由 fn 域收；
     /// `StructDecl.span` 由 parse_struct 现取（与 `parse_fn`／`parse_enum` 同形补齐），故零字段 struct 亦无兜底支路。
@@ -729,6 +731,30 @@ impl<'a> Ck<'a> {
                 match first {
                     Some((fl, fc)) => self.d("E1701", l, c, format!("{} '{}' 定义名重复（同域同名同类的具名定义至多一枚，R1 §6 定义名重复句；首现 {}:{}）", kind, name, fl, fc)),
                     None => { seen.insert((kind, name.clone()), (l, c)); }
+                }
+            }
+        }
+    }
+
+    /// R1 §6 入口契约句·存在性半句（0.1.22 项6 实发点）：一个编译单元（0.1.x 单档即程序，无多文件链接）内
+    /// 名为 `main` 的函数零枚时报 E1702，报点＝该文件 `1:1`（程序级缺失无自然 span）。
+    /// 唯一性不在此判（多枚由上行定义名重复域收 E1701）；签名形在唯一性之后单列，零枚时不叠报（无对象）。
+    fn check_entry_presence(&mut self) {
+        let prog = self.prog;
+        if !prog.fns.iter().any(|f| f.name == "main") {
+            self.d("E1702", 1, 1, "程序入口缺失（编译单元内须恰一枚 fn main，R1 §6 入口契约句；本单元实见 0 枚）");
+        }
+    }
+
+    /// R1 §6 入口契约句·签名形半句（0.1.22 项6 实发点）：首现那枚 `fn main` 若显式写返回类型且非 `unit` 报 E1703，
+    /// 报点＝该返回类型位（`FnDecl.ret` 由 parse_fn 现取，含 span）。缺省（不写 `-> R`）与显式 `-> unit` 皆合法
+    /// （沿 §6 首行「无 `R` 时视为 `-> unit`」，本支不新增语义）；带参数形态 `fn main(x: T)` 0.1.x 未作判定。
+    fn check_entry_signature(&mut self) {
+        let prog = self.prog;
+        if let Some(f) = prog.fns.iter().find(|f| f.name == "main") {
+            if let Some((t, l, c)) = &f.ret {
+                if !matches!(t, Ty::Prim("unit")) {
+                    self.d("E1703", *l, *c, format!("fn 'main' 签名形不合（程序入口返回类型须为 unit，R1 §6 入口契约句；实见 '{}'）", t.display()));
                 }
             }
         }
