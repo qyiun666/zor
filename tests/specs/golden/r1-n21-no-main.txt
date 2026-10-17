@@ -1,0 +1,1 @@
+zorcc: E1702 tests/specs/negative/r1-n21-no-main.zor:1:1: 程序入口缺失（编译单元内须恰一枚 fn main，R1 §6 入口契约句；本单元实见 0 枚）

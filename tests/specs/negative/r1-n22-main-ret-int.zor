@@ -1,0 +1,5 @@
+// r1-n22-main-ret-int.zor — AC-R1-2 负例（specs/r1-type-system.md §6 入口契约句·签名形半句，0.1.22 项6 配对件）
+// 预期：E1703 入口签名形不合（`main` 显式写非 `unit` 的返回类型，报点=该返回类型位；R1 §6 入口契约句）
+// 判据来源：PRD AC-R1-2；错误文案基线=门禁 T-4。基线件由 ci/capture_golden.sh 实测捕获产出，非手写。
+
+fn main() -> i64 { 0 }
