@@ -4,6 +4,12 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.1.x 顺序递进规则（见 README「版本规则」）。
 
+## [0.1.24] - 2026-10-17
+
+### Added
+- 规范面 空白补录（0.1.24 项 8a・票面 v1→v2・裁口位 主裁⑱／⑲ 定形）＝`specs/r2-ownership.md` §10 段尾 追加 OI-5 一条线 八枚 条目（add 8／del 0・追加首行号 119＝既有 118 行 逐字节 零改写）：本线 唯一定义源＝**owner 失活点**（非 Copy 值 之 owner 槽位 终结 之刻），凡书「失活」必带档别（借用／owner），借用 档 活跃性 保持 §2 L24 原位原文＝本窗 零吸入 零改写；四处 现身（channel 槽位／重赋值 旧值／C→ZOR 回调 入值／`Box` 堆内存）归 同一条线，不逐场景 追加规则。本版性质＝**规范 登记面 之 补录**，判定面 与 接受面 零变动：零新增 错误码（§8 行集 仍 8 枚＝[98…105]）、零新增 AC、零实现（`compiler/src/**` 零字节改动）、零 golden 变更（枚 45／objectsize 和 7066 之 集合恒等三判 预期值 未动）。「编译期可判定／运行期待验证」之 二分 与 联审签字 归 0.1.25 项 8b，`chan(T,N)` 归 0.2.x 语法冻结，spawn 捕获列表 归 OI-2＝本窗 皆 不成文。本版仍为**内部验证里程碑、非可用语言版本**，`zorcc` 仍为纯编译前端（零代码生成／零产物／零运行链路），`E3001`／`E3002` 仍为规范登记、未实发，`E1701`～`E1704` 在「码表对外页」未启动期间只作仓内登记，不构成任何可安装或可发布承诺，零新增 tag／零新增 release。
+- 版本身份锚（名册 恰 4 枚・主裁⑱ 定形）＝`compiler/Cargo.toml:3` 与 `compiler/Cargo.lock:7` 由 `0.1.23` 直锚 `0.1.24`（各 add 1／del 1；`Cargo.lock:3` 之 `version = 4` 系清单格式行、零触碰＝主裁⑲-四 禁面(八)），`CHANGELOG.md` 本节 顶部 一节 纯插入（add 6／del 0），合入体树 之前形 blob 逐枚＝r2 `c6c1d0e5d628ac066a66f2e64c59a557e1d6f215`／CHANGELOG `0ece1a82d6238d3db592bba47ea9f5783efb40bf`／Cargo.toml `ca3ce66761ce9203b468bedef3b65d59e8df5c00`／Cargo.lock `230d863e5298e71aec672ce613c5f817ec0a9740`（后形 blob 与 numstat 之实测 由 支主 实现拍 落笔件 与 判据位 复取拍 并书）。判据面 三枚 之 `zorcc --version`＝`zorcc 0.1.24` 依 主裁㉕ 唯 归 管理席 合入前 全闸面（丙档・位内 build 实取）＝本窗 支主 零 `cargo`、不取 亦 不代取；base 双档 随标（主裁㉒-三）＝身份档 `8c927a78e12254fe4adeb048ed1d00d2f0b4ab2d`／内容档 `44dea20d5d3ac2aecad0162b6417ad84e19d08ff`。
+
 ## [0.1.23] - 2026-10-17
 
 ### Added
