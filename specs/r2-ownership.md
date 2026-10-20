@@ -109,8 +109,8 @@
 ## 9. 测试用例映射（AC-R2-2：≥15 负例；目录基准 tests/specs/，M-1 定论）
 
 - 负例 r2-n01…r2-n21（≥15，AC-R2-2；F-1/F-1b 修订：剔除循环引用并补 3 条）：move 后用×2、部分移动后整体用、&mut 期间共享借用、双 &mut、独占借用期间再 `&mut` 重借（E2201 变体）、借用返回、引用入 struct、自引用构造、分支/循环多路径 drop 后另一路径使用（E2101）、unbox 后用、Box move 后解引用、channel move 后本地再用（R3 交叉，R3 规则成文前以 R2 §1 移动点条款为据）、块尾失活近邻×2（清单第 7 条）、FFI move 后用（R4 交叉）、引用入 enum 变体载荷（r2-n17：`&`/`&mut` 两子形态同件钉，golden 实发 E1501 #4 容器位文案）、引用入数组元素标注位（r2-n18：`[&T; N]`/`[&mut T; N]` 两子形态同件钉，同文案）、引用入 Box 载荷内子位（r2-n19：`Box<&T>`/`Box<&mut T>` 两子形态同件双行钉，golden 实发 E1501 #4 容器位文案两行 :5:13/:6:13）——后两条 0.1.11 P2 先实测后入册（三方同数实跑门在档：核心 seq1528/QA seq1535/文档 seq1532/对齐 seq1536/确认 seq1540/合入 seq1541；码表面零触碰）、r2-n19 0.1.12 P2 先实测后入册（三方同数实跑门按号引用：核心 seq1676/文档 seq1680/QA seq1682，12 跑全拦下零反差；码表面零触碰）。每条编译期失败且对应 §8 一码；循环引用 leak 场景**不占负例序号**（§7 已知限制）。
-- 正例 r2-01…：移动链、借用读/写、Box 递归堆（链表）、drop 顺序打点、管道式所有权交接（R3 交叉预备）。
-- AC-R2-4：`positive/r2-ref-*.zor` 与 Rust 同题程序对照，ZOR 侧零标注通过；对照 Rust 源码放 `tests/specs/compare/`（新增子目录，随 M-1 契约）。
+- 正例 r2-01…r2-12、r2-ref-01…r2-ref-03：移动链、借用读/写、Box 递归堆（链表）、drop 顺序打点、管道式所有权交接（R3 交叉预备）；AC-R2-4 三题（T-a 二输入择一返回／T-b struct 持引用字段／T-c 容器/数组元素持引用）的 ZOR 侧改写正例见下条。
+- AC-R2-4（0.1.26 项 7 落钉）：正例实存 `positive/r2-ref-01-two-input-select-owned.zor`／`r2-ref-02-struct-hold-value.zor`／`r2-ref-03-array-hold-value.zor`（T-a／T-b／T-c，`r2-ref-*` 通配集非空），ZOR 侧零标注通过；对照 Rust 源码实存 `tests/specs/compare/t-a-pick-annotated.rs`／`t-a-pick-unannotated.rs`／`t-b-holder-ref-field-annotated.rs`／`t-b-holder-ref-field-unannotated.rs`／`t-c-holder-ref-array-annotated.rs`／`t-c-holder-ref-array-unannotated.rs`（映射表见 `tests/specs/compare/README.md`），分 annotated／unannotated 两态：前者须可编，后者须报 Rust 侧 `missing lifetime specifier` 诊断（Rust 生命周期缺失码，非本语言码表成员）；CI `rust-compare` 段执行两段判与反空转三项（strict 下两侧各≥3 且成对，否则 FAIL）。三题载荷限 Copy 集（`i64`），**本集不覆盖非 Copy 绑定重赋值形态**。**在册结论句**：在 Rust 必须显式标注的三类同题形态上，ZOR 侧以禁则收窄＋所有权转移替代，用户标注负担为零；该结果系表达策略替换（返回拥有值／容器持值），非同一程序去掉标注——两侧源码不同题拼写，等价性只在「同输入得同输出口」层成立；该结果不蕴含检查器强于 Rust，亦不蕴含 ZOR 可表达 Rust 需标注的对应程序——后者属 §7 不可表达清单辖面。**引用 AC-R2-4 结果必须同引 §7 不可表达清单，不得单引。**
 
 ## 10. Open Issues（本 spec 自身）
 

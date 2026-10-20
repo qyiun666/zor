@@ -4,6 +4,25 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.1.x 顺序递进规则（见 README「版本规则」）。
 
+## [0.1.26] - 2026-10-20
+
+内部验证里程碑，非可用语言版本：`zorcc` 仍为纯编译前端（无代码生成／无产物／无运行链路）；本节不含任何运行期判据。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。本版性质＝**AC-R2-4 对外证据面落钉与规范同步，非语言能力扩面**：零新增语言判定、零新增错误码、零新增 AC、零新增负例、零 golden 重捕；`compiler/src/**` 零字节改动，`.zor` 源码面接受与拦截宽度与 0.1.25 逐字同宽。
+
+### Added
+- AC-R2-4 Rust 同题零标注对照落钉（0.1.26 项 7）：新建 `tests/specs/compare/`（`.gitkeep`＋映射表 `README.md`＋T-a／T-b／T-c 各一对 `*-annotated.rs`／`*-unannotated.rs`，共 3 对 6 件）。T-a＝二输入择一返回（Rust 侧 `pick` 返回引用 → ZOR 侧 `r2-ref-01-two-input-select-owned.zor` 改返回拥有值）；T-b＝struct 持引用字段（→ `r2-ref-02-struct-hold-value.zor` 改持值）；T-c＝容器／数组元素持引用（→ `r2-ref-03-array-hold-value.zor` 改持值，引用形由既有 E1501 负例承载）。三枚 ZOR 正例零标注、rc=0；三题与三枚控制流正例载荷限 Copy 集（`i64`），**本集不覆盖非 Copy 绑定重赋值形态**。
+- CI `ci/run_ci.sh` 新增 `rust-compare` 两段判：`*-annotated.rs` 可编（`rustc --edition=2021 --crate-type lib --emit=metadata`，rc=0）；`*-unannotated.rs` 为同题最小去标注变体，必 rc≠0 且 stderr 同时含 `error[E0106]` 与 `missing lifetime specifier`。反空转三项＝具名生命周期在位、差异仅去标注、rc≠0 与 E0106 同时命中；strict 下 ≥3 对且按 basename 成对，缺 rustc 即 FAIL（fail-closed），非 strict SKIP。日志记录 `rustc -vV`、edition 与逐对 rc／E0106 命中数。
+- 三枚控制流正例随项 7 并入：`r1-23-if-statement-no-else.zor`／`r1-24-if-statement-else.zor`／`r1-25-while-statement.zor`；0.1.x 口径 `if`／`while` 为语句、非表达式（表达式化 `if` 归 0.2.x 候选）；`specs/r1-type-system.md` §9 随实同步为 `r1-01…r1-25`，条款正文归 0.1.27 R1 §6 勘正。
+- 规范同步：`specs/r2-ownership.md` §9 正例行点名 `r2-ref-01…r2-ref-03` 实存件，AC-R2-4 行点名 9 个实存对照文件名（3 ZOR＋6 Rust），`r2-ref-*` 通配集非空；AC-R2-4 在册结论句与「引用 AC-R2-4 结果必须同引 R2 §7 不可表达清单，不得单引」同引纪律逐字在位（全文见 R2 §9）。R2 §8 码表 8 行、码集不变。
+- 回归读数（QA 终门禁 @`b8f10ff`）：positive `.zor` 41、negative 45、golden 45（逐字节零改）、compare 3 对、`tests/specs` `.zor` 86；双 locale（`LC_ALL=C`／`en_US.UTF-8`）strict 六段全 PASS、rc=0；compile `ok=82 fail=0`；unit 正例 41／失败 0、负例 45／漏检 0；code-table `21/21/17/1/1/2/17/17/12`、双 locale 逐字节 SAME；rust-compare 3/3（annotated rc=0；unannotated rc=1、E0106=1）；`cargo test` 78（0/7/31/40/0）；三项阴性对照（缺 rustc／未去标注／仅 2 对）均按预期 FAIL。
+- 版本身份锚：并入新 main（merge commit `8a6440f`，未改写历史）后，`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.1.25` 直锚 `0.1.26`（lock 由 cargo 同步、非手写；`Cargo.lock:3` 的 `version = 4` 零触碰）；`CHANGELOG.md` 本节顶部纯插入；`zorcc --version`／`-V` 实测 `zorcc 0.1.26`。
+
+### Known issues（跟踪中，非本版拦截）
+- 运行期／ASAN 验证不在本版范围：AC-R2-4 为编译期／规范面判据，运行期面仍挂 0.2.x。
+- `rust-compare` 除 `error[E0106]` 外还要求 `missing lifetime specifier` 文案；rustc 文案若变更可能假红。当前基线 `rustc 1.99.0 (b940084d7 2026-09-28)`，host `aarch64-apple-darwin`；后续建议固定工具链或改为只判码。
+- `cargo test` 78（较 0.1.25 的 72 增加 6 枚同源单测）；不作为门禁通过条件。
+- 表达式化 `if` 归 0.2.x；本版 `if`／`while` 仅语句形。
+- 0.1.27 手册侧三处（H-a／H-b／H-c）与仓库侧四处批次未开工，待本版定稿后接单。
+
 ## [0.1.25] - 2026-10-20
 
 内部验证里程碑，非可用语言版本：`zorcc` 仍为纯编译前端（无代码生成／无产物／无运行链路）；本节不含任何运行期判据。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。本版性质＝**规范裁定面与治理面的闭合，非语言能力扩面**：零新增语言判定、零新增错误码、零新增 AC、零新增 golden／负例，`compiler/src/**` 零字节改动，`.zor` 源码面接受与拦截宽度与 0.1.24 逐字同宽。

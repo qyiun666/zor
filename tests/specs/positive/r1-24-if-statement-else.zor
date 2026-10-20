@@ -1,0 +1,9 @@
+// tests/specs/positive/r1-24-if-statement-else.zor — R1 控制流正例（if-else）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：0.1.x `if`/`while` 为语句、非表达式（0.1.23 控制流条款；条款正文归 0.1.27 R1 §6 勘正）；载荷限 Copy（i64）；0.1.26 项 7。
+// 单测同源 pos_r1_24_if_statement_else（r1_diag.rs）。
+
+fn main() {
+    let x: i64 = 5;
+    if x > 0 { println(x); } else { println(0); }
+}

@@ -1,0 +1,14 @@
+// tests/specs/positive/r2-ref-02-struct-hold-value.zor — AC-R2-4 正例（T-b struct 持引用字段）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：R1 §3 / R2 §7 In2 禁引用入容器（改持值）；对照源 tests/specs/compare/t-b-holder-ref-field-*.rs；载荷限 Copy（i64）；0.1.26 项 7。
+// 单测同源 pos_r2_ref_02_struct_hold_value（r2_diag.rs）。
+
+struct Holder { v: i64 }
+
+fn read(h: &Holder) -> i64 { h.v }
+
+fn main() {
+    let h = Holder { v: 42 };
+    let x = read(&h);
+    println(x);
+}

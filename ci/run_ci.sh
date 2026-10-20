@@ -25,6 +25,8 @@ TESTS_POS_DIR="${TESTS_POS_DIR:-tests/specs/positive}"
 TESTS_NEG_DIR="${TESTS_NEG_DIR:-tests/specs/negative}"
 # T-4 黄金比对（strict 扩项复验记录 §2：golden 名=负例 basename 换 .txt；模式无关单份）
 TESTS_GOLDEN_DIR="${TESTS_GOLDEN_DIR:-tests/specs/golden}"
+# AC-R2-4 Rust 同题对照源（0.1.26 项 7：两态命名契约 *-annotated.rs / *-unannotated.rs）
+TESTS_COMPARE_DIR="${TESTS_COMPARE_DIR:-tests/specs/compare}"
 
 # —— OQ-2 双模式（debug=checked / release=wrap，flags 为 zorcc 落地的注入位）——
 DEBUG_FLAGS="${ZORC_DEBUG_FLAGS:--Zoverflow=check}"
@@ -33,6 +35,8 @@ MODES="debug release"
 
 ZORC="${ZORC_BIN:-zorcc}"
 command -v "$ZORC" >/dev/null 2>&1 || ZORC=""
+RUSTC_BIN="${RUSTC_BIN:-rustc}"
+command -v "$RUSTC_BIN" >/dev/null 2>&1 || RUSTC_BIN=""
 
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 LOG_DIR="ci/logs/$RUN_ID"; mkdir -p "$LOG_DIR"
@@ -263,12 +267,87 @@ stage_code_table() { # 0.1.18 项2 诊断码表不变式 A1–A7（单一实现�
   else echo "[code-table] 判定=FAIL" >> "$log"; record code-table FAIL 1 "$log"; fi
 }
 
+stage_rust_compare() { # AC-R2-4 两段判（0.1.26 项 7）：*-annotated.rs 可编 / *-unannotated.rs 必报 E0106
+  # 命名契约：annotated=须含具名生命周期参数且可编；unannotated=同题最小去标注变体，须编译失败且诊断含
+  # error[E0106] + missing lifetime specifier。两侧按 basename 成对，strict 下各≥3 对（防空套件假绿）。
+  # 反空转三项：① annotated 含 ≥1 具名生命周期；② stripped 与 annotated 归一化后仅差生命周期标注；
+  # ③ B 段须 rc≠0 与 E0106 同时命中。归一化只用于比对，不写回任何源件。
+  local log; log="$(new_log rust-compare)"
+  if [ -z "$RUSTC_BIN" ]; then
+    echo "rustc 未安装：AC-R2-4 两段判不可执行（--strict 判 FAIL，非 PASS）" > "$log"
+    [ "$STRICT" = 1 ] && record rust-compare FAIL 1 "$log" || record rust-compare SKIP 0 "$log"; return
+  fi
+  normalize_rs() {
+    sed -e 's|//.*$||' \
+        -e "s/<'[A-Za-z_][A-Za-z0-9_]*>//g" \
+        -e "s/'[A-Za-z_][A-Za-z0-9_]*//g" \
+        -e 's/&[[:space:]]*/\&/g' \
+        -e 's/[[:space:]][[:space:]]*/ /g' \
+        -e 's/^ //; s/ $//' "$1" | grep -v '^$'
+  }
+  local n_ann=0 n_unann=0 ann_fail=0 unann_fail=0 pair_fail=0 life_missing=0 strip_diff=0 f rc i=0 stem hits
+  local td; td="$(mktemp -d)"; trap 'rm -rf "$td"' RETURN
+  {
+    echo "[rust-compare] rustc=$( "$RUSTC_BIN" --version 2>&1 | head -1 ) edition=2021 crate-type=lib emit=metadata"
+    "$RUSTC_BIN" -vV 2>&1
+    echo "[rust-compare] dir=$TESTS_COMPARE_DIR"
+  } >> "$log"
+  for f in "$TESTS_COMPARE_DIR"/*-annotated.rs; do
+    [ -e "$f" ] || continue
+    n_ann=$((n_ann+1)); i=$((i+1))
+    stem="${f%-annotated.rs}"
+    [ -f "$stem-unannotated.rs" ] || { pair_fail=$((pair_fail+1)); echo "PAIR_MISSING $(basename "$f") 无对应 $(basename "$stem")-unannotated.rs" >>"$log"; }
+    if ! grep -Eq "<'[A-Za-z_]|&'[A-Za-z_]" "$f"; then
+      life_missing=$((life_missing+1)); echo "ANNOTATED_NO_NAMED_LIFETIME $f（反空转①：须含 ≥1 具名生命周期）" >>"$log"
+    fi
+    if "$RUSTC_BIN" --edition=2021 --crate-type lib --emit=metadata -o "$td/ann-$i.rmeta" "$f" >>"$log" 2>&1; then
+      echo "ANNOTATED_OK $(basename "$f") rc=0" >>"$log"
+    else
+      ann_fail=$((ann_fail+1)); echo "ANNOTATED_COMPILE_FAIL $(basename "$f")" >>"$log"
+    fi
+  done
+  i=0
+  for f in "$TESTS_COMPARE_DIR"/*-unannotated.rs; do
+    [ -e "$f" ] || continue
+    n_unann=$((n_unann+1)); i=$((i+1))
+    stem="${f%-unannotated.rs}"
+    [ -f "$stem-annotated.rs" ] || { pair_fail=$((pair_fail+1)); echo "PAIR_MISSING $(basename "$f") 无对应 $(basename "$stem")-annotated.rs" >>"$log"; }
+    if [ -f "$stem-annotated.rs" ]; then
+      normalize_rs "$stem-annotated.rs" > "$td/pair-$i-ann.norm"
+      normalize_rs "$f" > "$td/pair-$i-unann.norm"
+      if ! cmp -s "$td/pair-$i-ann.norm" "$td/pair-$i-unann.norm"; then
+        strip_diff=$((strip_diff+1)); echo "STRIP_DIFF $(basename "$f") 与 $(basename "$stem")-annotated.rs 归一化后不等（差异不止生命周期标注）" >>"$log"
+        diff "$td/pair-$i-ann.norm" "$td/pair-$i-unann.norm" | head -8 >>"$log"
+      fi
+    fi
+    "$RUSTC_BIN" --edition=2021 --crate-type lib --emit=metadata -o "$td/unann-$i.rmeta" "$f" >/dev/null 2>"$td/unann-$i.err"; rc=$?
+    if [ "$rc" -eq 0 ]; then
+      unann_fail=$((unann_fail+1)); echo "UNANNOTATED_UNEXPECTED_PASS $(basename "$f") rc=0" >>"$log"
+    elif ! grep -q 'error\[E0106\]' "$td/unann-$i.err" || ! grep -q 'missing lifetime specifier' "$td/unann-$i.err"; then
+      unann_fail=$((unann_fail+1)); echo "UNANNOTATED_WRONG_DIAG $(basename "$f") rc=$rc（期望 error[E0106] missing lifetime specifier）" >>"$log"
+      head -8 "$td/unann-$i.err" >>"$log"
+    else
+      hits="$(grep -c 'error\[E0106\]' "$td/unann-$i.err" || true)"
+      echo "PAIR_OK annotated=$(basename "$stem")-annotated.rs unannotated=$(basename "$f") rc=$rc E0106=$hits" >>"$log"
+    fi
+  done
+  echo "两段判 annotated=$n_ann annotated_fail=$ann_fail unannotated=$n_unann unannotated_fail=$unann_fail pair_fail=$pair_fail lifetime_missing=$life_missing strip_diff=$strip_diff strict_min_pairs=3" >> "$log"
+  if [ "$ann_fail" -gt 0 ] || [ "$unann_fail" -gt 0 ] || [ "$pair_fail" -gt 0 ] || [ "$life_missing" -gt 0 ] || [ "$strip_diff" -gt 0 ]; then record rust-compare FAIL 1 "$log"
+  elif [ "$n_ann" -eq 0 ] || [ "$n_unann" -eq 0 ]; then
+    [ "$STRICT" = 1 ] && record rust-compare FAIL 1 "$log" || record rust-compare SKIP 0 "$log"
+  elif [ "$STRICT" = 1 ] && { [ "$n_ann" -lt 3 ] || [ "$n_unann" -lt 3 ] || [ "$n_ann" -ne "$n_unann" ]; }; then
+    echo "strict 下限：annotated=$n_ann unannotated=$n_unann（要求各≥3 且成对）→ FAIL" >> "$log"
+    record rust-compare FAIL 1 "$log"
+  else record rust-compare PASS 0 "$log"; fi
+}
+
 echo "[ci] run=$RUN_ID strict=$STRICT bench=$WITH_BENCH modes='$MODES' pos='$TESTS_POS_DIR' neg='$TESTS_NEG_DIR'"
 stage_cargo
 stage_compile
 stage_unit_test
 stage_golden
 stage_code_table
+stage_rust_compare
 [ "$WITH_BENCH" = 1 ] && stage_bench
 
 {

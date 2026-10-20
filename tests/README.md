@@ -9,7 +9,7 @@
 - `tests/specs/positive/`：正例，命名 `r<N>-<序号>-<slug>.zor`（如 `r2-01-move-basic.zor`）
 - `tests/specs/negative/`：负例，命名 `r<N>-n<序号>-<slug>.zor`；必须编译期失败并输出 错误码+行:列+错误类型
 - `tests/specs/golden/`：T-4 黄金基线，命名 `<负例basename>.txt`（stderr 全文逐行，repo 根 cwd 捕获，模式无关单份；正例不落文件=空即基线；strict 下缺失即 FAIL。契约=strict 扩项复验记录 §2，捕获用 `ci/capture_golden.sh`）
-- `tests/specs/compare/`：AC-R2-4 的 Rust 同题对照源码
+- `tests/specs/compare/`：AC-R2-4 的 Rust 同题对照源码，两态命名 `*-annotated.rs`（须可编）／`*-unannotated.rs`（去标注变体须报 `E0106 missing lifetime specifier`）；映射表见 `tests/specs/compare/README.md`，两段判由 `ci/run_ci.sh` 的 `rust-compare` 段执行
 - `tests/runners/run_specs.sh`：runner 契约入口，实际逻辑在 `ci/run_ci.sh`
 
 runner 匹配面：`ci/run_ci.sh` 常量 `TESTS_POS_DIR/TESTS_NEG_DIR` 单点定义（=tests/specs/*）；strict 下**负例数=0 即 FAIL**（防空套件假绿）。历史文档中 `specs/tests/…` 写法一律视为过时（PRD v1.1 勘误），不得进入任何脚本。

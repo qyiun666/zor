@@ -61,6 +61,24 @@ fn pos_r1_22_print_zero_arg() {
     clean("fn main() {\n    print();\n    print(1);\n}");
 }
 
+#[test]
+fn pos_r1_23_if_statement_no_else() {
+    // 0.1.x if 为语句（非表达式），无 else 形零诊断；Copy 载荷（0.1.26 项 7 控制流正例）
+    clean("fn main() {\n    let x: i64 = 5;\n    if x > 0 { println(x); }\n}");
+}
+
+#[test]
+fn pos_r1_24_if_statement_else() {
+    // 0.1.x if 为语句（非表达式），if-else 形零诊断；Copy 载荷（0.1.26 项 7 控制流正例）
+    clean("fn main() {\n    let x: i64 = 5;\n    if x > 0 { println(x); } else { println(0); }\n}");
+}
+
+#[test]
+fn pos_r1_25_while_statement() {
+    // 0.1.x while 为语句（非表达式），含 Copy 绑定重赋值的循环体零诊断（0.1.26 项 7 控制流正例）
+    clean("fn main() {\n    let i: i64 = 0;\n    while i < 3 {\n        println(i);\n        i = i + 1;\n    }\n}");
+}
+
 // ———— 负例：逐码触发 ————
 
 #[test]

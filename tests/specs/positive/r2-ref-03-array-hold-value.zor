@@ -1,0 +1,12 @@
+// tests/specs/positive/r2-ref-03-array-hold-value.zor — AC-R2-4 正例（T-c 容器/数组元素持引用）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：R1 §3 / R2 §7 In2 禁引用入容器（改持值，所有权交接预备）；对照源 tests/specs/compare/t-c-holder-ref-array-*.rs；载荷限 Copy（i64）；0.1.26 项 7。
+// 单测同源 pos_r2_ref_03_array_hold_value（r2_diag.rs）。
+
+fn sum_pair(a: [i64; 2]) -> i64 { a[0] + a[1] }
+
+fn main() {
+    let a: [i64; 2] = [10, 20];
+    let s = sum_pair(a);
+    println(s);
+}
