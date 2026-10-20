@@ -2,7 +2,7 @@
 
 OQ-1 定论=方案 B（评审 3/3 通过）：过渡实现用 Rust 编写，后端走 C 代码生成；0.2.x 前可替换。本目录即该实现的 Cargo 工程。
 
-## 0.1.x 现状：R1＋R2 前端（0.1.26 基线）
+## 0.1.x 现状：R1＋R2 前端
 
 - `src/lexer.rs` → `src/parser.rs` → `src/check.rs`（R1 类型检查＋R2 所有权/借用检查，E1xxx／E2xxx 诊断）。
 - 诊断格式（T-4 黄金文件基线，变更需 PR+QA 评审）：`zorcc: {E-code} {file}:{line}:{col}: {message}`
