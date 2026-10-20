@@ -84,6 +84,24 @@ fn pos_box_return_expr_tail() {
     clean("fn make() -> Box<i64> { box 42 }\nfn main() { }");
 }
 
+#[test]
+fn pos_r2_ref_01_two_input_select_owned() {
+    // AC-R2-4 T-a：二输入择一返回，ZOR 侧按 §4 改返回拥有值（零标注；对照源 compare/t-a-pick-*.rs；0.1.26 项 7）
+    clean("fn pick(a: i64, b: i64) -> i64 { let out = a; if a > b { out = b; } out }\nfn main() { let x = pick(3, 7); println(x); }");
+}
+
+#[test]
+fn pos_r2_ref_02_struct_hold_value() {
+    // AC-R2-4 T-b：struct 持引用字段由 R1 §3 禁则收窄，改持值（零标注；对照源 compare/t-b-holder-ref-field-*.rs；0.1.26 项 7）
+    clean("struct Holder { v: i64 }\nfn read(h: &Holder) -> i64 { h.v }\nfn main() { let h = Holder { v: 42 }; let x = read(&h); println(x); }");
+}
+
+#[test]
+fn pos_r2_ref_03_array_hold_value() {
+    // AC-R2-4 T-c：容器/数组元素持引用由 R1 §3 禁则收窄，改持值（零标注；对照源 compare/t-c-holder-ref-array-*.rs；0.1.26 项 7）
+    clean("fn sum_pair(a: [i64; 2]) -> i64 { a[0] + a[1] }\nfn main() { let a: [i64; 2] = [10, 20]; let s = sum_pair(a); println(s); }");
+}
+
 // ———— R2 负例：21 条（其中 20 条逐码首诊固化、1 条 r2-n21 全序五行钉定；均与 tests/specs/negative/r2-n*.zor 同源构造） ————
 
 #[test]

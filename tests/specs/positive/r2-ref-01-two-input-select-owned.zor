@@ -1,0 +1,15 @@
+// tests/specs/positive/r2-ref-01-two-input-select-owned.zor — AC-R2-4 正例（T-a 二输入择一返回）
+// 预期：编译成功，debug/release 双模式 zorcc exit 0、零诊断。
+// 判据来源：R2 §4 禁止返回引用（改返回拥有值）；对照源 tests/specs/compare/t-a-pick-*.rs；载荷限 Copy（i64）；0.1.26 项 7。
+// 单测同源 pos_r2_ref_01_two_input_select_owned（r2_diag.rs）。
+
+fn pick(a: i64, b: i64) -> i64 {
+    let out = a;
+    if a > b { out = b; }
+    out
+}
+
+fn main() {
+    let x = pick(3, 7);
+    println(x);
+}
