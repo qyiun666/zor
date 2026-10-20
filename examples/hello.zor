@@ -1,6 +1,6 @@
 // examples/hello.zor — 最小编译示例（hello 级占位）
 // 用途：解耦 CI 基线/基准环境与语言实现（PRD §12 风险项）。
-// 语法以 specs/ 定稿为准，当前仅作骨架示意；原型编译器就绪前不承诺可编译。
+// 语法以 specs/ 定稿为准；本件为前端可编译的最小示例（zorcc examples/hello.zor rc=0）；0.1.x 无代码生成与运行链路，不产出可执行体。
 
 fn main() {
     let greeting = "Hello, ZOR";   // 字面量默认推断，见 R1
