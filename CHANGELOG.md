@@ -16,7 +16,7 @@
 - `specs/r1-type-system.md` §9 负例范围句由 `r1-n01…r1-n16` 改为 `r1-n01…r1-n23`，与 §8 表及目录实存一致。
 - `examples/hello.zor` L3 注释勘正：由「原型编译器就绪前不承诺可编译」改为「本件为前端可编译的最小示例（`zorcc examples/hello.zor` rc=0）；0.1.x 无代码生成与运行链路，不产出可执行体」。
 - 版本身份锚：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.1.26` 直锚 `0.1.27`（lock 由 cargo 同步、非手写；`Cargo.lock:3` 的 `version = 4` 零触碰）；`CHANGELOG.md` 本节顶部纯插入；`zorcc --version`／`-V` 实测 `zorcc 0.1.27`。
-- 门禁与回归读数（QA 终门禁 @<0.1.27 head SHA 待回填>，取刻 <UTC 待回填>）：positive `.zor`=<待回填>、negative=<待回填>、golden=<待回填>、compare=<待回填>、`tests/specs` `.zor`=<待回填>；双 locale（`LC_ALL=C`／`en_US.UTF-8`）strict 六段=<待回填>、rc=<待回填>；compile=<待回填>；unit=<待回填>；code-table=<待回填>；rust-compare=<待回填>；`cargo test`=<待回填>；三项阴性对照=<待回填>。
+- 门禁与回归读数（QA 终门禁 @`cecfc9d5ea8f7e1eec80d306aa8c4f0bffbf8c3f`，取刻 2026-10-20T15:44:43Z（C）／2026-10-20T15:44:47Z（UTF-8））：positive `.zor` 41、negative 45、golden 45（逐字节零改）、compare 3 对、`tests/specs` `.zor` 86；双 locale（`LC_ALL=C`／`en_US.UTF-8`）strict 六段 PASS、rc=0；compile `ok=82 fail=0`；unit 正例 41／失败 0、负例 45／漏检 0；golden `45/45/45`、差异 0；code-table `21/21/17/1/1/2/17/17/12`、双 locale 逐字节 SAME；rust-compare `3/3`（annotated rc=0；unannotated rc=1、E0106=1）；`cargo test` 78（0/7/31/40/0）；三项阴性对照（缺 rustc／未去标注／仅 2 对）均按预期 FAIL；`zorcc --version`＝`zorcc 0.1.27`、`zorcc examples/hello.zor` rc=0（实际二进制）。
 
 ### Known issues（跟踪中，非本版拦截）
 - 运行期／ASAN 验证不在本版范围；AC-R2-4 为编译期／规范面判据，运行期面仍挂 0.2.x。
