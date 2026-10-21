@@ -1,0 +1,1 @@
+zorcc: E2203 tests/specs/negative/r2-n23-move-while-shared-borrow.zor:8:13: 'x' 有活跃借用，不可移出（R2 §2 owner 槽位直接访问）

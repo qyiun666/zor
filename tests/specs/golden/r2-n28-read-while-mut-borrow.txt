@@ -1,0 +1,1 @@
+zorcc: E2204 tests/specs/negative/r2-n28-read-while-mut-borrow.zor:8:13: 'x' 正被独占借用（&mut），不可直接读取（R2 §2 owner 槽位直接访问）

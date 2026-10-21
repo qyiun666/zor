@@ -1,0 +1,1 @@
+zorcc: E2203 tests/specs/negative/r2-n24-unbox-while-shared-borrow.zor:8:5: 'b' 有活跃借用，不可 unbox（R2 §2 owner 槽位直接访问）

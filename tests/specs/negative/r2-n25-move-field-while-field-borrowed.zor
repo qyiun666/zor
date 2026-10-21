@@ -1,0 +1,11 @@
+// r2-n25-move-field-while-field-borrowed.zor — AC-R2-2 负例（L2a-GE1B：字段借用活跃期间移出该字段；字段借用沿字段链归到根绑定，R2 §2，§8 E2203 同窗登记）
+// 预期：E2203「'o.x' 的 owner 槽位有活跃借用，不可移出字段（R2 §2）」恰一行；debug/release 双模式均编译期失败、退出码非零、stderr 逐行同值
+// 判据来源：shared/ZOR-L2a-范围冻结件-项目管理-v1.md §一/§五；specs/r2-ownership.md §2/§8；shared/ZOR-0.2.x-L2-门禁与计数delta-QA-v1.md §4.2；错误文案基线=门禁 T-4。
+
+struct P { x: Box<i64> }
+fn main() {
+    let o = P { x: box 1 };
+    let r = &o.x;
+    let y = o.x;
+    println(*r);
+}
