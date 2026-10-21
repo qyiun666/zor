@@ -137,25 +137,7 @@ fn check_block(blk: &Blk, strings: &mut HashSet<String>) -> Result<(), SubsetErr
 }
 
 pub(crate) fn expr_span(e: &Ex) -> (usize, usize) {
-    match e {
-        Ex::Lit(_, l, c)
-        | Ex::Path(_, l, c)
-        | Ex::UnitLit(l, c)
-        | Ex::Bin(_, _, _, l, c)
-        | Ex::Un(_, _, l, c)
-        | Ex::Call(_, _, l, c)
-        | Ex::Method(_, _, _, l, c)
-        | Ex::Index(_, _, l, c)
-        | Ex::Field(_, _, l, c)
-        | Ex::Record(_, _, l, c)
-        | Ex::Tup(_, l, c)
-        | Ex::ArrLit(_, l, c)
-        | Ex::Ref(_, _, l, c)
-        | Ex::Box(_, l, c)
-        | Ex::Deref(_, l, c)
-        | Ex::Unbox(_, l, c) => (*l, *c),
-        Ex::Block(b) => b.span,
-    }
+    e.span()
 }
 
 #[cfg(test)]

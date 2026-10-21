@@ -147,14 +147,14 @@ fn main() {
             debug,
         } => {
             let src = read_source(&path);
-            let (prog, diags) = zorcc::compile(&src);
-            if !diags.is_empty() {
-                render_diags(&path, &diags);
+            let c = zorcc::compile_typed(&src);
+            if !c.diags.is_empty() {
+                render_diags(&path, &c.diags);
                 exit(1);
             }
             let source = std::path::Path::new(&path);
             let output = std::path::Path::new(&out);
-            match zorcc::backend::build(&prog, source, output, BuildOptions { opt, debug }) {
+            match zorcc::backend::build(&c.prog, &c.types, source, output, BuildOptions { opt, debug }) {
                 Ok(()) => exit(0),
                 Err(e) => {
                     eprintln!("{}", e.render(source));
