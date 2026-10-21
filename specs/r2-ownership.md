@@ -25,6 +25,7 @@
 - 活跃性：借用句柄自创建处到其所在块尾均活跃；句柄最后使用后提前失活（NLL 式词法近似：0.1.x 采用**块尾失活**，不做流敏感死变量收窄——差异写入不可表达清单 §7 第 7 条）。
 - 引用不得逃逸出借用者作用域（R1 §3 已禁引用入容器类型）；存疑逃逸判定：引用创建与任何可能逸出的赋值/返回之间由 §4 禁则切断。
 - 对 `&mut` 指向值再次借用须先结束原借用（重新进入外层块等结构手段）。
+- **owner 槽位直接访问（L2）**：绑定或字段槽位 `v` 存在活跃借用（`&v` 或 `&mut v`，活跃性沿本节块尾口径）时，禁止对 `v` 直接写入、整值或字段移出、`unbox`（E2203）；`&mut v` 活跃时禁止直接读取 `v`（E2204），经 `&mut` 句柄 `*m`／`m.field` 的读写不在此列。绑定级判定：对 `v` 的字段借用视为对 `v` 的借用；字段不相交的精确放行不在本版承诺。借用创建本身仍按本节判定表（E2201／E2202），不与 E2203／E2204 叠报。
 
 ## 3. 释放（drop）
 
@@ -102,6 +103,8 @@
 | E2102 部分移动后整体使用 | 实发 | R2 §2 判定表 | tests/specs/golden/r2-n03-partial-move.txt |
 | E2201 独占借用期间再借用 | 实发 | R2 §2 判定表 | tests/specs/golden/r2-n06-shared-during-mut.txt（另有同目录 1 份：r2-n15-reborrow-during-mut-stale） |
 | E2202 共享/独占共存冲突 | 实发 | R2 §2 判定表 | tests/specs/golden/r2-n04-mut-while-shared.txt（另有同目录 2 份：r2-n05-double-mut、r2-n14-mut-while-shared-stale） |
+| E2203 借用活跃期间变更 owner 槽位 | 实发 | R2 §2 owner 槽位直接访问句 | tests/specs/golden/r2-n22-write-while-shared-borrow.txt（另有同目录 5 份：r2-n23-move-while-shared-borrow、r2-n24-unbox-while-shared-borrow、r2-n25-move-field-while-field-borrowed、r2-n26-write-field-while-field-borrowed、r2-n27-write-while-mut-borrow） |
+| E2204 独占借用活跃期间直接读取 owner 槽位 | 实发 | R2 §2 owner 槽位直接访问句 | tests/specs/golden/r2-n28-read-while-mut-borrow.txt（另有同目录 1 份：r2-n29-read-field-while-mut-borrow） |
 | E2301 double free/unbox 后再用 | 实发 | R2 §3 释放点、§5 unbox | tests/specs/golden/r2-n11-use-after-unbox.txt |
 | E2302 悬垂引用逃逸（结构上已由禁则覆盖，保留码位防御实现漏洞） | 保留 | R2 §1 禁逃逸句、§7 In1／In2 面 | —（无承载件：本码 0.1.x 不实发，定性=保留） |
 | E2401 返回引用（=E1502 别名码，择一实现，黄金文件固定） | 别名→E1502 | R2 §4 禁止返回引用句、§7 In1 行 | —（别名不独立承载；黄金文件取 E1502 侧＝tests/specs/golden/r2-n07-return-ref.txt） |
