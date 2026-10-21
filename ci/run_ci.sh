@@ -327,9 +327,9 @@ stage_rust_compare() { # AC-R2-4 两段判（0.1.26 项 7）：*-annotated.rs �
       unann_fail=$((unann_fail+1)); echo "UNANNOTATED_WRONG_DIAG $(basename "$f") rc=$rc（期望 error[E0106]）" >>"$log"
       head -8 "$td/unann-$i.err" >>"$log"
     else
-      # D1（QA v4 §12）：判据只取 rc≠0＋E0106；旧措辞仅记日志、不计红。
+      # D1（QA v5 §12）：判据只取 rc≠0＋E0106；旧措辞仅记日志、不计红。
       if ! grep -q 'missing lifetime specifier' "$td/unann-$i.err"; then
-        echo "WORDING_DIFF $(basename "$f") 含 E0106 但无旧措辞（按 QA v4 §12 不计红）" >>"$log"
+        echo "WORDING_DIFF $(basename "$f") 含 E0106 但无旧措辞（按 QA v5 §12 不计红）" >>"$log"
       fi
       hits="$(grep -c 'error\[E0106\]' "$td/unann-$i.err" || true)"
       echo "PAIR_OK annotated=$(basename "$stem")-annotated.rs unannotated=$(basename "$f") rc=$rc E0106=$hits" >>"$log"
@@ -345,7 +345,7 @@ stage_rust_compare() { # AC-R2-4 两段判（0.1.26 项 7）：*-annotated.rs �
   else record rust-compare PASS 0 "$log"; fi
 }
 
-stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（QA v4）
+stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（QA v5）
   local log; log="$(new_log run-smoke)"
   if [ -z "$ZORC" ]; then
     echo "zorcc 未安装：run-smoke strict 判 FAIL（不可 SKIP 洗绿）" > "$log"
