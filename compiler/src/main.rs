@@ -1,16 +1,27 @@
 use std::io::Write;
 use std::process::exit;
 
+use zorcc::backend::{BuildOptions, OptLevel};
+
 #[derive(Debug, PartialEq, Eq)]
 enum Cli {
     Version,
     /// 缺源文件：保留 0.1.2 在册 usage 句原样，不加前缀
     Usage,
+    /// 无 `-o`：0.1.x 检查模式（零产物）
     Compile(String),
+    /// 有 `-o`：0.2.0 构建模式（显式产出原生可执行文件）
+    Build {
+        src: String,
+        out: String,
+        opt: OptLevel,
+        debug: bool,
+    },
 }
 
-/// C-1 白名单（冻结件 §〇-3／§三 C-1 逐字照录）：仍为接受并忽略、rc 不变。
-/// 语义锚：这些是 ci/run_ci.sh:30-31 的在册注入位与 ASAN 判据句要求，非本窗拒判面。
+/// C-1 白名单（冻结件 §〇-3／§三 C-1 逐字照录）：仍为接受。
+/// `-O0`／`-O2`／`-g` 在构建模式实映射到 C 编译器；`-Zoverflow=*` 首片接受并忽略（溢出归 L2）。
+/// 这些是 ci/run_ci.sh:30-31 的在册注入位与 ASAN 判据句要求，非本窗用户 CLI 契约。
 fn is_whitelisted_flag(f: &str) -> bool {
     matches!(
         f,
@@ -25,82 +36,150 @@ fn parse_cli(args: &[String]) -> Result<Cli, String> {
         return Ok(Cli::Version);
     }
     let mut positional: Vec<&str> = Vec::new();
+    let mut out: Option<String> = None;
+    let mut opt = OptLevel::O2;
+    let mut debug = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
+        if a == "-o" {
+            if out.is_some() {
+                return Err("'-o' 重复：只允许一次，避免产物路径歧义".to_string());
+            }
+            match it.next() {
+                Some(v) if v.is_empty() => {
+                    return Err("'-o' 的值为空：必须显式给出产物路径".to_string());
+                }
+                Some(v) => out = Some(v.clone()),
+                None => {
+                    return Err(
+                        "'-o' 缺值：用法为 zorcc <file.zor> -o <output>（不提供隐式产物路径）"
+                            .to_string(),
+                    );
+                }
+            }
+            continue;
+        }
+        if a == "--output" || a.starts_with("--output=") {
+            return Err(format!(
+                "'{a}' 不是 0.2.0 契约：只接受 '-o'（--output 不作别名）"
+            ));
+        }
         if !a.starts_with('-') {
             positional.push(a.as_str());
             continue;
         }
-        if a == "-o" || a == "--output" {
-            // 连同其值一并拒判，避免出参路径被后续当源文件（①形的错指根因）
-            let _ = it.next();
-            return Err(format!(
-                "'{a}' 未实现：0.1.x 无代码生成路径，不产出任何文件（显式拒判，非接受并忽略）"
-            ));
-        }
-        if a.starts_with("--output=") {
-            return Err(
-                "'--output=' 未实现：0.1.x 无代码生成路径，不产出任何文件（显式拒判，非接受并忽略）"
-                    .to_string(),
-            );
-        }
         if is_whitelisted_flag(a) {
+            match a.as_str() {
+                "-O0" => opt = OptLevel::O0,
+                "-O2" => opt = OptLevel::O2,
+                "-g" => debug = true,
+                _ => {}
+            }
             continue;
         }
         return Err(format!("未知选项 '{a}'：不在本窗白名单内，不予静默接受"));
     }
-    match positional.len() {
-        0 => Ok(Cli::Usage),
-        1 => Ok(Cli::Compile(positional[0].to_string())),
-        n => Err(format!(
+    match (positional.len(), out) {
+        (0, _) => Ok(Cli::Usage),
+        (1, None) => Ok(Cli::Compile(positional[0].to_string())),
+        (1, Some(o)) => Ok(Cli::Build {
+            src: positional[0].to_string(),
+            out: o,
+            opt,
+            debug,
+        }),
+        (n, _) => Err(format!(
             "只接受一个源文件，收到 {n} 枚：{}（第二枚起显式拒判，静默丢弃会漏检未检查的源文件）",
             positional.join(" ")
         )),
     }
 }
 
-fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let path = match parse_cli(&args) {
-        Ok(Cli::Version) => {
-            println!("zorcc {}", env!("CARGO_PKG_VERSION"));
-            exit(0);
-        }
-        Ok(Cli::Usage) => {
-            eprintln!("usage: zorcc [flags] <file.zor>");
-            exit(2);
-        }
-        Ok(Cli::Compile(p)) => p,
-        Err(msg) => {
-            eprintln!("zorcc: CLI: {msg}");
-            exit(2);
-        }
-    };
-    let src = match std::fs::read_to_string(&path) {
+fn read_source(path: &str) -> String {
+    match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("zorcc: cannot read '{}': {}", path, e);
             exit(2);
         }
-    };
-    let diags = zorcc::compile_to_diags(&src);
-    if diags.is_empty() {
-        exit(0);
     }
+}
+
+fn render_diags(path: &str, diags: &[zorcc::diag::Diag]) {
     let err = std::io::stderr();
     let mut w = err.lock();
-    for d in &diags {
-        let _ = writeln!(w, "{}", d.render(&path));
+    for d in diags {
+        let _ = writeln!(w, "{}", d.render(path));
     }
-    exit(1);
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let cli = match parse_cli(&args) {
+        Ok(c) => c,
+        Err(msg) => {
+            eprintln!("zorcc: CLI: {msg}");
+            exit(2);
+        }
+    };
+    match cli {
+        Cli::Version => {
+            println!("zorcc {}", env!("CARGO_PKG_VERSION"));
+            exit(0);
+        }
+        Cli::Usage => {
+            eprintln!("usage: zorcc [flags] <file.zor>");
+            exit(2);
+        }
+        Cli::Compile(path) => {
+            let src = read_source(&path);
+            let diags = zorcc::compile_to_diags(&src);
+            if diags.is_empty() {
+                exit(0);
+            }
+            render_diags(&path, &diags);
+            exit(1);
+        }
+        Cli::Build {
+            src: path,
+            out,
+            opt,
+            debug,
+        } => {
+            let src = read_source(&path);
+            let (prog, diags) = zorcc::compile(&src);
+            if !diags.is_empty() {
+                render_diags(&path, &diags);
+                exit(1);
+            }
+            let source = std::path::Path::new(&path);
+            let output = std::path::Path::new(&out);
+            match zorcc::backend::build(&prog, source, output, BuildOptions { opt, debug }) {
+                Ok(()) => exit(0),
+                Err(e) => {
+                    eprintln!("{}", e.render(source));
+                    exit(e.rc());
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_cli, Cli};
+    use super::{parse_cli, Cli, OptLevel};
 
     fn v(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn build(src: &str, out: &str, opt: OptLevel, debug: bool) -> Cli {
+        Cli::Build {
+            src: src.to_string(),
+            out: out.to_string(),
+            opt,
+            debug,
+        }
     }
 
     /// C-1：白名单逐枚仍接受并忽略，且 --version/-V 短路先于文件处理
@@ -114,28 +193,54 @@ mod tests {
             );
         }
         assert!(matches!(parse_cli(&v(&["--version"])), Ok(Cli::Version)));
-        assert!(matches!(parse_cli(&v(&["-O2", "-V", "a.zor"])), Ok(Cli::Version)));
+        assert!(matches!(
+            parse_cli(&v(&["-O2", "-V", "a.zor"])),
+            Ok(Cli::Version)
+        ));
     }
 
-    /// 形①：`-o <path>` 任何位置一律指名拒判
+    /// D-020-1 A：`-o` 任意位置进入构建模式；`-O0`／`-g` 实映射
     #[test]
-    fn form1_output_flag_rejected_at_any_position() {
+    fn form1_output_flag_selects_build_mode() {
         for argv in [
             v(&["-o", "out.bin", "a.zor"]),
             v(&["a.zor", "-o", "out.bin"]),
             v(&["-O2", "-o", "out.bin", "a.zor"]),
+            v(&["-O2", "a.zor", "-o", "out.bin"]),
         ] {
-            let e = parse_cli(&argv).unwrap_err();
-            assert!(e.contains("-o") && e.contains("未实现"), "{e}");
+            assert_eq!(
+                parse_cli(&argv),
+                Ok(build("a.zor", "out.bin", OptLevel::O2, false)),
+                "{argv:?}"
+            );
         }
-        assert!(parse_cli(&v(&["--output", "out.bin", "a.zor"]))
-            .unwrap_err()
-            .contains("--output"));
-        assert!(parse_cli(&v(&["a.zor", "--output=out.bin"]))
-            .unwrap_err()
-            .contains("--output="));
-        // -o 缺值也不放行
-        assert!(parse_cli(&v(&["a.zor", "-o"])).unwrap_err().contains("-o"));
+        assert_eq!(
+            parse_cli(&v(&["-O0", "a.zor", "-o", "out.bin"])),
+            Ok(build("a.zor", "out.bin", OptLevel::O0, false))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-g", "a.zor", "-o", "out.bin"])),
+            Ok(build("a.zor", "out.bin", OptLevel::O2, true))
+        );
+    }
+
+    /// 形①：`-o` 误用与 `--output` 一律指名拒判（rc=2 路径）
+    #[test]
+    fn form1b_output_flag_misuse_is_named_rejection() {
+        let e = parse_cli(&v(&["a.zor", "-o"])).unwrap_err();
+        assert!(e.contains("-o") && e.contains("缺值"), "{e}");
+
+        let e = parse_cli(&v(&["-o", "", "a.zor"])).unwrap_err();
+        assert!(e.contains("为空"), "{e}");
+
+        let e = parse_cli(&v(&["-o", "a", "-o", "b", "x.zor"])).unwrap_err();
+        assert!(e.contains("重复"), "{e}");
+
+        let e = parse_cli(&v(&["--output", "out.bin", "a.zor"])).unwrap_err();
+        assert!(e.contains("--output") && e.contains("只接受 '-o'"), "{e}");
+
+        let e = parse_cli(&v(&["a.zor", "--output=out.bin"])).unwrap_err();
+        assert!(e.contains("--output="), "{e}");
     }
 
     /// 形②：未列入 C-1 白名单的任意 flag 一律拒判
@@ -173,18 +278,24 @@ mod tests {
         assert!(matches!(parse_cli(&v(&[])), Ok(Cli::Usage)));
         assert!(matches!(parse_cli(&v(&["-O2"])), Ok(Cli::Usage)));
         assert!(matches!(parse_cli(&v(&["-Zoverflow=check"])), Ok(Cli::Usage)));
+        assert!(matches!(parse_cli(&v(&["-o", "out.bin"])), Ok(Cli::Usage)));
     }
 
     /// C-2：CLI 面诊断不占语言诊断码位（红线 2），也不写成 E1xxx/E2xxx 串
     #[test]
     fn c2_cli_diagnostics_allocate_no_language_codes() {
         for bad in [
-            v(&["-o", "out.bin", "a.zor"]),
+            v(&["a.zor", "-o"]),
+            v(&["-o", "", "a.zor"]),
+            v(&["-o", "a", "-o", "b", "x.zor"]),
             v(&["a.zor", "--bogus"]),
             v(&["a.zor", "b.zor"]),
         ] {
             let e = parse_cli(&bad).unwrap_err();
-            assert!(!e.contains("E1") && !e.contains("E2") && !e.contains("E3"), "CLI 句不得携语言诊断码位: {e}");
+            assert!(
+                !e.contains("E1") && !e.contains("E2") && !e.contains("E3"),
+                "CLI 句不得携语言诊断码位: {e}"
+            );
         }
     }
 
@@ -192,7 +303,10 @@ mod tests {
     #[test]
     fn single_source_still_compiles_through() {
         assert_eq!(
-            parse_cli(&v(&["-Zoverflow=check", "tests/specs/positive/r1-01-prim-declare.zor"])),
+            parse_cli(&v(&[
+                "-Zoverflow=check",
+                "tests/specs/positive/r1-01-prim-declare.zor"
+            ])),
             Ok(Cli::Compile(
                 "tests/specs/positive/r1-01-prim-declare.zor".to_string()
             ))
