@@ -400,6 +400,8 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   # F-CI-4：成功构建后临时件零残留
   if find "$td" -maxdepth 1 -name '.zorcc-tmp-*' -print -quit | grep -q .; then
     echo "S0-1 FAIL: 成功构建后残留 .zorcc-tmp-*" >> "$log"; fail=1
+  else
+    echo "TMP_CLEAN: 成功构建后无 .zorcc-tmp-*" >> "$log"
   fi
 
   # N-1 期望串错一位：比对器必须判不等
@@ -417,8 +419,11 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   else
     "$zorc_abs" "$ctl_spawn" -o "$td/spawn.out" > "$td/n2.out" 2> "$td/n2.err"; rc=$?
     echo "N-2 rc=$rc" >> "$log"
-    { [ "$rc" -eq 1 ] && grep -q 'E1101' "$td/n2.err" && [ ! -e "$td/spawn.out" ]; } \
-      || { echo "N-2 FAIL: 期望 rc=1/E1101/无产物（实得 rc=${rc}）" >> "$log"; fail=1; }
+    if [ "$rc" -eq 1 ] && grep -q 'E1101' "$td/n2.err" && [ ! -e "$td/spawn.out" ]; then
+      echo "N-2 PASS: rc=1/E1101/无产物" >> "$log"
+    else
+      echo "N-2 FAIL: 期望 rc=1/E1101/无产物（实得 rc=${rc}）" >> "$log"; fail=1
+    fi
   fi
 
   # N-3 后端 fail-closed：最小 struct → rc=1、zorcc: codegen:、无产物
@@ -428,8 +433,11 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   else
     "$zorc_abs" "$ctl_codegen" -o "$td/codegen.out" > "$td/n3.out" 2> "$td/n3.err"; rc=$?
     echo "N-3 rc=$rc" >> "$log"
-    { [ "$rc" -eq 1 ] && grep -q 'zorcc: codegen:' "$td/n3.err" && [ ! -e "$td/codegen.out" ]; } \
-      || { echo "N-3 FAIL: 期望 rc=1/zorcc: codegen:/无产物（实得 rc=${rc}）" >> "$log"; fail=1; }
+    if [ "$rc" -eq 1 ] && grep -q 'zorcc: codegen:' "$td/n3.err" && [ ! -e "$td/codegen.out" ]; then
+      echo "N-3 PASS: rc=1/zorcc: codegen:/无产物" >> "$log"
+    else
+      echo "N-3 FAIL: 期望 rc=1/zorcc: codegen:/无产物（实得 rc=${rc}）" >> "$log"; fail=1
+    fi
   fi
 
   # N-4 无 -o：检查模式 rc=0、源目录零新增；负例仍 rc=1 且源目录零新增
@@ -505,12 +513,16 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   # N-5h 失败原子性：sentinel 目标 + 前端负例
   mkdir -p "$td/m13"
   printf 'sentinel-content' > "$td/m13/sentinel"
+  local n5h_ok=1
   "$zorc_abs" "$REPO_ROOT/tests/specs/negative/r1-n01-unknown-type.zor" -o "$td/m13/sentinel" > "$td/n5h.out" 2>&1; rc=$?
-  [ "$rc" -eq 1 ] || { echo "N-5h FAIL: 前端负例 rc=${rc}（期望1）" >> "$log"; fail=1; }
-  [ "$(cat "$td/m13/sentinel")" = "sentinel-content" ] || { echo "N-5h FAIL: sentinel 被改写" >> "$log"; fail=1; }
+  [ "$rc" -eq 1 ] || { echo "N-5h FAIL: 前端负例 rc=${rc}（期望1）" >> "$log"; fail=1; n5h_ok=0; }
+  [ "$(cat "$td/m13/sentinel")" = "sentinel-content" ] || { echo "N-5h FAIL: sentinel 被改写" >> "$log"; fail=1; n5h_ok=0; }
   if find "$td" -name '.zorcc-tmp-*' -print -quit | grep -q .; then
-    echo "N-5 FAIL: 残留 .zorcc-tmp-*" >> "$log"; fail=1
+    echo "N-5 FAIL: 残留 .zorcc-tmp-*" >> "$log"; fail=1; n5h_ok=0
+  else
+    echo "TMP_CLEAN: N-5h 后无 .zorcc-tmp-*" >> "$log"
   fi
+  [ "$n5h_ok" -eq 1 ] && echo "N-5h PASS: rc=1、sentinel 未改写、无临时残留" >> "$log"
 
   # S0-3 换临时目录复算
   "$zorc_abs" "$hello" -o "$td2/hello" >> "$log" 2>&1; rc=$?
@@ -525,6 +537,8 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   fi
   if find "$td2" -maxdepth 1 -name '.zorcc-tmp-*' -print -quit | grep -q .; then
     echo "S0-3 FAIL: 第二次构建后残留 .zorcc-tmp-*" >> "$log"; fail=1
+  else
+    echo "TMP_CLEAN: 第二次构建后无 .zorcc-tmp-*" >> "$log"
   fi
 
   if [ "$fail" -eq 0 ]; then
