@@ -357,7 +357,7 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   command -v "$CCBIN" >/dev/null 2>&1 || missing="$missing cc"
   command -v file >/dev/null 2>&1 || missing="$missing file"
   if [ -n "$missing" ]; then
-    echo "run-smoke 环境缺失：$missing（strict 判 FAIL，不 SKIP）" > "$log"
+    echo "run-smoke 环境缺失：${missing}（strict 判 FAIL，不 SKIP）" > "$log"
     [ "$STRICT" = 1 ] && record run-smoke FAIL 1 "$log" || record run-smoke SKIP 0 "$log"
     return
   fi
@@ -380,7 +380,7 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   # S0-1 构建：显式 -o + 原生可执行
   "$zorc_abs" "$hello" -o "$td/hello" >> "$log" 2>&1; rc=$?
   echo "S0-1 BUILD rc=$rc target=$td/hello" >> "$log"
-  [ "$rc" -eq 0 ] || { echo "S0-1 FAIL: build rc=$rc（期望0）" >> "$log"; fail=1; }
+  [ "$rc" -eq 0 ] || { echo "S0-1 FAIL: build rc=${rc}（期望0）" >> "$log"; fail=1; }
   if [ ! -x "$td/hello" ]; then
     echo "S0-1 FAIL: 产物缺失或不可执行" >> "$log"; fail=1
   else
@@ -393,7 +393,7 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   if [ -x "$td/hello" ]; then
     "$td/hello" > "$td/out" 2> "$td/err"; rc=$?
     echo "S0-2 RUN rc=$rc stdout_sha256=$(sha256_of "$td/out") stderr_bytes=$(wc -c < "$td/err" | tr -d ' ')" >> "$log"
-    [ "$rc" -eq 0 ] || { echo "S0-2 FAIL: run rc=$rc（期望0）" >> "$log"; fail=1; }
+    [ "$rc" -eq 0 ] || { echo "S0-2 FAIL: run rc=${rc}（期望0）" >> "$log"; fail=1; }
     cmp -s "$td/out" "$expected" || { echo "S0-2 FAIL: stdout 非 Hello, ZOR\\n" >> "$log"; fail=1; }
     [ -s "$td/err" ] && { echo "S0-2 FAIL: stderr 非空" >> "$log"; fail=1; }
   fi
@@ -418,7 +418,7 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
     "$zorc_abs" "$ctl_spawn" -o "$td/spawn.out" > "$td/n2.out" 2> "$td/n2.err"; rc=$?
     echo "N-2 rc=$rc" >> "$log"
     { [ "$rc" -eq 1 ] && grep -q 'E1101' "$td/n2.err" && [ ! -e "$td/spawn.out" ]; } \
-      || { echo "N-2 FAIL: 期望 rc=1/E1101/无产物（实得 rc=$rc）" >> "$log"; fail=1; }
+      || { echo "N-2 FAIL: 期望 rc=1/E1101/无产物（实得 rc=${rc}）" >> "$log"; fail=1; }
   fi
 
   # N-3 后端 fail-closed：最小 struct → rc=1、zorcc: codegen:、无产物
@@ -429,7 +429,7 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
     "$zorc_abs" "$ctl_codegen" -o "$td/codegen.out" > "$td/n3.out" 2> "$td/n3.err"; rc=$?
     echo "N-3 rc=$rc" >> "$log"
     { [ "$rc" -eq 1 ] && grep -q 'zorcc: codegen:' "$td/n3.err" && [ ! -e "$td/codegen.out" ]; } \
-      || { echo "N-3 FAIL: 期望 rc=1/zorcc: codegen:/无产物（实得 rc=$rc）" >> "$log"; fail=1; }
+      || { echo "N-3 FAIL: 期望 rc=1/zorcc: codegen:/无产物（实得 rc=${rc}）" >> "$log"; fail=1; }
   fi
 
   # N-4 无 -o：检查模式 rc=0、源目录零新增；负例仍 rc=1 且源目录零新增
@@ -437,15 +437,15 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   cp "$hello" "$nodir/hello.zor"
   ( cd "$nodir" && "$zorc_abs" "$nodir/hello.zor" ) > "$td/n4.out" 2> "$td/n4.err"; rc=$?
   n4_files="$(find "$nodir" -mindepth 1 | wc -l | tr -d ' ')"
-  echo "N-4 rc=$rc source_dir_files=$n4_files（期望1=仅源副本）" >> "$log"
+  echo "N-4 rc=$rc source_dir_files=${n4_files}（期望1=仅源副本）" >> "$log"
   { [ "$rc" -eq 0 ] && [ "$n4_files" -eq 1 ] && [ -f "$nodir/hello.zor" ]; } \
-    || { echo "N-4 FAIL: 无 -o 应 rc=0 且源目录仅源副本（实得 rc=$rc files=$n4_files）" >> "$log"; fail=1; }
+    || { echo "N-4 FAIL: 无 -o 应 rc=0 且源目录仅源副本（实得 rc=$rc files=${n4_files}）" >> "$log"; fail=1; }
   local negdir="$td/negdir"; mkdir -p "$negdir"
   cp "$REPO_ROOT/tests/specs/negative/r1-n01-unknown-type.zor" "$negdir/"
   ( cd "$negdir" && "$zorc_abs" "$negdir/r1-n01-unknown-type.zor" ) > "$td/n4b.out" 2> "$td/n4b.err"; rc=$?
   local neg_files; neg_files="$(find "$negdir" -mindepth 1 | wc -l | tr -d ' ')"
   { [ "$rc" -eq 1 ] && [ "$neg_files" -eq 1 ]; } \
-    || { echo "N-4b FAIL: 检查模式负例 rc=$rc files=$neg_files（期望1/1）" >> "$log"; fail=1; }
+    || { echo "N-4b FAIL: 检查模式负例 rc=$rc files=${neg_files}（期望1/1）" >> "$log"; fail=1; }
 
   # N-5 -o 误用与原子性：每例独立子目录，断言 rc=2 且目录无新增/无残留
   src_hash_before="$(sha256_of "$hello")"
@@ -506,7 +506,7 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   mkdir -p "$td/m13"
   printf 'sentinel-content' > "$td/m13/sentinel"
   "$zorc_abs" "$REPO_ROOT/tests/specs/negative/r1-n01-unknown-type.zor" -o "$td/m13/sentinel" > "$td/n5h.out" 2>&1; rc=$?
-  [ "$rc" -eq 1 ] || { echo "N-5h FAIL: 前端负例 rc=$rc（期望1）" >> "$log"; fail=1; }
+  [ "$rc" -eq 1 ] || { echo "N-5h FAIL: 前端负例 rc=${rc}（期望1）" >> "$log"; fail=1; }
   [ "$(cat "$td/m13/sentinel")" = "sentinel-content" ] || { echo "N-5h FAIL: sentinel 被改写" >> "$log"; fail=1; }
   if find "$td" -name '.zorcc-tmp-*' -print -quit | grep -q .; then
     echo "N-5 FAIL: 残留 .zorcc-tmp-*" >> "$log"; fail=1
