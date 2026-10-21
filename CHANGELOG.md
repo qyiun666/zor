@@ -12,7 +12,7 @@
 - `ci/run_ci.sh` 五处 shell 花括号（仅在对应失败／告警分支触发；成功路径零行为变化）：L120 `$n_neg，`→`${n_neg}，`；L301 `$f（`→`${f}（`；L327 `$rc（`→`${rc}（`；L343 `$n_unann（`→`${n_unann}（`；L567 `$n_skip：`→`${n_skip}：`。全角标点造成变量名边界歧义，在 `set -u` 下报 unbound；加花括号后按字面边界解析，其余行零改。
 - 0.2.0 闭合记录维护项计数勘正（六→五）：集成报告曾记「6 处」；按 main `0d514e0` 实读为 **5 处**——L360 已是 `${missing}（`（0.2.0 locale 修复已加括号），L553 无此形态；闭合记录已就地勘正，本版按 5 处执行。
 - 版本与记录：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.2.0` 直锚 `0.2.1`（`Cargo.lock:3` 的 `version = 4` 零触）；`CHANGELOG.md` 本节顶部纯插入；`zorcc --version`／`-V` 实测 `zorcc 0.2.1`。
-- 门禁与回归读数（QA 终门禁 @<0.2.1 最终 head SHA 待回填>，取刻 <UTC 待回填>）：双 locale（`en_US.UTF-8`／`zh_CN.UTF-8`）strict 七段=<待回填>、rc=<待回填>；compile=<待回填>；unit=<待回填>；golden=<待回填>；code-table=<待回填>；rust-compare=<待回填>；run-smoke=<待回填>（含正例 stdout／stderr／rc／file 与五类负控）；`cargo test`=<待回填>；0.1.x 计数=<待回填>；版本锚 `zorcc 0.2.1`=<待回填>。
+- 门禁与回归读数（QA 终门禁 @`981620f18a4c3bc211c55d398365d0363e50cbf3`，取刻 `2026-10-21T09:37Z–09:39Z`）：双 locale（`en_US.UTF-8`／`zh_CN.UTF-8`）strict 七段=7/7 PASS、rc=0（run `20261021T093813Z-57294`／`20261021T093819Z-58280`）；compile=`ok=82 fail=0`；unit=正例 41/0、负例 45/漏检 0；golden=`45/45/45`；code-table=九值 `21/21/17/1/1/2/17/17/12`；rust-compare=3/3；run-smoke=PASS（构建 rc=0、`Mach-O 64-bit executable arm64`；运行 rc=0、stdout 11 B sha256 `2d9c3d17…baca`、stderr 0 B；N-1～N-5h 全 PASS、`TMP_CLEAN`×3、0 行 FAIL）；`cargo test`=119/0；0.1.x 计数=41／45／45／3／86（五段日志与 0.2.0 main run `20261021T033348Z-17790` 逐字节 SAME）；版本锚 `zorcc 0.2.1`=`--version`／`-V` 一致（`Cargo.toml:3`／`Cargo.lock:7` 0.2.1、`Cargo.lock:3` 仍 `version = 4`）；零 tag、零 0.2.1 Release；无 `[0.2.2]`。
 
 ### Known issues（跟踪中，非本版拦截）
 - 本版为维护性补丁：不新增语言能力、不改变 0.2.0 首片子集与用户 CLI 契约；0.2.0 的残余风险（G-E-1b／G-E-1c、ASAN／LSAN、stdout 六数、E30xx、R3／R4、stdlib／zb／LSP、跨平台、基准与内存／性能）不在本版判绿，归 L2–L4；内存／性能出数前只写「目标」。
