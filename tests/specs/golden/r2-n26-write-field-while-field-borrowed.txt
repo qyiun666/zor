@@ -1,0 +1,1 @@
+zorcc: E2203 tests/specs/negative/r2-n26-write-field-while-field-borrowed.zor:9:6: 'o.x' 的 owner 槽位有活跃借用，不可写入（R2 §2）

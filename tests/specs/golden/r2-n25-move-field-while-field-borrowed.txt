@@ -1,0 +1,1 @@
+zorcc: E2203 tests/specs/negative/r2-n25-move-field-while-field-borrowed.zor:9:14: 'o.x' 的 owner 槽位有活跃借用，不可移出字段（R2 §2）

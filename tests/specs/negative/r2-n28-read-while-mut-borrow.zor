@@ -1,0 +1,10 @@
+// r2-n28-read-while-mut-borrow.zor — AC-R2-2 负例（L2a-GE1C：&mut 活跃期间直接读 owner 槽位；R2 §2，§8 E2204 同窗登记）
+// 预期：E2204「'x' 正被独占借用（&mut），不可直接读取（R2 §2 owner 槽位直接访问）」恰一行；debug/release 双模式均编译期失败、退出码非零、stderr 逐行同值
+// 判据来源：shared/ZOR-L2a-范围冻结件-项目管理-v1.md §一/§五；specs/r2-ownership.md §2/§8；shared/ZOR-0.2.x-L2-门禁与计数delta-QA-v1.md §4.2；错误文案基线=门禁 T-4。
+
+fn main() {
+    let x: i64 = 1;
+    let m = &mut x;
+    println(x);
+    println(*m);
+}

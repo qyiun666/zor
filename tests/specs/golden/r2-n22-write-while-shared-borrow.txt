@@ -1,0 +1,1 @@
+zorcc: E2203 tests/specs/negative/r2-n22-write-while-shared-borrow.zor:8:5: 'x' 有活跃借用，不可写入（R2 §2 owner 槽位直接访问）
