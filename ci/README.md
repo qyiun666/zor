@@ -3,6 +3,8 @@
 归属：ZOR工具链与开发工程师。设计与验证记录：shared/ZOR-0.1x-CI基线-设计草案-v1.md；门禁判据单一来源：shared/ZOR-0.1x-质量门禁标准-v1.md（C/T/B 编号）。
 
 - `bash ci/run_ci.sh`：compile → unit-test（骨架期工具缺失记 SKIP；`--strict` 转拦截；`--bench` 追加基准阶段）
+- `bash ci/run_ci.sh --strict --asan`：仅 Linux x86_64；在七段之后追加 `asan`（QA-01 `ci/asan/run_asan.sh`）；macOS 不传 `--asan`，保持七段
+- `bash ci/run_ci.sh --asan-host-check`：仅校验 ubuntu-24.04／x86_64／clang 18.1.3 宿主固定；不读 manifest、不跑用例
 - `bash ci/install-hooks.sh`：安装 pre-push 本地直连钩子（MG 子集）
 - `.github/workflows/`：外部 CI 预备件，凭据获群主授权前不启用
 - 用例目录契约：`tests/specs/positive|negative`（见 tests/README）；证据落 `ci/logs/<run-id>/`
@@ -13,6 +15,7 @@
 - `code-table`（0.1.18 项 2 新增）：诊断码表不变式校验段，单一实现处＝`ci/run_ci.sh` 的 `stage_code_table`（规范文本不另抄期望表）；口径源＝`specs/r1-type-system.md` §8／§8b 与 `specs/r2-ownership.md` §8 各自的取径注记；判定项＝A1–A7＋A8b1＋HDR（A8a 搬运闸与 A8b2 新行出处闸须对 base 侧旧文核对，属升格窗一次性执行，不入本段常驻面）；strict 下 FAIL 计入 `overall`
 - `rust-compare`（0.1.26 项 7 新增；D1 处置 @0.2.0）：AC-R2-4 Rust 同题两段判，单一实现处＝`ci/run_ci.sh` 的 `stage_rust_compare`；`tests/specs/compare/*-annotated.rs` 须 `rustc --edition=2021 --crate-type lib --emit=metadata` exit=0，`*-unannotated.rs` 须非零退出且 stderr 含 `error[E0106]`（**D1：旧措辞 `missing lifetime specifier` 仅记日志、不计红**，0.1.x 历史件不回改）；反空转三项＝annotated 含 ≥1 具名生命周期／stripped 归一化后仅差生命周期标注／B 段 rc≠0 与 E0106 同时命中；strict 下两侧各≥3 且按 basename 成对，否则 FAIL；rustc 缺失时 strict 判 FAIL、默认 SKIP（同 compile 段环境口径）；`RUSTC_BIN` 可注入指定 rustc
 - `run-smoke`（0.2.0／020-CI-01 新增）：首个可执行闭环——`zorcc examples/hello.zor -o <tmp>/hello` → rc=0、宿主原生可执行、运行 stdout 逐字节 `Hello, ZOR\n`（11 B）／stderr 0 B／rc=0；五类负控每次运行（期望串错一位／前端 `spawn` E1101／后端 fail-closed 最小 `struct`／无 `-o` 检查模式零新增文件／`-o` 误用与失败原子性）；strict 下 `cc`／`file` 缺失判 FAIL；无 `-o` 不进入 codegen，保持 0.1.x 检查态（D-020-1 A）；日志 `ci/logs/<run>/run-smoke.log`
+- `asan`（L2a／L2A-CI-01 接线；判据脚本＝QA-01 `ci/asan/run_asan.sh`）：仅 `--asan` 且 Linux x86_64；manifest 48 行（41 `compile-only`＋7 `build-run`）、两轮构建／运行、UAF／LSAN 泄漏／去 `-g` 三探针；manifest 缺位／行数不符／路径不存在＝FAIL；证据 `ci/logs/<run>/asan/`；**不并入 macOS 七段常驻面，八段口径只在 Linux gate 成立**
 - `bench` 仅在 `--bench` 下追加，不属常驻段名
 - 历史口径出清：0.1.17 及以前在册的「四段全 PASS」句现存于 `CHANGELOG.md` 的 `[0.1.17]` 节（历史节，零触碰红线覆盖、不改），凡引段数一律绑所检 head ＋节名锚，**不得把该句读作现态**
 
