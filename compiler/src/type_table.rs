@@ -105,7 +105,12 @@ impl TypeTable {
     }
 
     pub fn insert_expr(&mut self, e: &Ex, ty: Ty) {
-        self.exprs.insert(NodeKey::expr(e), ty);
+        let key = NodeKey::expr(e);
+        if let Some(prev) = self.exprs.get(&key) {
+            // 同一节点被重复检查时类型必须一致（QA R-2：不同 expect 下取最后一次即漂移）
+            debug_assert_eq!(prev, &ty, "同一节点重复检查且类型不一致");
+        }
+        self.exprs.insert(key, ty);
     }
 
     pub fn expr_ty(&self, e: &Ex) -> Option<&Ty> {
@@ -151,8 +156,9 @@ pub fn byte_array_len(t: &Ty) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{byte_array_len, ExTag};
-    use crate::{compile_typed, parser::Ty};
+    use super::{byte_array_len, ExTag, NodeKey, TypeTable};
+    use crate::parser::{Ex, Ty};
+    use crate::compile_typed;
 
     #[test]
     fn check_records_expr_let_and_fn_sig_types() {
@@ -190,5 +196,39 @@ mod tests {
         assert_eq!(byte_array_len(&Ty::Arr(Box::new(Ty::Prim("i64")), 3)), None);
         assert_eq!(byte_array_len(&Ty::Prim("byte")), None);
         assert_eq!(byte_array_len(&Ty::Bad), None);
+    }
+
+    // QA R-1：键＝位置＋节点类别；同位置不同类别不冲突，不同位置独立成项
+    #[test]
+    fn node_key_includes_position_and_kind() {
+        let a = Ex::Path("x".to_string(), 3, 5);
+        let b = Ex::Path("x".to_string(), 3, 6);
+        let call = Ex::Call(Box::new(Ex::Path("f".to_string(), 3, 5)), vec![], 3, 5);
+        assert_ne!(NodeKey::expr(&a), NodeKey::expr(&b));
+        assert_ne!(NodeKey::expr(&a), NodeKey::expr(&call));
+        // 同位置同类别＝同一槽位（调用与 callee Path 同位置，但类别不同，故不覆盖）
+        assert_eq!(NodeKey::expr(&a), NodeKey::expr(&Ex::Path("y".to_string(), 3, 5)));
+    }
+
+    #[test]
+    fn distinct_positions_record_independently() {
+        let mut t = TypeTable::new();
+        let a = Ex::Path("x".to_string(), 2, 5);
+        let b = Ex::Path("x".to_string(), 3, 5);
+        t.insert_expr(&a, Ty::Prim("i64"));
+        t.insert_expr(&b, Ty::Prim("bool"));
+        assert_eq!(t.expr_count(), 2);
+        assert_eq!(t.expr_ty(&a), Some(&Ty::Prim("i64")));
+        assert_eq!(t.expr_ty(&b), Some(&Ty::Prim("bool")));
+    }
+
+    #[test]
+    fn reinsert_same_node_keeps_single_entry() {
+        let mut t = TypeTable::new();
+        let e = Ex::Path("x".to_string(), 2, 5);
+        t.insert_expr(&e, Ty::Prim("i64"));
+        t.insert_expr(&e, Ty::Prim("i64"));
+        assert_eq!(t.expr_count(), 1);
+        assert_eq!(t.expr_ty(&e), Some(&Ty::Prim("i64")));
     }
 }

@@ -29,6 +29,16 @@ pub struct Ck<'a> {
     fns: HashMap<String, (Vec<Ty>, Ty)>,
     /// 类型规则唯一来源的落点：check 写，lower 只读（L2a typed IR 使能项）。
     types: TypeTable,
+    /// 同语句 E2204 待落：读取位置；若同语句已对该绑定发 E2203，则丢弃（只留变更诊断）。
+    pending_e2204: Vec<(String, usize, usize)>,
+    /// 当前语句已发 E2203 的绑定（同语句同槽位去重）。
+    scope_e2203: Vec<String>,
+    /// 作用域栈：语句／块尾开始处的 (scope_e2203, pending_e2204) 长度。
+    place_starts: Vec<(usize, usize)>,
+    /// 借用创建期间的绑定：创建 `&v`／`&mut v` 不是对 v 的值读取，不落 E2204。
+    e2204_exempt: Vec<String>,
+    /// 已发 E2201／E2202 的绑定：借用状态已判错，后续不再级联 E2203／E2204（首错优先，保既有 golden）。
+    borrow_conflict: Vec<String>,
 }
 
 fn int_bits(p: &str) -> Option<u32> {
@@ -37,7 +47,19 @@ fn int_bits(p: &str) -> Option<u32> {
 
 impl<'a> Ck<'a> {
     pub fn new(prog: &'a Prog) -> Self {
-        Ck { prog, diags: vec![], structs: HashMap::new(), enums: HashMap::new(), fns: HashMap::new(), types: TypeTable::new() }
+        Ck {
+            prog,
+            diags: vec![],
+            structs: HashMap::new(),
+            enums: HashMap::new(),
+            fns: HashMap::new(),
+            types: TypeTable::new(),
+            pending_e2204: vec![],
+            scope_e2203: vec![],
+            place_starts: vec![],
+            e2204_exempt: vec![],
+            borrow_conflict: vec![],
+        }
     }
 
     /// 检查并产出（诊断, 类型表）。类型表是 check 结果的公开面，lower 不得重算。
@@ -116,6 +138,70 @@ impl<'a> Ck<'a> {
         self.diags.push(Diag::new(code, l, c, msg));
     }
 
+    /// 语句／块尾作用域：E2203 同槽位去重；E2204 待落到作用域尾再定，
+    /// 若同作用域已对该绑定发 E2203（变更优先），则不落 E2204。
+    fn place_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let e3_start = self.scope_e2203.len();
+        let e4_start = self.pending_e2204.len();
+        self.place_starts.push((e3_start, e4_start));
+        let r = f(self);
+        let (s3, s4) = self.place_starts.pop().unwrap_or((0, 0));
+        let e3_names: Vec<String> = self.scope_e2203.drain(s3..).collect();
+        let pending: Vec<(String, usize, usize)> = self.pending_e2204.drain(s4..).collect();
+        let mut seen: Vec<String> = Vec::new();
+        for (n, l, c) in pending {
+            if e3_names.iter().any(|x| x == &n) || seen.iter().any(|x| x == &n) {
+                continue;
+            }
+            seen.push(n.clone());
+            self.d(
+                "E2204",
+                l,
+                c,
+                format!("'{}' 正被独占借用（&mut），不可直接读取（R2 §2 owner 槽位直接访问）", n),
+            );
+        }
+        r
+    }
+
+    /// E2203：借用活跃期间变更 owner 槽位（写／移出／unbox）；同语句同槽位只发一枚。
+    fn e2203(&mut self, n: &str, l: usize, c: usize, msg: impl Into<String>) {
+        if self.borrow_conflict.iter().any(|x| x == n) {
+            return;
+        }
+        let start = self.place_starts.last().map(|x| x.0).unwrap_or(0);
+        if self.scope_e2203[start..].iter().any(|x| x == n) {
+            return;
+        }
+        self.scope_e2203.push(n.to_string());
+        self.d("E2203", l, c, msg);
+    }
+
+    fn note_e2204(&mut self, n: &str, l: usize, c: usize) {
+        if self.borrow_conflict.iter().any(|x| x == n) || self.e2204_exempt.iter().any(|x| x == n) {
+            return;
+        }
+        self.pending_e2204.push((n.to_string(), l, c));
+    }
+
+    fn mark_borrow_conflict(&mut self, n: &str) {
+        if !self.borrow_conflict.iter().any(|x| x == n) {
+            self.borrow_conflict.push(n.to_string());
+        }
+    }
+
+    /// 借用创建期间抑制 E2204（`&v`／`&mut v` 不是值读取）。
+    fn exempt_e2204<R>(&mut self, n: Option<&str>, f: impl FnOnce(&mut Self) -> R) -> R {
+        if let Some(name) = n {
+            self.e2204_exempt.push(name.to_string());
+        }
+        let r = f(self);
+        if n.is_some() {
+            self.e2204_exempt.pop();
+        }
+        r
+    }
+
     fn known_named(&self, n: &str) -> bool {
         self.structs.contains_key(n) || self.enums.contains_key(n)
     }
@@ -153,14 +239,29 @@ impl<'a> Ck<'a> {
         }
     }
 
-    /// 移动源登记：e 属主转移入新位置（绑定/实参/返回/赋值/容器槽位）
+    /// 移动源登记：e 属主转移入新位置（绑定/实参/返回/赋值/容器槽位）。
+    /// 借用活跃期间移出 owner 槽位＝E2203（R2 §2）；状态错误优先，不叠报。
     fn note_move_src(&mut self, e: &Ex, ty: &Ty, env: &mut HashMap<String, Var>) {
         if self.is_copy(ty) { return; }
         match e {
-            Ex::Path(n, _, _) => {
+            Ex::Path(n, l, c) => {
+                if let Some(v) = env.get(n) {
+                    if !v.moved && !v.unboxed && !v.partial_moved && (v.shared > 0 || v.mut_active) {
+                        let msg = format!("'{}' 有活跃借用，不可移出（R2 §2 owner 槽位直接访问）", n);
+                        self.e2203(n, *l, *c, msg);
+                    }
+                }
                 if let Some(v) = env.get_mut(n) { v.moved = true; }
             }
-            Ex::Field(base, fname, _, _) => {
+            Ex::Field(base, fname, l, c) => {
+                if let Some(n) = place_root(base) {
+                    if let Some(v) = env.get(n) {
+                        if !v.moved && !v.unboxed && (v.shared > 0 || v.mut_active) {
+                            let msg = format!("'{}.{}' 的 owner 槽位有活跃借用，不可移出字段（R2 §2）", n, fname);
+                            self.e2203(n, *l, *c, msg);
+                        }
+                    }
+                }
                 if let Ex::Path(n, _, _) = base.as_ref() {
                     if let Some(v) = env.get_mut(n) {
                         v.partial_moved = true;
@@ -262,12 +363,15 @@ impl<'a> Ck<'a> {
         let mut env2 = env.clone();
         for st in &blk.stmts { self.check_stmt(st, &mut env2); }
         if let Some(tail) = &blk.tail {
-            let t = self.check_expr(tail, expect, &mut env2);
-            if let Some(e) = expect {
-                if !compatible(e, &t) { self.mismatch(t_span(tail), e, &t); }
-            }
-            // 返回=移动点（R2 §1）
-            self.note_move_src(tail.as_ref(), &t, &mut env2);
+            // 尾表达式＝value 位置；E2203 若成立则同作用域内不落 E2204（移动优先）
+            self.place_scope(|ck| {
+                let t = ck.check_expr(tail, expect, &mut env2);
+                if let Some(e) = expect {
+                    if !compatible(e, &t) { ck.mismatch(t_span(tail), e, &t); }
+                }
+                // 返回=移动点（R2 §1）
+                ck.note_move_src(tail.as_ref(), &t, &mut env2);
+            });
         } else if let Some(e) = expect {
             if e != &Ty::unit() && e != &Ty::Bad {
                 self.d("E1601", blk.span.0, blk.span.1, format!("函数体需尾表达式返回 '{}'", e.display()));
@@ -284,6 +388,11 @@ impl<'a> Ck<'a> {
     }
 
     fn check_stmt(&mut self, st: &St, env: &mut HashMap<String, Var>) {
+        // 每条语句一个 E2203／E2204 作用域（嵌套语句各自结算，外侧状态恢复）
+        self.place_scope(|ck| ck.check_stmt_inner(st, env));
+    }
+
+    fn check_stmt_inner(&mut self, st: &St, env: &mut HashMap<String, Var>) {
         match st {
             St::Let(name, ann, init, l, c) => {
                 let vt = if let Some(a) = ann {
@@ -297,9 +406,10 @@ impl<'a> Ck<'a> {
                 self.types.insert_let(*l, *c, vt.clone());
                 if matches!(ann, Some(Ty::Ref(..))) { self.d("E1501", *l, *c, "引用类型只能出现在函数参数/局部借用，不得作为 let 标注持久化"); }
                 self.note_move_src(init, &vt, env);
-                // 持久借用记账：句柄绑定 `let h = &v / &mut v`（活跃至所在块尾，R2 §2）
+                // 持久借用记账：句柄绑定 `let h = &v / &mut v`（活跃至所在块尾，R2 §2）；
+                // 字段借用按绑定级记在根绑定上（`&o.a` 记为对 `o` 的借用，L2a 保守口径）
                 if let Ex::Ref(inner, m, _, _) = init {
-                    if let Ex::Path(n, _, _) = inner.as_ref() {
+                    if let Some(n) = place_root(inner) {
                         if let Some(v) = env.get_mut(n) {
                             if *m { v.mut_active = true; } else { v.shared += 1; }
                         }
@@ -315,9 +425,16 @@ impl<'a> Ck<'a> {
                 self.note_move_src(rhs, &rt, env);
                 let lt = match lhs {
                     Ex::Path(n, ll, lc) => {
-                        // 重赋整值：恢复/覆盖所有权状态（R2 §1 再赋整值恢复），不做读检查
+                        // 重赋整值：恢复/覆盖所有权状态（R2 §1 再赋整值恢复），不做读检查；
+                        // 借用活跃期间写 owner 槽位＝E2203（R2 §2，状态错误优先不叠报）
                         match env.get_mut(n) {
-                            Some(v) => { let t = v.ty.clone(); *v = Var::fresh(rt.clone()); t }
+                            Some(v) => {
+                                if !v.moved && !v.unboxed && (v.shared > 0 || v.mut_active) {
+                                    let msg = format!("'{}' 有活跃借用，不可写入（R2 §2 owner 槽位直接访问）", n);
+                                    self.e2203(n, *ll, *lc, msg);
+                                }
+                                let t = v.ty.clone(); *v = Var::fresh(rt.clone()); t
+                            }
                             None => { self.d("E1101", *ll, *lc, format!("unknown identifier '{}'", n)); Ty::Bad }
                         }
                     }
@@ -332,7 +449,16 @@ impl<'a> Ck<'a> {
                         }
                     }
                     Ex::Field(base, fname, fl, fc) => {
-                        let ft = self.field_place_ty(base, fname, *fl, *fc, env);
+                        let ft = self.field_place_ty(base, fname, *fl, *fc, env, false);
+                        // 字段写＝对根绑定槽位的变更；借用活跃期间→E2203（绑定级保守口径）
+                        if let Some(n) = place_root(base) {
+                            if let Some(v) = env.get(n) {
+                                if !v.moved && !v.unboxed && (v.shared > 0 || v.mut_active) {
+                                    let msg = format!("'{}.{}' 的 owner 槽位有活跃借用，不可写入（R2 §2）", n, fname);
+                                    self.e2203(n, *fl, *fc, msg);
+                                }
+                            }
+                        }
                         // 写回被移出的字段=恢复该字段（R2 §1）
                         if let Ex::Path(n, _, _) = base.as_ref() {
                             if let Some(v) = env.get_mut(n) {
@@ -367,8 +493,9 @@ impl<'a> Ck<'a> {
         }
     }
 
-    /// 字段可放置/读取的类型（含 moved_fields 判定；不触发 E2102 整体使用）
-    fn field_place_ty(&mut self, base: &Ex, fname: &str, l: usize, c: usize, env: &mut HashMap<String, Var>) -> Ty {
+    /// 字段可放置/读取的类型（含 moved_fields 判定；不触发 E2102 整体使用）。
+    /// `value_read=true` 表示值位置读取：`&mut` 活跃期间直接读→E2204。
+    fn field_place_ty(&mut self, base: &Ex, fname: &str, l: usize, c: usize, env: &mut HashMap<String, Var>, value_read: bool) -> Ty {
         let bt = if let Ex::Path(n, bl, bc) = base {
             match env.get(n).cloned() {
                 Some(v) => {
@@ -379,6 +506,9 @@ impl<'a> Ck<'a> {
                         self.d("E2101", l, c, format!("字段 '{}' 已移出，不可使用（R2 §1 部分移动）", fname));
                         Ty::Bad
                     } else {
+                        if value_read && v.mut_active {
+                            self.note_e2204(n, l, c);
+                        }
                         v.ty.clone()
                     }
                 }
@@ -423,6 +553,10 @@ impl<'a> Ck<'a> {
             Ex::Path(n, l, c) => {
                 if let Some(v) = env.get(n).cloned() {
                     self.read_check(n, *l, *c, &v, true);
+                    // 值位置直接读：`&mut` 活跃期间→E2204（状态错误优先；移动点由 E2203 收口）
+                    if !(v.unboxed || v.moved || v.partial_moved) && v.mut_active {
+                        self.note_e2204(n, *l, *c);
+                    }
                     v.ty
                 } else { self.d("E1101", *l, *c, format!("unknown identifier '{}'", n)); Ty::Bad }
             }
@@ -456,7 +590,11 @@ impl<'a> Ck<'a> {
                         if v.unboxed { self.d("E2301", *l, *c, format!("'{}' 重复 unbox（double free，R2 §8）", n)); }
                         else if v.moved { self.d("E2101", *l, *c, format!("'{}' 已移出，不可 unbox（R2 §1）", n)); }
                         else if !matches!(v.ty, Ty::BoxTy(_)) { self.d("E1201", *l, *c, format!("unbox 仅适用于 Box 句柄，实际 '{}'", v.ty.display())); }
-                        else { if let Some(v) = env.get_mut(n) { v.unboxed = true; } }
+                        else if v.shared > 0 || v.mut_active {
+                            // 借用活跃期间 unbox＝变更 owner 槽位（E2203，R2 §2）
+                            let msg = format!("'{}' 有活跃借用，不可 unbox（R2 §2 owner 槽位直接访问）", n);
+                            self.e2203(n, *l, *c, msg);
+                        } else { if let Some(v) = env.get_mut(n) { v.unboxed = true; } }
                     }
                     None => self.d("E1101", *l, *c, format!("unknown identifier '{}'", n)),
                 }
@@ -465,19 +603,26 @@ impl<'a> Ck<'a> {
             Ex::Ref(inner, m, l, c) => {
                 // R2 §2 借用判定表冲突检查（不记账）：持久借用的记账仅发生在 let 绑定处
                 // （§2"借用句柄自创建处到其所在块尾均活跃"——句柄=绑定持有；实参位匿名借用为瞬时）
-                if let Ex::Path(n, _, _) = inner.as_ref() {
+                // 字段借用按绑定级对根绑定判（`&o.a` 视为对 `o` 的借用）。
+                let root = place_root(inner);
+                if let Some(n) = root {
                     if let Some(vcl) = env.get(n).cloned() {
-                        self.read_check(n, *l, *c, &vcl, true);
+                        if matches!(inner.as_ref(), Ex::Path(..)) {
+                            self.read_check(n, *l, *c, &vcl, true);
+                        }
                         if *m {
                             if vcl.mut_active || vcl.shared > 0 {
                                 self.d("E2202", *l, *c, format!("'{}' 已有活跃借用，不可再创建 &mut（R2 §2）", n));
+                                self.mark_borrow_conflict(n);
                             }
                         } else if vcl.mut_active {
                             self.d("E2201", *l, *c, format!("'{}' 正被独占借用，不可创建共享借用（R2 §2）", n));
+                            self.mark_borrow_conflict(n);
                         }
                     }
                 }
-                let t = self.check_expr(inner, None, env);
+                // 借用创建本身不是值读取：`&v`／`&mut v` 只走 E2201／E2202，不叠 E2204
+                let t = self.exempt_e2204(root, |ck| ck.check_expr(inner, None, env));
                 Ty::Ref(Box::new(t), *m)
             }
             Ex::Call(callee, args, l, c) => {
@@ -560,7 +705,7 @@ impl<'a> Ck<'a> {
                 }
             }
             Ex::Field(base, fname, l, c) => {
-                self.field_place_ty(base, fname, *l, *c, env)
+                self.field_place_ty(base, fname, *l, *c, env, true)
             }
             Ex::Record(name, fields, l, c) => {
                 if let Some(fs) = self.structs.get(name).cloned() {
@@ -817,13 +962,16 @@ fn compatible(expect: &Ty, got: &Ty) -> bool {
 }
 
 fn t_span(e: &Ex) -> (usize, usize) {
+    e.span()
+}
+
+/// owner 槽位根绑定：`v`／`v.f`／`v.f.g` 均归到 `v`（绑定级保守口径，R2 §2）。
+/// 经句柄 `*m`／`m.f` 的访问不属 owner 槽位，返回 `None`。
+fn place_root(e: &Ex) -> Option<&str> {
     match e {
-        Ex::Lit(_, l, c) | Ex::Path(_, l, c) | Ex::UnitLit(l, c) | Ex::Bin(_, _, _, l, c)
-        | Ex::Un(_, _, l, c) | Ex::Call(_, _, l, c) | Ex::Method(_, _, _, l, c)
-        | Ex::Index(_, _, l, c) | Ex::Field(_, _, l, c) | Ex::Record(_, _, l, c)
-        | Ex::Tup(_, l, c) | Ex::ArrLit(_, l, c) | Ex::Ref(_, _, l, c)
-        | Ex::Box(_, l, c) | Ex::Deref(_, l, c) | Ex::Unbox(_, l, c) => (*l, *c),
-        Ex::Block(b) => b.span,
+        Ex::Path(n, _, _) => Some(n),
+        Ex::Field(base, _, _, _) => place_root(base),
+        _ => None,
     }
 }
 
@@ -884,4 +1032,97 @@ fn dfs_cycle<'a, 'b>(
         let _ = visited;
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::compile_to_diags;
+
+    fn codes(src: &str) -> Vec<String> {
+        compile_to_diags(src).iter().map(|d| d.code.clone()).collect()
+    }
+
+    fn assert_one(src: &str, code: &str) {
+        let cs = codes(src);
+        assert_eq!(cs, vec![code.to_string()], "诊断应恰为 {code}：{cs:?}");
+    }
+
+    // —— G-E-1b：借用活跃期间变更 owner 槽位 → E2203（6 枚主形）——
+
+    #[test]
+    fn e2203_write_while_shared_borrow() {
+        assert_one("fn main() {\n    let x = box 1;\n    let r = &x;\n    x = box 2;\n    println(*r);\n}\n", "E2203");
+    }
+
+    #[test]
+    fn e2203_move_while_shared_borrow() {
+        assert_one("fn main() {\n    let x = box 1;\n    let r = &x;\n    let y = x;\n    println(*r);\n}\n", "E2203");
+    }
+
+    #[test]
+    fn e2203_unbox_while_shared_borrow() {
+        assert_one("fn main() {\n    let b = box 1;\n    let r = &b;\n    unbox b;\n    println(*r);\n}\n", "E2203");
+    }
+
+    #[test]
+    fn e2203_move_field_while_field_borrowed() {
+        assert_one("struct P { x: Box<i64> }\nfn main() {\n    let o = P { x: box 1 };\n    let r = &o.x;\n    let y = o.x;\n    println(*r);\n}\n", "E2203");
+    }
+
+    #[test]
+    fn e2203_write_field_while_field_borrowed() {
+        assert_one("struct P { x: Box<i64> }\nfn main() {\n    let o = P { x: box 1 };\n    let r = &o.x;\n    o.x = box 3;\n    println(*r);\n}\n", "E2203");
+    }
+
+    #[test]
+    fn e2203_write_while_mut_borrow() {
+        assert_one("fn main() {\n    let x = box 1;\n    let m = &mut x;\n    x = box 2;\n    println(*m);\n}\n", "E2203");
+    }
+
+    // —— G-E-1c：&mut 活跃期间直接读 → E2204（2 枚主形）——
+
+    #[test]
+    fn e2204_read_while_mut_borrow() {
+        assert_one("fn main() {\n    let x: i64 = 1;\n    let m = &mut x;\n    println(x);\n    println(*m);\n}\n", "E2204");
+    }
+
+    #[test]
+    fn e2204_read_field_while_mut_borrow() {
+        assert_one("struct P { x: i64, y: i64 }\nfn main() {\n    let o = P { x: 1, y: 2 };\n    let m = &mut o;\n    println(o.x);\n}\n", "E2204");
+    }
+
+    // —— 放行口径：p12／p3／p10d 必须 rc=0（零诊断）——
+
+    #[test]
+    fn allow_borrow_ended_by_block() {
+        assert!(codes("fn main() {\n    let x = box 1;\n    if true {\n        let r = &x;\n        println(*r);\n    }\n    x = box 2;\n    println(x);\n}\n").is_empty());
+    }
+
+    #[test]
+    fn allow_self_assign_without_borrow() {
+        assert!(codes("fn main() {\n    let x = box 1;\n    x = x;\n}\n").is_empty());
+    }
+
+    #[test]
+    fn allow_access_through_mut_handle() {
+        assert!(codes("fn main() {\n    let x: i64 = 1;\n    let m = &mut x;\n    println(*m);\n    *m = 5;\n    println(*m);\n}\n").is_empty());
+    }
+
+    // —— 同语句去重与状态错误优先 ——
+
+    #[test]
+    fn same_statement_read_write_reports_only_e2203() {
+        assert_one("fn main() {\n    let x: i64 = 1;\n    let m = &mut x;\n    x = x + 1;\n    println(*m);\n}\n", "E2203");
+    }
+
+    #[test]
+    fn state_error_precedes_borrow_diagnostic() {
+        let cs = codes("fn main() {\n    let x = box 1;\n    unbox x;\n    let r = &x;\n    println(*r);\n}\n");
+        assert!(!cs.is_empty() && cs.iter().all(|c| c == "E2301"), "{cs:?}");
+    }
+
+    #[test]
+    fn non_copy_field_move_under_mut_borrow_is_e2203_not_e2204() {
+        assert_one("struct P { x: Box<i64>, y: i64 }\nfn main() {\n    let o = P { x: box 1, y: 2 };\n    let m = &mut o;\n    let y = o.x;\n    println(y);\n}\n", "E2203");
+    }
 }
