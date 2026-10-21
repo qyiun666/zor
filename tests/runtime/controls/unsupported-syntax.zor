@@ -1,0 +1,4 @@
+// 0.2.0 run-smoke 前端负控：spawn 属首片未支持语法，前端必须报 E1101。
+fn main() {
+    spawn worker();
+}
