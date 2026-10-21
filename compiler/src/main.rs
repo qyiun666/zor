@@ -199,9 +199,25 @@ mod tests {
         ));
     }
 
-    /// D-020-1 A：`-o` 任意位置进入构建模式；`-O0`／`-g` 实映射
+    /// 形①（D-020-9 允许更新的 2 条在册测试之一）：D-020-1 A 后 `-o` 正形进入
+    /// 构建模式（移入新增 form1a）；`--output`／`--output=`／`-o` 缺值仍指名拒判。
+    /// 旧断言：三种位置的 `-o` + `--output` + `--output=` + `-o` 缺值全部 Err；
+    /// 新断言：仅保留后者，`-o` 正形不再属于本测试的拒判面。
     #[test]
-    fn form1_output_flag_selects_build_mode() {
+    fn form1_output_flag_rejected_at_any_position() {
+        let e = parse_cli(&v(&["--output", "out.bin", "a.zor"])).unwrap_err();
+        assert!(e.contains("--output") && e.contains("只接受 '-o'"), "{e}");
+
+        let e = parse_cli(&v(&["a.zor", "--output=out.bin"])).unwrap_err();
+        assert!(e.contains("--output="), "{e}");
+
+        let e = parse_cli(&v(&["a.zor", "-o"])).unwrap_err();
+        assert!(e.contains("-o") && e.contains("缺值"), "{e}");
+    }
+
+    /// D-020-9 新增：`-o` 任意位置进入构建模式；`-O0`／`-g` 实映射
+    #[test]
+    fn form1a_output_flag_selects_build_mode() {
         for argv in [
             v(&["-o", "out.bin", "a.zor"]),
             v(&["a.zor", "-o", "out.bin"]),
@@ -224,23 +240,14 @@ mod tests {
         );
     }
 
-    /// 形①：`-o` 误用与 `--output` 一律指名拒判（rc=2 路径）
+    /// D-020-9 新增：`-o` 空值与重复指名拒判（rc=2 路径）
     #[test]
     fn form1b_output_flag_misuse_is_named_rejection() {
-        let e = parse_cli(&v(&["a.zor", "-o"])).unwrap_err();
-        assert!(e.contains("-o") && e.contains("缺值"), "{e}");
-
         let e = parse_cli(&v(&["-o", "", "a.zor"])).unwrap_err();
         assert!(e.contains("为空"), "{e}");
 
         let e = parse_cli(&v(&["-o", "a", "-o", "b", "x.zor"])).unwrap_err();
         assert!(e.contains("重复"), "{e}");
-
-        let e = parse_cli(&v(&["--output", "out.bin", "a.zor"])).unwrap_err();
-        assert!(e.contains("--output") && e.contains("只接受 '-o'"), "{e}");
-
-        let e = parse_cli(&v(&["a.zor", "--output=out.bin"])).unwrap_err();
-        assert!(e.contains("--output="), "{e}");
     }
 
     /// 形②：未列入 C-1 白名单的任意 flag 一律拒判
@@ -281,7 +288,8 @@ mod tests {
         assert!(matches!(parse_cli(&v(&["-o", "out.bin"])), Ok(Cli::Usage)));
     }
 
-    /// C-2：CLI 面诊断不占语言诊断码位（红线 2），也不写成 E1xxx/E2xxx 串
+    /// C-2：CLI 面诊断不占语言诊断码位（红线 2），也不写成 E1xxx/E2xxx 串。
+    /// D-020-9 允许更新：`-o` 正形已改走构建路径，坏例替换为缺值／空值／重复。
     #[test]
     fn c2_cli_diagnostics_allocate_no_language_codes() {
         for bad in [

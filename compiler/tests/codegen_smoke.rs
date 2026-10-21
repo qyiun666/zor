@@ -193,7 +193,8 @@ fn non_string_println_is_rejected_by_subset() {
     let out = d.path().join("p");
     let o = run(&[src.to_str().unwrap(), "-o", out.to_str().unwrap()]);
     assert_eq!(o.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&o.stderr).contains("首片不支持"));
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.contains("zorcc: codegen:") && err.contains("首片不支持"), "{err}");
     assert!(!out.exists());
 }
 
@@ -230,6 +231,10 @@ fn output_flag_misuse_is_rc2_and_leaves_no_artifacts() {
     let o = run(&[srcs, "-o", ""]);
     assert_eq!(o.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&o.stderr).contains("为空"));
+
+    let o = run(&["--output", "out.bin", srcs]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&o.stderr).contains("--output"));
 
     let missing = d.path().join("missing").join("hello");
     let o = run(&[srcs, "-o", missing.to_str().unwrap()]);
