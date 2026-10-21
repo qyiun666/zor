@@ -1,0 +1,49 @@
+case_id	source_path	expect_rc	mode	expect_stdout_sha256	kind	notes
+m1-s1-passthrough	tests/specs/positive/m1-s1-passthrough.zor	0	compile-only		fixture	codegen-subset: 0.2.0 codegen 子集外；M1 夹具，不计入 AC-R1-2；不入 ASAN run
+r1-01-prim-declare	tests/specs/positive/r1-01-prim-declare.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-02-arr-zero-len	tests/specs/positive/r1-02-arr-zero-len.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-03-arr-fixed-index	tests/specs/positive/r1-03-arr-fixed-index.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-04-tuple-unit-k0	tests/specs/positive/r1-04-tuple-unit-k0.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-05-tuple-two-annotated	tests/specs/positive/r1-05-tuple-two-annotated.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-06-tuple-three-inferred	tests/specs/positive/r1-06-tuple-three-inferred.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-07-struct-empty	tests/specs/positive/r1-07-struct-empty.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-08-struct-multi-field	tests/specs/positive/r1-08-struct-multi-field.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-09-enum-nullary	tests/specs/positive/r1-09-enum-nullary.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-10-enum-tuple-variant	tests/specs/positive/r1-10-enum-tuple-variant.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-11-ref-shared-param	tests/specs/positive/r1-11-ref-shared-param.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-12-ref-mut-param	tests/specs/positive/r1-12-ref-mut-param.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-13-fn-unit-return	tests/specs/positive/r1-13-fn-unit-return.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-14-copy-prim-assign	tests/specs/positive/r1-14-copy-prim-assign.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-15-copy-arr-assign	tests/specs/positive/r1-15-copy-arr-assign.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-16-copy-struct-tuple	tests/specs/positive/r1-16-copy-struct-tuple.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-17-lit-infer-default	tests/specs/positive/r1-17-lit-infer-default.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-18-lit-infer-annotate	tests/specs/positive/r1-18-lit-infer-annotate.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-19-explicit-convert-fns	tests/specs/positive/r1-19-explicit-convert-fns.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-20-byte-string-lit	tests/specs/positive/r1-20-byte-string-lit.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-21-struct-mixed-separators	tests/specs/positive/r1-21-struct-mixed-separators.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-22-print-zero-arg	tests/specs/positive/r1-22-print-zero-arg.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-23-if-statement-no-else	tests/specs/positive/r1-23-if-statement-no-else.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-24-if-statement-else	tests/specs/positive/r1-24-if-statement-else.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r1-25-while-statement	tests/specs/positive/r1-25-while-statement.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-01-box-create-read-unbox	tests/specs/positive/r2-01-box-create-read-unbox.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-02-move-chain-arg-return	tests/specs/positive/r2-02-move-chain-arg-return.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-03-borrow-read-write-params	tests/specs/positive/r2-03-borrow-read-write-params.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-04-borrow-block-end-deactivation	tests/specs/positive/r2-04-borrow-block-end-deactivation.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-05-partial-move-restore	tests/specs/positive/r2-05-partial-move-restore.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-06-box-recursive-list	tests/specs/positive/r2-06-box-recursive-list.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-07-assign-move-between-bindings	tests/specs/positive/r2-07-assign-move-between-bindings.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-08-field-auto-borrow-read-write	tests/specs/positive/r2-08-field-auto-borrow-read-write.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-09-full-lifecycle-construct-borrow-release	tests/specs/positive/r2-09-full-lifecycle-construct-borrow-release.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-10-enum-box-self-cycle-indirection	tests/specs/positive/r2-10-enum-box-self-cycle-indirection.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-11-enum-box-mutual-indirection	tests/specs/positive/r2-11-enum-box-mutual-indirection.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-12-box-return-expr-tail	tests/specs/positive/r2-12-box-return-expr-tail.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-ref-01-two-input-select-owned	tests/specs/positive/r2-ref-01-two-input-select-owned.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-ref-02-struct-hold-value	tests/specs/positive/r2-ref-02-struct-hold-value.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+r2-ref-03-array-hold-value	tests/specs/positive/r2-ref-03-array-hold-value.zor	0	compile-only		positive	codegen-subset: 0.2.0 codegen 子集外（核心 41/41 实测）；仅编译期零回归，不入 ASAN run
+hello	examples/hello.zor	0	build-run	2d9c3d17adeb767e3d4bd29eb0c743f842f1db7e57f913ac583be066e0dbbaca	positive	hello 基线；stdout 11 B；stderr 0 B；ASAN/LSAN 零报告
+box_create_read_unbox	tests/runtime/cases/box_create_read_unbox.zor	0	build-run	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	positive	Box 构造/读/unbox；stdout 空；stderr 0 B；ASAN/LSAN 零报告
+box_scope_drop	tests/runtime/cases/box_scope_drop.zor	0	build-run	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	positive	作用域末逆序 drop（两枚 Box）；stdout 空；stderr 0 B；ASAN/LSAN 零报告
+box_overwrite_drop	tests/runtime/cases/box_overwrite_drop.zor	0	build-run	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	positive	W2 立即 drop 载体：覆盖旧值即释放；stdout 空；stderr 0 B；ASAN/LSAN 零报告
+box_move_between_bindings	tests/runtime/cases/box_move_between_bindings.zor	0	build-run	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	positive	绑定间移动；仅新 owner 释放；stdout 空；stderr 0 B；ASAN/LSAN 零报告
+box_self_assign_no_drop	tests/runtime/cases/box_self_assign_no_drop.zor	0	build-run	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	positive	W2 例外面：自赋值不 drop；stdout 空；stderr 0 B；ASAN/LSAN 零报告
+box_unbox_then_reinit	tests/runtime/cases/box_unbox_then_reinit.zor	0	build-run	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	positive	unbox 后槽位无活值再重初始化；stdout 空；stderr 0 B；ASAN/LSAN 零报告
