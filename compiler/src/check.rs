@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use crate::diag::Diag;
 use crate::parser::*;
+use crate::type_table::{FnSig, TypeTable};
 
 /// R2 所有权状态：类型 + 移动/借用位（块尾失活：check_block 出块时清零借方位）
 #[derive(Clone, Debug)]
@@ -26,6 +27,8 @@ pub struct Ck<'a> {
     structs: HashMap<String, Vec<(String, Ty)>>,
     enums: HashMap<String, HashMap<String, Vec<Ty>>>,
     fns: HashMap<String, (Vec<Ty>, Ty)>,
+    /// 类型规则唯一来源的落点：check 写，lower 只读（L2a typed IR 使能项）。
+    types: TypeTable,
 }
 
 fn int_bits(p: &str) -> Option<u32> {
@@ -34,10 +37,11 @@ fn int_bits(p: &str) -> Option<u32> {
 
 impl<'a> Ck<'a> {
     pub fn new(prog: &'a Prog) -> Self {
-        Ck { prog, diags: vec![], structs: HashMap::new(), enums: HashMap::new(), fns: HashMap::new() }
+        Ck { prog, diags: vec![], structs: HashMap::new(), enums: HashMap::new(), fns: HashMap::new(), types: TypeTable::new() }
     }
 
-    pub fn run(mut self) -> Vec<Diag> {
+    /// 检查并产出（诊断, 类型表）。类型表是 check 结果的公开面，lower 不得重算。
+    pub fn run_typed(mut self) -> (Vec<Diag>, TypeTable) {
         self.check_entry_presence(); // 入口存在性先于定义名域（0.1.22 项6 入口契约句 → E1702）
         // 0. 定义名域检查（R1 §6 定义名重复句 → E1701，0.1.20 项5a）：先于登记跑；重复不改变后续登记形制（后定义覆盖前定义＝BASE 现态零变）
         self.check_def_names();
@@ -92,7 +96,20 @@ impl<'a> Ck<'a> {
             }
             self.check_block(&fd.body, Some(&ret), &mut env);
         }
-        self.diags
+        let sigs = self
+            .fns
+            .iter()
+            .map(|(n, (ps, ret))| (n.clone(), FnSig { params: ps.clone(), ret: ret.clone() }))
+            .collect::<Vec<_>>();
+        for (n, sig) in sigs {
+            self.types.insert_fn_sig(n, sig);
+        }
+        (self.diags, self.types)
+    }
+
+    /// 兼容壳：既有调用方只取诊断。
+    pub fn run(self) -> Vec<Diag> {
+        self.run_typed().0
     }
 
     fn d(&mut self, code: &str, l: usize, c: usize, msg: impl Into<String>) {
@@ -277,6 +294,7 @@ impl<'a> Ck<'a> {
                 } else {
                     self.check_expr(init, None, env)
                 };
+                self.types.insert_let(*l, *c, vt.clone());
                 if matches!(ann, Some(Ty::Ref(..))) { self.d("E1501", *l, *c, "引用类型只能出现在函数参数/局部借用，不得作为 let 标注持久化"); }
                 self.note_move_src(init, &vt, env);
                 // 持久借用记账：句柄绑定 `let h = &v / &mut v`（活跃至所在块尾，R2 §2）
@@ -292,7 +310,7 @@ impl<'a> Ck<'a> {
             St::LetDecl(name, _, l, c) => {
                 self.d("E1601", *l, *c, format!("let '{}' 缺少初始化（0.1.x 不支持无初始值绑定）", name));
             }
-            St::Assign(lhs, rhs, _l, _c) => {
+            St::Assign(lhs, rhs, l, c) => {
                 let rt = self.check_expr(rhs, None, env);
                 self.note_move_src(rhs, &rt, env);
                 let lt = match lhs {
@@ -326,6 +344,7 @@ impl<'a> Ck<'a> {
                     }
                     other => self.check_expr(other, None, env),
                 };
+                self.types.insert_assign(*l, *c, lt.clone());
                 if !compatible(&lt, &rt) { self.mismatch(t_span(lhs), &lt, &rt); }
             }
             St::Expr(Some(e), _, _) => { self.check_expr(e, None, env); }
@@ -387,7 +406,14 @@ impl<'a> Ck<'a> {
         }
     }
 
+    /// 表达式检查入口：统一把结果类型写入 type table（lower 的唯一类型来源）。
     fn check_expr(&mut self, e: &Ex, expect: Option<&Ty>, env: &mut HashMap<String, Var>) -> Ty {
+        let ty = self.check_expr_inner(e, expect, env);
+        self.types.insert_expr(e, ty.clone());
+        ty
+    }
+
+    fn check_expr_inner(&mut self, e: &Ex, expect: Option<&Ty>, env: &mut HashMap<String, Var>) -> Ty {
         match e {
             Ex::Lit(lit, l, c) => self.check_lit(lit, expect, *l, *c),
             Ex::UnitLit(l, c) => {

@@ -133,12 +133,12 @@ fn emit_array(out: &mut String, label: &str, bytes: &[u8]) {
 mod tests {
     use super::{emit, escape_line_filename, mangle};
     use crate::backend::lower;
-    use crate::compile;
+    use crate::compile_typed;
 
     fn ir(src: &str) -> crate::backend::ir::Program {
-        let (prog, diags) = compile(src);
-        assert!(diags.is_empty(), "{diags:?}");
-        lower::lower(&prog).expect("lower")
+        let c = compile_typed(src);
+        assert!(c.diags.is_empty(), "{:?}", c.diags);
+        lower::lower(&c.prog, &c.types).expect("lower")
     }
 
     #[test]

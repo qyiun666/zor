@@ -9,6 +9,7 @@ pub mod lower;
 pub mod subset;
 
 use crate::parser::Prog;
+use crate::type_table::TypeTable;
 use std::path::Path;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,9 +67,11 @@ impl BuildError {
     }
 }
 
-/// 构建入口：仅在 `compile()` 返回零诊断后调用。
+/// 构建入口：仅在 `compile_typed()` 返回零诊断后调用。
+/// `types` 来自 check（类型唯一来源）；lower 只读该表，不复制类型规则。
 pub fn build(
     prog: &Prog,
+    types: &TypeTable,
     source: &Path,
     output: &Path,
     opts: BuildOptions,
@@ -78,7 +81,7 @@ pub fn build(
         col: e.col,
         what: e.what,
     })?;
-    let ir = lower::lower(prog).map_err(|e| BuildError::Unsupported {
+    let ir = lower::lower(prog, types).map_err(|e| BuildError::Unsupported {
         line: e.line,
         col: e.col,
         what: e.what,

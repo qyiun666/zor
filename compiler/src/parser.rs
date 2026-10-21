@@ -60,6 +60,31 @@ pub enum Ex {
     Block(Blk),
 }
 
+impl Ex {
+    /// 表达式起始位置（1-based 行／列）；type table 以位置＋类别作键。
+    pub fn span(&self) -> (usize, usize) {
+        match self {
+            Ex::Lit(_, l, c)
+            | Ex::Path(_, l, c)
+            | Ex::UnitLit(l, c)
+            | Ex::Bin(_, _, _, l, c)
+            | Ex::Un(_, _, l, c)
+            | Ex::Call(_, _, l, c)
+            | Ex::Method(_, _, _, l, c)
+            | Ex::Index(_, _, l, c)
+            | Ex::Field(_, _, l, c)
+            | Ex::Record(_, _, l, c)
+            | Ex::Tup(_, l, c)
+            | Ex::ArrLit(_, l, c)
+            | Ex::Ref(_, _, l, c)
+            | Ex::Box(_, l, c)
+            | Ex::Deref(_, l, c)
+            | Ex::Unbox(_, l, c) => (*l, *c),
+            Ex::Block(b) => b.span,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Blk {
     pub stmts: Vec<St>,
