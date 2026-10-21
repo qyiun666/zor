@@ -4,6 +4,25 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.1.x 顺序递进规则（见 README「版本规则」）。
 
+## [0.1.27] - 2026-10-20
+
+内部验证里程碑，非可用语言版本：`zorcc` 仍为纯编译前端（无代码生成／无产物／无运行链路）；本节不含任何运行期判据。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。本版性质＝**册实不符勘正批，非语言能力扩面**：零新增语言判定、零新增错误码、零新增 AC、零新增负例、零 golden 重捕、零运行期判据；`compiler/src/**` 零字节改动；`.zor` 源码面接受与拦截宽度与 0.1.26 逐字同宽。
+
+### Fixed
+- `compiler/README.md` 状态段勘正：L5 标题由「0.1.1 现状：R1 最小前端」改为「0.1.x 现状：R1＋R2 前端」（删版本括注，避免 bump 后过期）；L7 链路补 R2 所有权/借用检查（E1xxx／E2xxx 诊断）；L11 由「未实现 R2 借用检查／box/unbox」改为「已实现 R2 所有权/借用检查与 box/unbox；未实现 C 代码生成（0.2.x）」。
+- `compiler/README.md` L10 已实现诊断码随实补齐（核心逐码确认，实发 17 枚）：`- 已实现诊断码：E1101/E1201/E1202/E1301/E1401/E1501/E1601/E1701/E1702/E1703/E1704（R1 §8 码表）；E1502/E2101/E2102/E2201/E2202/E2301（R2 §8 码表）。`
+- README L10 码面口径：实发 17 枚；E2302 为 R2 §8 保留码位（0.1.x 不实发）、E2401 为 E1502 别名（不独立实发），二者均不列入 README「已实现诊断码」。
+- `specs/r1-type-system.md` §6 追加控制流语句条款：0.1.x `if`／`while` 为语句、非表达式，不产出值；条件均须为 `bool`；`else`／`else if` 合法，`if` 无 `else` 合法；表达式化 `if` 归 0.2.x 候选；语句形正例引 §9 `r1-23`／`r1-24`／`r1-25`。条款逐字见 `specs/r1-type-system.md` §6。
+- `specs/r1-type-system.md` §9 负例范围句由 `r1-n01…r1-n16` 改为 `r1-n01…r1-n23`，与 §8 表及目录实存一致。
+- `examples/hello.zor` L3 注释勘正：由「原型编译器就绪前不承诺可编译」改为「本件为前端可编译的最小示例（`zorcc examples/hello.zor` rc=0）；0.1.x 无代码生成与运行链路，不产出可执行体」。
+- 版本身份锚：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.1.26` 直锚 `0.1.27`（lock 由 cargo 同步、非手写；`Cargo.lock:3` 的 `version = 4` 零触碰）；`CHANGELOG.md` 本节顶部纯插入；`zorcc --version`／`-V` 实测 `zorcc 0.1.27`。
+- 门禁与回归读数（QA 终门禁 @`cecfc9d5ea8f7e1eec80d306aa8c4f0bffbf8c3f`，取刻 2026-10-20T15:44:43Z（C）／2026-10-20T15:44:47Z（UTF-8））：positive `.zor` 41、negative 45、golden 45（逐字节零改）、compare 3 对、`tests/specs` `.zor` 86；双 locale（`LC_ALL=C`／`en_US.UTF-8`）strict 六段 PASS、rc=0；compile `ok=82 fail=0`；unit 正例 41／失败 0、负例 45／漏检 0；golden `45/45/45`、差异 0；code-table `21/21/17/1/1/2/17/17/12`、双 locale 逐字节 SAME；rust-compare `3/3`（annotated rc=0；unannotated rc=1、E0106=1）；`cargo test` 78（0/7/31/40/0）；三项阴性对照（缺 rustc／未去标注／仅 2 对）均按预期 FAIL；`zorcc --version`＝`zorcc 0.1.27`、`zorcc examples/hello.zor` rc=0（实际二进制）。
+
+### Known issues（跟踪中，非本版拦截）
+- 运行期／ASAN 验证不在本版范围；AC-R2-4 为编译期／规范面判据，运行期面仍挂 0.2.x。
+- `rust-compare` 除 `error[E0106]` 外还要求 `missing lifetime specifier` 文案；rustc 文案若变更可能假红（rustc 版本以 QA 终门禁日志 `rustc -vV` 为准）。D1 登记，不在本版扩批。
+- 0.1.27 为 0.1.x 册实不符勘正批；0.2.x 开窗与运行链路仍按路线图另行推进。
+
 ## [0.1.26] - 2026-10-20
 
 内部验证里程碑，非可用语言版本：`zorcc` 仍为纯编译前端（无代码生成／无产物／无运行链路）；本节不含任何运行期判据。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。本版性质＝**AC-R2-4 对外证据面落钉与规范同步，非语言能力扩面**：零新增语言判定、零新增错误码、零新增 AC、零新增负例、零 golden 重捕；`compiler/src/**` 零字节改动，`.zor` 源码面接受与拦截宽度与 0.1.25 逐字同宽。
