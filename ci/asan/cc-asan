@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# ci/asan/cc-asan — L2a QA ASAN CC wrapper
+# 只追加 sanitizer 旗标；不解析、不改写 zorcc 传入的其余参数；不经 shell。
+# 由 zorcc 以 CC=<本文件绝对路径> 调用；实际编译器取 CC_REAL（默认 cc）。
+set -euo pipefail
+REAL_CC="${CC_REAL:-cc}"
+case "$REAL_CC" in
+  */cc-asan|*/cc-nog) echo "[cc-asan] CC_REAL 不得指向 wrapper 自身：$REAL_CC" >&2; exit 2 ;;
+esac
+exec "$REAL_CC" -fsanitize=address -fno-omit-frame-pointer -g "$@"

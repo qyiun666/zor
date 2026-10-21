@@ -1,0 +1,8 @@
+// tests/runtime/cases/box_scope_drop.zor — L2a build-run 样本（ASAN／LSAN 零报告）
+// 语义：两枚 Box 均不在显式 unbox，作用域末按逆序 drop；覆盖 scope drop 与释放。
+// 期望：构建 rc=0；运行 rc=0；stdout 空；stderr 0 B；ASAN／LSAN 零报告（无泄漏／无 double-free）。
+
+fn main() {
+    let a = box 1;
+    let b = box 2;
+}

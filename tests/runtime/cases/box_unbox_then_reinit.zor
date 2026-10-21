@@ -1,0 +1,9 @@
+// tests/runtime/cases/box_unbox_then_reinit.zor — L2a build-run 样本（ASAN／LSAN 零报告）
+// 语义：unbox 后槽位无活值，再以新 Box 重初始化；作用域末仅释放新值。
+// 期望：构建 rc=0；运行 rc=0；stdout 空；stderr 0 B；ASAN／LSAN 零报告（无 double-free／泄漏）。
+
+fn main() {
+    let a = box 1;
+    unbox a;
+    a = box 2;
+}

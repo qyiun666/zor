@@ -1,0 +1,10 @@
+// tests/runtime/cases/box_create_read_unbox.zor — L2a build-run 样本（ASAN／LSAN 零报告）
+// 语义：Box 构造→读→unbox；覆盖 malloc／读（无 UAF）／free。
+// 期望：构建 rc=0；运行 rc=0；stdout 空；stderr 0 B；ASAN／LSAN 零报告。
+// 说明：本样本不打印值；Box 读值正确性由 L2a 单测／生成 C 断言覆盖（QA v1.3 §6.3）。
+
+fn main() {
+    let b = box 1;
+    let v = *b;
+    unbox b;
+}
