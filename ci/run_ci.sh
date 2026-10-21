@@ -117,7 +117,7 @@ stage_unit_test() {
   echo "正例数=$n_pos 正例失败=$pos_fail 负例数=$n_neg 负例漏检(双模式合计)=$neg_leak" >>"$log"
   # M-1/n_pos 对称判据：strict 下任一侧用例集为空即 FAIL（防空套件假绿，两侧对称）
   if [ "$STRICT" = 1 ] && { [ "$n_pos" -eq 0 ] || [ "$n_neg" -eq 0 ]; }; then
-    echo "对称判据：strict 下 正例数=$n_pos 负例数=$n_neg，任一侧=0 → FAIL（M-1/S-1）" >>"$log"
+    echo "对称判据：strict 下 正例数=$n_pos 负例数=${n_neg}，任一侧=0 → FAIL（M-1/S-1）" >>"$log"
     record unit-test FAIL 1 "$log"; return
   fi
   if [ "$pos_fail" -gt 0 ] || [ "$neg_leak" -gt 0 ]; then record unit-test FAIL 1 "$log"
@@ -298,7 +298,7 @@ stage_rust_compare() { # AC-R2-4 两段判（0.1.26 项 7）：*-annotated.rs �
     stem="${f%-annotated.rs}"
     [ -f "$stem-unannotated.rs" ] || { pair_fail=$((pair_fail+1)); echo "PAIR_MISSING $(basename "$f") 无对应 $(basename "$stem")-unannotated.rs" >>"$log"; }
     if ! grep -Eq "<'[A-Za-z_]|&'[A-Za-z_]" "$f"; then
-      life_missing=$((life_missing+1)); echo "ANNOTATED_NO_NAMED_LIFETIME $f（反空转①：须含 ≥1 具名生命周期）" >>"$log"
+      life_missing=$((life_missing+1)); echo "ANNOTATED_NO_NAMED_LIFETIME ${f}（反空转①：须含 ≥1 具名生命周期）" >>"$log"
     fi
     if "$RUSTC_BIN" --edition=2021 --crate-type lib --emit=metadata -o "$td/ann-$i.rmeta" "$f" >>"$log" 2>&1; then
       echo "ANNOTATED_OK $(basename "$f") rc=0" >>"$log"
@@ -324,7 +324,7 @@ stage_rust_compare() { # AC-R2-4 两段判（0.1.26 项 7）：*-annotated.rs �
     if [ "$rc" -eq 0 ]; then
       unann_fail=$((unann_fail+1)); echo "UNANNOTATED_UNEXPECTED_PASS $(basename "$f") rc=0" >>"$log"
     elif ! grep -q 'error\[E0106\]' "$td/unann-$i.err"; then
-      unann_fail=$((unann_fail+1)); echo "UNANNOTATED_WRONG_DIAG $(basename "$f") rc=$rc（期望 error[E0106]）" >>"$log"
+      unann_fail=$((unann_fail+1)); echo "UNANNOTATED_WRONG_DIAG $(basename "$f") rc=${rc}（期望 error[E0106]）" >>"$log"
       head -8 "$td/unann-$i.err" >>"$log"
     else
       # D1（QA v5 §12）：判据只取 rc≠0＋E0106；旧措辞仅记日志、不计红。
@@ -340,7 +340,7 @@ stage_rust_compare() { # AC-R2-4 两段判（0.1.26 项 7）：*-annotated.rs �
   elif [ "$n_ann" -eq 0 ] || [ "$n_unann" -eq 0 ]; then
     [ "$STRICT" = 1 ] && record rust-compare FAIL 1 "$log" || record rust-compare SKIP 0 "$log"
   elif [ "$STRICT" = 1 ] && { [ "$n_ann" -lt 3 ] || [ "$n_unann" -lt 3 ] || [ "$n_ann" -ne "$n_unann" ]; }; then
-    echo "strict 下限：annotated=$n_ann unannotated=$n_unann（要求各≥3 且成对）→ FAIL" >> "$log"
+    echo "strict 下限：annotated=$n_ann unannotated=${n_unann}（要求各≥3 且成对）→ FAIL" >> "$log"
     record rust-compare FAIL 1 "$log"
   else record rust-compare PASS 0 "$log"; fi
 }
@@ -564,6 +564,6 @@ stage_run_smoke
   echo "--- stage summary ($RUN_ID) ---"
   for s in "${summary[@]}"; do echo "$s"; done
 } | tee "$LOG_DIR/summary.txt"
-n_skip="$(printf '%s\n' "${summary[@]}" | grep -c '^SKIP|' || true)"; [ "$STRICT" != 1 ] && [ "$n_skip" -gt 0 ] && echo "[ci][警告] 非 strict 且 SKIP=$n_skip：存在被跳过的判定面，绿≠全绿（告警行不入任何 log、不改 rc 语义与 summary 段数）"
+n_skip="$(printf '%s\n' "${summary[@]}" | grep -c '^SKIP|' || true)"; [ "$STRICT" != 1 ] && [ "$n_skip" -gt 0 ] && echo "[ci][警告] 非 strict 且 SKIP=${n_skip}：存在被跳过的判定面，绿≠全绿（告警行不入任何 log、不改 rc 语义与 summary 段数）"
 echo "[ci] 证据目录: $LOG_DIR"
 exit "$overall"

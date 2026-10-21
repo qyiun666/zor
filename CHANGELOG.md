@@ -4,6 +4,21 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.2.1] - 2026-10-21
+
+内部验证里程碑，非可用语言版本：本版为 0.2.0 之后的**维护性补丁，零行为变更**——仅修复 `ci/run_ci.sh` 五处 shell 变量后接全角标点（`，`／`（`／`：`）在 UTF-8 locale 下被并入变量名的解析问题；不改门禁判定、rc 语义、七段结构、`compiler/src/**`、`tests/specs` 或运行期行为。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。零新增 AC 编号、零新增 E 码、零修改 `r2:9`、零新增 golden／negative；0.2.0 的首个可执行闭环与 0.1.x 编译期语义均不变。
+
+### Fixed
+- `ci/run_ci.sh` 五处 shell 花括号（仅在对应失败／告警分支触发；成功路径零行为变化）：L120 `$n_neg，`→`${n_neg}，`；L301 `$f（`→`${f}（`；L327 `$rc（`→`${rc}（`；L343 `$n_unann（`→`${n_unann}（`；L567 `$n_skip：`→`${n_skip}：`。全角标点造成变量名边界歧义，在 `set -u` 下报 unbound；加花括号后按字面边界解析，其余行零改。
+- 0.2.0 闭合记录维护项计数勘正（六→五）：集成报告曾记「6 处」；按 main `0d514e0` 实读为 **5 处**——L360 已是 `${missing}（`（0.2.0 locale 修复已加括号），L553 无此形态；闭合记录已就地勘正，本版按 5 处执行。
+- 版本与记录：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.2.0` 直锚 `0.2.1`（`Cargo.lock:3` 的 `version = 4` 零触）；`CHANGELOG.md` 本节顶部纯插入；`zorcc --version`／`-V` 实测 `zorcc 0.2.1`。
+- 门禁与回归读数（QA 终门禁 @`981620f18a4c3bc211c55d398365d0363e50cbf3`，取刻 `2026-10-21T09:37Z–09:39Z`）：双 locale（`en_US.UTF-8`／`zh_CN.UTF-8`）strict 七段=7/7 PASS、rc=0（run `20261021T093813Z-57294`／`20261021T093819Z-58280`）；compile=`ok=82 fail=0`；unit=正例 41/0、负例 45/漏检 0；golden=`45/45/45`；code-table=九值 `21/21/17/1/1/2/17/17/12`；rust-compare=3/3；run-smoke=PASS（构建 rc=0、`Mach-O 64-bit executable arm64`；运行 rc=0、stdout 11 B sha256 `2d9c3d17…baca`、stderr 0 B；N-1～N-5h 全 PASS、`TMP_CLEAN`×3、0 行 FAIL）；`cargo test`=119/0；0.1.x 计数=41／45／45／3／86（五段日志与 0.2.0 main run `20261021T033348Z-17790` 逐字节 SAME）；版本锚 `zorcc 0.2.1`=`--version`／`-V` 一致（`Cargo.toml:3`／`Cargo.lock:7` 0.2.1、`Cargo.lock:3` 仍 `version = 4`）；零 tag、零 0.2.1 Release；无 `[0.2.2]`。
+
+### Known issues（跟踪中，非本版拦截）
+- 本版为维护性补丁：不新增语言能力、不改变 0.2.0 首片子集与用户 CLI 契约；0.2.0 的残余风险（G-E-1b／G-E-1c、ASAN／LSAN、stdout 六数、E30xx、R3／R4、stdlib／zb／LSP、跨平台、基准与内存／性能）不在本版判绿，归 L2–L4；内存／性能出数前只写「目标」。
+- 0.2.1 仅以 CI 基线宿主（macos-14 arm64）验收；其他平台归后续切片。
+- 0.1.x 计数不变式 41／45／45／3／86、`tests/specs` 零 diff、`r2:9` 零触；不新增 AC 编号；零 tag、零 0.2.1 Release。
+
 ## [0.2.0] - 2026-10-21
 
 内部验证里程碑，非可用语言版本：`zorcc` 首次具备**可执行闭环**，但仅覆盖 0.2.0 首片最小子集（`main`＋字符串字面量 `let`＋`println` 单实参），不承诺安装、stdlib、性能／内存、跨平台或对外 API 稳定。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。本版性质＝**首个可执行闭环（对账锚 G-A-0，非 AC 编号）＋G-E-1 前置**，非语言能力全面扩面：零新增 AC 编号、零新增 E 码、未改动 `tests/specs` 的 golden／negative 集合与计数、零修改 `r2:9`；0.1.x 源码判定与 `tests/specs` 计数不变；新增面为 C11 后端、`-o` 构建、运行期门禁与运行期控制件。
