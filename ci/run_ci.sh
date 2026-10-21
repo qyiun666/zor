@@ -323,10 +323,14 @@ stage_rust_compare() { # AC-R2-4 两段判（0.1.26 项 7）：*-annotated.rs �
     "$RUSTC_BIN" --edition=2021 --crate-type lib --emit=metadata -o "$td/unann-$i.rmeta" "$f" >/dev/null 2>"$td/unann-$i.err"; rc=$?
     if [ "$rc" -eq 0 ]; then
       unann_fail=$((unann_fail+1)); echo "UNANNOTATED_UNEXPECTED_PASS $(basename "$f") rc=0" >>"$log"
-    elif ! grep -q 'error\[E0106\]' "$td/unann-$i.err" || ! grep -q 'missing lifetime specifier' "$td/unann-$i.err"; then
-      unann_fail=$((unann_fail+1)); echo "UNANNOTATED_WRONG_DIAG $(basename "$f") rc=$rc（期望 error[E0106] missing lifetime specifier）" >>"$log"
+    elif ! grep -q 'error\[E0106\]' "$td/unann-$i.err"; then
+      unann_fail=$((unann_fail+1)); echo "UNANNOTATED_WRONG_DIAG $(basename "$f") rc=$rc（期望 error[E0106]）" >>"$log"
       head -8 "$td/unann-$i.err" >>"$log"
     else
+      # D1（QA v5 §12）：判据只取 rc≠0＋E0106；旧措辞仅记日志、不计红。
+      if ! grep -q 'missing lifetime specifier' "$td/unann-$i.err"; then
+        echo "WORDING_DIFF $(basename "$f") 含 E0106 但无旧措辞（按 QA v5 §12 不计红）" >>"$log"
+      fi
       hits="$(grep -c 'error\[E0106\]' "$td/unann-$i.err" || true)"
       echo "PAIR_OK annotated=$(basename "$stem")-annotated.rs unannotated=$(basename "$f") rc=$rc E0106=$hits" >>"$log"
     fi
@@ -341,6 +345,211 @@ stage_rust_compare() { # AC-R2-4 两段判（0.1.26 项 7）：*-annotated.rs �
   else record rust-compare PASS 0 "$log"; fi
 }
 
+stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（QA v5）
+  local log; log="$(new_log run-smoke)"
+  if [ -z "$ZORC" ]; then
+    echo "zorcc 未安装：run-smoke strict 判 FAIL（不可 SKIP 洗绿）" > "$log"
+    [ "$STRICT" = 1 ] && record run-smoke FAIL 1 "$log" || record run-smoke SKIP 0 "$log"
+    return
+  fi
+  local CCBIN="${CC:-cc}"
+  local missing=""
+  command -v "$CCBIN" >/dev/null 2>&1 || missing="$missing cc"
+  command -v file >/dev/null 2>&1 || missing="$missing file"
+  if [ -n "$missing" ]; then
+    echo "run-smoke 环境缺失：${missing}（strict 判 FAIL，不 SKIP）" > "$log"
+    [ "$STRICT" = 1 ] && record run-smoke FAIL 1 "$log" || record run-smoke SKIP 0 "$log"
+    return
+  fi
+  local td td2; td="$(mktemp -d)"; td2="$(mktemp -d)"
+  trap 'rm -rf "$td" "$td2"' RETURN
+  local hello="$REPO_ROOT/examples/hello.zor"
+  local expected="$td/expected"; printf 'Hello, ZOR\n' > "$expected"
+  local fail=0 rc ftype n4_files misuse src_hash_before src_hash_after
+  local zorc_abs
+  if printf '%s' "$ZORC" | grep -q '/'; then
+    zorc_abs="$(cd "$(dirname "$ZORC")" && pwd)/$(basename "$ZORC")"
+  else
+    zorc_abs="$(command -v "$ZORC")"
+  fi
+  sha256_of() { if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'; else sha256sum "$1" | awk '{print $1}'; fi; }
+  echo "[run-smoke] zorcc=$zorc_abs cc=$CCBIN host=$(uname -sm)" >> "$log"
+  "$CCBIN" --version 2>&1 | head -1 >> "$log"
+  echo "[run-smoke] hello=$hello" >> "$log"
+
+  # S0-1 构建：显式 -o + 原生可执行
+  "$zorc_abs" "$hello" -o "$td/hello" >> "$log" 2>&1; rc=$?
+  echo "S0-1 BUILD rc=$rc target=$td/hello" >> "$log"
+  [ "$rc" -eq 0 ] || { echo "S0-1 FAIL: build rc=${rc}（期望0）" >> "$log"; fail=1; }
+  if [ ! -x "$td/hello" ]; then
+    echo "S0-1 FAIL: 产物缺失或不可执行" >> "$log"; fail=1
+  else
+    ftype="$(file -b "$td/hello")"; echo "S0-1 FILE=$ftype" >> "$log"
+    printf '%s' "$ftype" | grep -Eq 'Mach-O .* executable|ELF .* executable' \
+      || { echo "S0-1 FAIL: 非宿主原生可执行: $ftype" >> "$log"; fail=1; }
+  fi
+
+  # S0-2 运行：rc=0、stdout 逐字节、stderr 空
+  if [ -x "$td/hello" ]; then
+    "$td/hello" > "$td/out" 2> "$td/err"; rc=$?
+    echo "S0-2 RUN rc=$rc stdout_sha256=$(sha256_of "$td/out") stderr_bytes=$(wc -c < "$td/err" | tr -d ' ')" >> "$log"
+    [ "$rc" -eq 0 ] || { echo "S0-2 FAIL: run rc=${rc}（期望0）" >> "$log"; fail=1; }
+    cmp -s "$td/out" "$expected" || { echo "S0-2 FAIL: stdout 非 Hello, ZOR\\n" >> "$log"; fail=1; }
+    [ -s "$td/err" ] && { echo "S0-2 FAIL: stderr 非空" >> "$log"; fail=1; }
+  fi
+  # F-CI-4：成功构建后临时件零残留
+  if find "$td" -maxdepth 1 -name '.zorcc-tmp-*' -print -quit | grep -q .; then
+    echo "S0-1 FAIL: 成功构建后残留 .zorcc-tmp-*" >> "$log"; fail=1
+  else
+    echo "TMP_CLEAN: 成功构建后无 .zorcc-tmp-*" >> "$log"
+  fi
+
+  # N-1 期望串错一位：比对器必须判不等
+  printf 'Hello, ZOR\nX' > "$td/expected.wrong"
+  if cmp -s "$td/out" "$td/expected.wrong"; then
+    echo "N-1 FAIL: 比对器失明（错误期望串判等）" >> "$log"; fail=1
+  else
+    echo "N-1 PASS: 错一位期望串判不等" >> "$log"
+  fi
+
+  # N-2 前端负控：spawn → rc=1、E1101、无产物
+  local ctl_spawn="$REPO_ROOT/tests/runtime/controls/unsupported-syntax.zor"
+  if [ ! -f "$ctl_spawn" ]; then
+    echo "N-2 FAIL: 缺少 $ctl_spawn" >> "$log"; fail=1
+  else
+    "$zorc_abs" "$ctl_spawn" -o "$td/spawn.out" > "$td/n2.out" 2> "$td/n2.err"; rc=$?
+    echo "N-2 rc=$rc" >> "$log"
+    if [ "$rc" -eq 1 ] && grep -q 'E1101' "$td/n2.err" && [ ! -e "$td/spawn.out" ]; then
+      echo "N-2 PASS: rc=1/E1101/无产物" >> "$log"
+    else
+      echo "N-2 FAIL: 期望 rc=1/E1101/无产物（实得 rc=${rc}）" >> "$log"; fail=1
+    fi
+  fi
+
+  # N-3 后端 fail-closed：最小 struct → rc=1、zorcc: codegen:、无产物
+  local ctl_codegen="$REPO_ROOT/tests/runtime/controls/codegen-unsupported.zor"
+  if [ ! -f "$ctl_codegen" ]; then
+    echo "N-3 FAIL: 缺少 $ctl_codegen" >> "$log"; fail=1
+  else
+    "$zorc_abs" "$ctl_codegen" -o "$td/codegen.out" > "$td/n3.out" 2> "$td/n3.err"; rc=$?
+    echo "N-3 rc=$rc" >> "$log"
+    if [ "$rc" -eq 1 ] && grep -q 'zorcc: codegen:' "$td/n3.err" && [ ! -e "$td/codegen.out" ]; then
+      echo "N-3 PASS: rc=1/zorcc: codegen:/无产物" >> "$log"
+    else
+      echo "N-3 FAIL: 期望 rc=1/zorcc: codegen:/无产物（实得 rc=${rc}）" >> "$log"; fail=1
+    fi
+  fi
+
+  # N-4 无 -o：检查模式 rc=0、源目录零新增；负例仍 rc=1 且源目录零新增
+  local nodir="$td/noout"; mkdir -p "$nodir"
+  cp "$hello" "$nodir/hello.zor"
+  ( cd "$nodir" && "$zorc_abs" "$nodir/hello.zor" ) > "$td/n4.out" 2> "$td/n4.err"; rc=$?
+  n4_files="$(find "$nodir" -mindepth 1 | wc -l | tr -d ' ')"
+  echo "N-4 rc=$rc source_dir_files=${n4_files}（期望1=仅源副本）" >> "$log"
+  { [ "$rc" -eq 0 ] && [ "$n4_files" -eq 1 ] && [ -f "$nodir/hello.zor" ]; } \
+    || { echo "N-4 FAIL: 无 -o 应 rc=0 且源目录仅源副本（实得 rc=$rc files=${n4_files}）" >> "$log"; fail=1; }
+  local negdir="$td/negdir"; mkdir -p "$negdir"
+  cp "$REPO_ROOT/tests/specs/negative/r1-n01-unknown-type.zor" "$negdir/"
+  ( cd "$negdir" && "$zorc_abs" "$negdir/r1-n01-unknown-type.zor" ) > "$td/n4b.out" 2> "$td/n4b.err"; rc=$?
+  local neg_files; neg_files="$(find "$negdir" -mindepth 1 | wc -l | tr -d ' ')"
+  { [ "$rc" -eq 1 ] && [ "$neg_files" -eq 1 ]; } \
+    || { echo "N-4b FAIL: 检查模式负例 rc=$rc files=${neg_files}（期望1/1）" >> "$log"; fail=1; }
+
+  # N-5 -o 误用与原子性：每例独立子目录，断言 rc=2 且目录无新增/无残留
+  src_hash_before="$(sha256_of "$hello")"
+  misuse=0
+  check_rc2_case() { # <desc> <dir> <cmd...>：rc=2、目录条目数不变、无 .zorcc-tmp-*
+    local desc="$1" dir="$2"; shift 2
+    mkdir -p "$dir"
+    local before after ntmp
+    before="$(find "$dir" -mindepth 1 | wc -l | tr -d ' ')"
+    "$@" > /dev/null 2>&1; local r=$?
+    after="$(find "$dir" -mindepth 1 | wc -l | tr -d ' ')"
+    ntmp="$(find "$dir" -name '.zorcc-tmp-*' -print -quit)"
+    if [ "$r" -eq 2 ] && [ "$after" -eq "$before" ] && [ -z "$ntmp" ]; then
+      echo "N-5 $desc rc=2 entries=$before PASS" >> "$log"
+    else
+      echo "N-5 $desc rc=$r entries_before=$before entries_after=$after tmp=${ntmp:-none} FAIL（期望rc=2/零新增/无残留）" >> "$log"; misuse=1
+    fi
+  }
+  check_rc2_case_in() { # <desc> <dir> <cmd...>：在 dir 内运行（捕 cwd 隐式产物）
+    local desc="$1" dir="$2"; shift 2
+    mkdir -p "$dir"
+    local before after ntmp
+    before="$(find "$dir" -mindepth 1 | wc -l | tr -d ' ')"
+    ( cd "$dir" && "$@" ) > /dev/null 2>&1; local r=$?
+    after="$(find "$dir" -mindepth 1 | wc -l | tr -d ' ')"
+    ntmp="$(find "$dir" -name '.zorcc-tmp-*' -print -quit)"
+    if [ "$r" -eq 2 ] && [ "$after" -eq "$before" ] && [ -z "$ntmp" ]; then
+      echo "N-5 $desc rc=2 entries=$before PASS（cwd 无隐式产物）" >> "$log"
+    else
+      echo "N-5 $desc rc=$r entries_before=$before entries_after=$after tmp=${ntmp:-none} FAIL（期望rc=2/零新增/无残留）" >> "$log"; misuse=1
+    fi
+  }
+  check_rc2_case_in "missing-value" "$td/m5" "$zorc_abs" "$hello" -o
+  check_rc2_case "duplicate" "$td/m6" "$zorc_abs" "$hello" -o "$td/m6/a" -o "$td/m6/b"
+  check_rc2_case_in "empty-path" "$td/m7" "$zorc_abs" "$hello" -o ""
+  check_rc2_case "parent-missing" "$td/m8" "$zorc_abs" "$hello" -o "$td/m8/missing/hello"
+  mkdir -p "$td/m9"; : > "$td/m9/notdir"
+  check_rc2_case "parent-is-file" "$td/m9" "$zorc_abs" "$hello" -o "$td/m9/notdir/hello"
+  [ -f "$td/m9/notdir" ] || { echo "N-5 FAIL: parent-is-file 的 notdir 被改写" >> "$log"; fail=1; }
+  mkdir -p "$td/m10/target"; printf 'keep' > "$td/m10/target/keep"
+  check_rc2_case "target-is-dir" "$td/m10" "$zorc_abs" "$hello" -o "$td/m10/target"
+  [ "$(cat "$td/m10/target/keep" 2>/dev/null)" = "keep" ] || { echo "N-5 FAIL: target-is-dir 既有内容被改写" >> "$log"; fail=1; }
+  mkdir -p "$td/m11"; cp "$hello" "$td/m11/same.zor"
+  local same_before same_after
+  same_before="$(sha256_of "$td/m11/same.zor")"
+  check_rc2_case "same-as-source" "$td/m11" "$zorc_abs" "$td/m11/same.zor" -o "$td/m11/same.zor"
+  same_after="$(sha256_of "$td/m11/same.zor")"
+  [ "$same_before" = "$same_after" ] || { echo "N-5 FAIL: 同路径源副本被改写" >> "$log"; fail=1; }
+  if [ "$(id -u)" -ne 0 ]; then
+    mkdir -p "$td/m12/ro"; chmod 500 "$td/m12/ro"
+    check_rc2_case "unwritable-dir" "$td/m12" "$zorc_abs" "$hello" -o "$td/m12/ro/hello"
+    chmod 700 "$td/m12/ro"
+  fi
+  src_hash_after="$(sha256_of "$hello")"
+  [ "$src_hash_before" = "$src_hash_after" ] || { echo "N-5 FAIL: 源文件被改写" >> "$log"; fail=1; }
+  [ "$misuse" -eq 0 ] || { echo "N-5 FAIL: -o 误用未全判 rc=2/零新增" >> "$log"; fail=1; }
+  # N-5h 失败原子性：sentinel 目标 + 前端负例
+  mkdir -p "$td/m13"
+  printf 'sentinel-content' > "$td/m13/sentinel"
+  local n5h_ok=1
+  "$zorc_abs" "$REPO_ROOT/tests/specs/negative/r1-n01-unknown-type.zor" -o "$td/m13/sentinel" > "$td/n5h.out" 2>&1; rc=$?
+  [ "$rc" -eq 1 ] || { echo "N-5h FAIL: 前端负例 rc=${rc}（期望1）" >> "$log"; fail=1; n5h_ok=0; }
+  [ "$(cat "$td/m13/sentinel")" = "sentinel-content" ] || { echo "N-5h FAIL: sentinel 被改写" >> "$log"; fail=1; n5h_ok=0; }
+  if find "$td" -name '.zorcc-tmp-*' -print -quit | grep -q .; then
+    echo "N-5 FAIL: 残留 .zorcc-tmp-*" >> "$log"; fail=1; n5h_ok=0
+  else
+    echo "TMP_CLEAN: N-5h 后无 .zorcc-tmp-*" >> "$log"
+  fi
+  [ "$n5h_ok" -eq 1 ] && echo "N-5h PASS: rc=1、sentinel 未改写、无临时残留" >> "$log"
+
+  # S0-3 换临时目录复算
+  "$zorc_abs" "$hello" -o "$td2/hello" >> "$log" 2>&1; rc=$?
+  [ "$rc" -eq 0 ] || { echo "S0-3 FAIL: 第二次构建 rc=$rc" >> "$log"; fail=1; }
+  if [ -x "$td2/hello" ]; then
+    "$td2/hello" > "$td2/out" 2> "$td2/err"; rc=$?
+    [ "$rc" -eq 0 ] || { echo "S0-3 FAIL: 第二次运行 rc=$rc" >> "$log"; fail=1; }
+    cmp -s "$td/out" "$td2/out" || { echo "S0-3 FAIL: 两次 stdout 不同" >> "$log"; fail=1; }
+    [ -s "$td2/err" ] && { echo "S0-3 FAIL: 第二次 stderr 非空" >> "$log"; fail=1; }
+  else
+    echo "S0-3 FAIL: 第二次产物缺失" >> "$log"; fail=1
+  fi
+  if find "$td2" -maxdepth 1 -name '.zorcc-tmp-*' -print -quit | grep -q .; then
+    echo "S0-3 FAIL: 第二次构建后残留 .zorcc-tmp-*" >> "$log"; fail=1
+  else
+    echo "TMP_CLEAN: 第二次构建后无 .zorcc-tmp-*" >> "$log"
+  fi
+
+  if [ "$fail" -eq 0 ]; then
+    echo "[run-smoke] 判定=PASS（正例＋五类负控）" >> "$log"
+    record run-smoke PASS 0 "$log"
+  else
+    echo "[run-smoke] 判定=FAIL" >> "$log"
+    record run-smoke FAIL 1 "$log"
+  fi
+}
+
 echo "[ci] run=$RUN_ID strict=$STRICT bench=$WITH_BENCH modes='$MODES' pos='$TESTS_POS_DIR' neg='$TESTS_NEG_DIR'"
 stage_cargo
 stage_compile
@@ -348,6 +557,7 @@ stage_unit_test
 stage_golden
 stage_code_table
 stage_rust_compare
+stage_run_smoke
 [ "$WITH_BENCH" = 1 ] && stage_bench
 
 {

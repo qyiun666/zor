@@ -1,0 +1,7 @@
+// 0.2.0 run-smoke 后端 fail-closed 负控：struct 前端通过、codegen 子集不支持。
+// 期望 rc=1、stderr 含 "zorcc: codegen:"、无产物、不新增 E 码位。
+struct Mark {}
+fn main() {
+    let m = Mark {};
+    println("ok");
+}

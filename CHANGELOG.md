@@ -2,7 +2,38 @@
 
 本项目的所有重要变更记录在此文件。
 
-格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.1.x 顺序递进规则（见 README「版本规则」）。
+格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
+
+## [0.2.0] - 2026-10-21
+
+内部验证里程碑，非可用语言版本：`zorcc` 首次具备**可执行闭环**，但仅覆盖 0.2.0 首片最小子集（`main`＋字符串字面量 `let`＋`println` 单实参），不承诺安装、stdlib、性能／内存、跨平台或对外 API 稳定。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。本版性质＝**首个可执行闭环（对账锚 G-A-0，非 AC 编号）＋G-E-1 前置**，非语言能力全面扩面：零新增 AC 编号、零新增 E 码、未改动 `tests/specs` 的 golden／negative 集合与计数、零修改 `r2:9`；0.1.x 源码判定与 `tests/specs` 计数不变；新增面为 C11 后端、`-o` 构建、运行期门禁与运行期控制件。
+
+### Added
+- **原生 codegen 首片**：新增 `compiler/src/backend/**`（typed IR、subset 闸、lower、C11 emitter、系统 `cc` 调用）与 `compile() -> (Prog, Vec<Diag>)`；`compile_to_diags` 改为薄包装。首片子集＝`main`（unit 返回）＋字符串字面量 `let`＋`println` 单实参＋正常退出；子集外 rc=1、`zorcc: codegen:` 诊断、无产物、不新增 E 码。
+- **`-o` 构建模式**：`zorcc <input.zor> -o <output>` 构建宿主原生可执行；无 `-o` 保持 0.1.x 检查模式（rc 按诊断、零新增文件）；`-o` 缺值／重复／空串／不可写／父目录缺失／目标为目录／与源同路径 rc=2、零产物、既有目标不变、不建父目录、无 `.zorcc-tmp-*` 残留；`cc` 缺失／失败 rc=2；源码诊断 rc=1，不以 rc=2 吞诊断。0.2.0 用户 CLI 只承诺 `-o`；不新增 `--check`，`--output` 不作别名，`-O*`／`-g` 仅内部／CI。
+- **`hello.zor` 首个可执行闭环**：`zorcc examples/hello.zor -o <tmp>/hello` 产出宿主原生可执行（macOS arm64 Mach-O），运行 stdout 恰为 `Hello, ZOR\n`（11 B）、stderr 0 B、rc=0；连续两次构建／换临时目录结果一致；产物只落临时目录／用户 `-o`，不提交仓库。
+- **运行期门禁雏形**：`ci/run_ci.sh` 新增 `run-smoke` 段（位于 `rust-compare` 后、可选 `bench` 前）；正例构建＋运行＋stdout／stderr／rc 比对；每次运行五类负控（期望串错一位／前端 `spawn` E1101／后端 fail-closed 最小 struct rc=1、`zorcc: codegen:`、无产物／无 `-o` 零新增文件／`-o` 误用与失败原子性 rc=2、sentinel 不变、无 `.zorcc-tmp-*`）；strict 缺 `cc`／`file` 判 FAIL、不 SKIP；同路径负控用临时副本；D1 措辞降日志。
+- **G-E-1 前置（规范面）**：`specs/r2-ownership.md` §1／§3／§10 纯插入 3 行——非 Copy owner 槽位重赋值采「条件式立即 drop」（RHS 求值→槽位仍持活值则 drop 旧值→写入新值；自赋值／`x=g(x)`／已移出／已 unbox／部分移出子值不 drop；Copy 不适用）；`r2:9` 零触、不触发 J-7、不新增 E 码／AC／golden／negative；0.2.0 只落规范文本，运行期 drop 代码归 L2，不宣称 drop 已实现或运行期内存安全。
+- **测试与版本**：前端诊断 76 项单测零改；按 D-020-9 更新 2 条 CLI `-o` 测试（`form1_output_flag_rejected_at_any_position`、`c2_cli_diagnostics_allocate_no_language_codes`），逐条列旧／新断言；总数 ≥78、不删测；新增 codegen smoke 与构建路径测试；版本锚 `compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 0.1.27→0.2.0（`Cargo.lock:3` 的 `version = 4` 零触）；`CHANGELOG.md` 顶部纯插入；`zorcc --version`／`-V` 实测 `zorcc 0.2.0`。
+- 门禁与回归读数（QA 终门禁 @`70e81907311523aba29e5e39147eeaeba1fcbf68`，取刻 `2026-10-21T03:23Z–03:25Z`（构建 03:23:04Z；runs 03:23:08Z／03:23:16Z／03:23:19Z））：三 locale（`en_US.UTF-8`／`C`／`zh_CN.UTF-8`）strict 七段=7/7 PASS、rc=0（run `20261021T032308Z-5220`／`20261021T032316Z-6737`／`20261021T032319Z-7617`；五段日志跨 locale 逐字节 SAME）；cargo=build rc=0（`--release --offline`）；compile=`ok=82 fail=0`；unit=正例 41/0、负例 45/漏检 0；golden=`45/45/45`、差异 0；code-table=九值 `21/21/17/1/1/2/17/17/12` PASS；rust-compare=3/3（`error[E0106]`=3；D1 仅日志）；run-smoke=PASS（构建 rc=0、`Mach-O 64-bit executable arm64`；运行 rc=0、stdout 11 B sha256 `2d9c3d17…baca`、stderr 0 B；换目录复算一致；N-1～N-5 全 PASS、`TMP_CLEAN`×3、日志 0 行 FAIL）；`cargo test`=119/0；0.1.x 计数=41／45／45／3／86（`tests/specs` 零 diff、`r2:9` sha `72f7f391…` 未变）；版本锚 `zorcc 0.2.0`=`--version`／`-V` 一致（`Cargo.toml:3`／`Cargo.lock:7` 0.2.0、`Cargo.lock:3` 仍 `version = 4`）；F1（head B）=docs-only 4 文件 `+11/−11` 与改文 v3 逐字一致、代码／CI／specs／tests 零触；零 tag、零 0.2.0 Release；无 `[0.2.1]`。
+
+### Changed
+- `-o` 由 0.1.x 的「未实现／一律拒判」转为构建入口；无 `-o` 检查模式与既有六段行为保持不变；2 条 CLI 测试按 D-020-9 更新；`--output` 仍拒判、`-o` 缺值仍 rc=2。
+- `rust-compare` D1 处置：判据统一为 `rc≠0` 且 stderr 含 `error[E0106]`；`missing lifetime specifier` 降为日志、不计红；0.1.x 历史件与已出报告不回改；0.2.0 CI 按 D-020-7 执行。
+
+### Fixed
+- `run-smoke` locale 脚本修复：9 处 `$var` 加花括号，避免全角括号在 UTF-8 locale 被并入变量名（`set -u` unbound）；六段函数体零改。
+- CI 负控加固：无 `-o` 改查源目录零新增；`-o` 误用每例独立子目录并断言零产物；成功构建后补查 `.zorcc-tmp-*` 零残留；README 补 CI↔W5 编号映射。
+
+### Known issues（跟踪中，非本版拦截）
+- 0.2.0 只覆盖首片最小子集；stdlib／zb／LSP／泛型／trait／模式匹配／async／R3／R4 运行期／FFI／完整 stdout 契约／完整 CLI 均不做；`i64` 算术／`if`／`while`／多实参 `println` 为可选加速项，不作为 0.2.0 出口。
+- ASAN／LSAN、溢出、基准、内存／性能均不在 0.2.0；macOS 无 LSAN，泄漏面归 Linux 或 BLOCKED（L2）；出数前内存／性能只写「目标」，不构成达标承诺。
+- G-E-1 只落规范文本；AC-R2-3（ASAN 零报告）归 L2，0.2.0 不宣称 drop 已实现、不宣称运行期内存安全。
+- G-E-1b：活跃借用期间直接写／移／unbox 现态 rc=0；drop 进入运行期后这些形态会 UAF；E2203 仅为 L2 候选码位，L2 开窗须先入 PRD／R2 §8 并经 QA 会签，4–6 负例＋golden 同批；未落件前不对含活跃借用的程序生成 drop／Box 代码。0.2.0 首片**可构建子集**不涉 Box／借用／重赋值／drop；无 `-o` 检查模式仍覆盖既有正例集。
+- G-E-1c：`&mut` 活跃期间直接读现态 rc=0；不造成 UAF，归 L2 R2 §2 另案，不并入 G-E-1、不阻塞 0.2.0。
+- 跨平台：0.2.0 仅以 CI 基线宿主（macos-14 arm64）验收；Linux／其他平台归后续切片。
+- `run-smoke` 五类负控是门禁有牙的前提；任一类未 FAIL 即按缺陷处理，不得以正例通过代替。
+- 0.1.x 计数不变式 41／45／45／3／86、golden／negative 零 diff、`r2:9` 零触；不新增 AC 编号；本版为内部验证里程碑，零 tag、零 release。
 
 ## [0.1.27] - 2026-10-20
 

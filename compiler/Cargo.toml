@@ -1,8 +1,8 @@
 [package]
 name = "zorcc"
-version = "0.1.27"
+version = "0.2.0"
 edition = "2021"
-description = "ZOR 0.1.x R1 reference compiler (transitional Rust impl + C backend, OQ-1 Plan B). R1 minimal type-system checks; C codegen lands with R2."
+description = "ZOR 0.2.x reference compiler (transitional Rust impl + C11 backend, OQ-1 Plan B); R1/R2 checks; minimal hello-subset codegen; R2 runtime drop not implemented."
 
 [dependencies]
 

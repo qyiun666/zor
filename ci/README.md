@@ -9,9 +9,10 @@
 - 本地复现前置（0.1.16 实测）：先 `cd compiler && cargo build --release`，再 `ZORC_BIN=<仓库绝对路径>/compiler/target/release/zorcc bash ci/run_ci.sh --strict`；不注入时 `ci/run_ci.sh:34` 回退 `zorcc`，PATH 无该二进制则 compile/unit-test/golden 判 FAIL（环境坑，非仓库缺陷），口径同 `.github/workflows/ci.yml`
 
 ## 段名清单（0.1.18 起；本件只枚举段名、不写段数计数句——计数句随版本腐烂）
-- `--strict` 常驻段名（`summary.txt` 每行形如 `状态|段名|exit=N|log=路径`，首列为状态、第二列为段名）：`cargo`／`compile`／`unit-test`／`golden`／`code-table`／`rust-compare`
+- `--strict` 常驻段名（`summary.txt` 每行形如 `状态|段名|exit=N|log=路径`，首列为状态、第二列为段名）：`cargo`／`compile`／`unit-test`／`golden`／`code-table`／`rust-compare`／`run-smoke`
 - `code-table`（0.1.18 项 2 新增）：诊断码表不变式校验段，单一实现处＝`ci/run_ci.sh` 的 `stage_code_table`（规范文本不另抄期望表）；口径源＝`specs/r1-type-system.md` §8／§8b 与 `specs/r2-ownership.md` §8 各自的取径注记；判定项＝A1–A7＋A8b1＋HDR（A8a 搬运闸与 A8b2 新行出处闸须对 base 侧旧文核对，属升格窗一次性执行，不入本段常驻面）；strict 下 FAIL 计入 `overall`
-- `rust-compare`（0.1.26 项 7 新增）：AC-R2-4 Rust 同题两段判，单一实现处＝`ci/run_ci.sh` 的 `stage_rust_compare`；`tests/specs/compare/*-annotated.rs` 须 `rustc --edition=2021 --crate-type lib --emit=metadata` exit=0，`*-unannotated.rs` 须非零退出且 stderr 含 `error[E0106]`＋`missing lifetime specifier`；反空转三项＝annotated 含 ≥1 具名生命周期／stripped 归一化后仅差生命周期标注／B 段 rc≠0 与 E0106 同时命中；strict 下两侧各≥3 且按 basename 成对，否则 FAIL；rustc 缺失时 strict 判 FAIL、默认 SKIP（同 compile 段环境口径）；`RUSTC_BIN` 可注入指定 rustc
+- `rust-compare`（0.1.26 项 7 新增；D1 处置 @0.2.0）：AC-R2-4 Rust 同题两段判，单一实现处＝`ci/run_ci.sh` 的 `stage_rust_compare`；`tests/specs/compare/*-annotated.rs` 须 `rustc --edition=2021 --crate-type lib --emit=metadata` exit=0，`*-unannotated.rs` 须非零退出且 stderr 含 `error[E0106]`（**D1：旧措辞 `missing lifetime specifier` 仅记日志、不计红**，0.1.x 历史件不回改）；反空转三项＝annotated 含 ≥1 具名生命周期／stripped 归一化后仅差生命周期标注／B 段 rc≠0 与 E0106 同时命中；strict 下两侧各≥3 且按 basename 成对，否则 FAIL；rustc 缺失时 strict 判 FAIL、默认 SKIP（同 compile 段环境口径）；`RUSTC_BIN` 可注入指定 rustc
+- `run-smoke`（0.2.0／020-CI-01 新增）：首个可执行闭环——`zorcc examples/hello.zor -o <tmp>/hello` → rc=0、宿主原生可执行、运行 stdout 逐字节 `Hello, ZOR\n`（11 B）／stderr 0 B／rc=0；五类负控每次运行（期望串错一位／前端 `spawn` E1101／后端 fail-closed 最小 `struct`／无 `-o` 检查模式零新增文件／`-o` 误用与失败原子性）；strict 下 `cc`／`file` 缺失判 FAIL；无 `-o` 不进入 codegen，保持 0.1.x 检查态（D-020-1 A）；日志 `ci/logs/<run>/run-smoke.log`
 - `bench` 仅在 `--bench` 下追加，不属常驻段名
 - 历史口径出清：0.1.17 及以前在册的「四段全 PASS」句现存于 `CHANGELOG.md` 的 `[0.1.17]` 节（历史节，零触碰红线覆盖、不改），凡引段数一律绑所检 head ＋节名锚，**不得把该句读作现态**
 
