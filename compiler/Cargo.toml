@@ -1,6 +1,6 @@
 [package]
 name = "zorcc"
-version = "0.1.27"
+version = "0.2.0"
 edition = "2021"
 description = "ZOR 0.1.x R1 reference compiler (transitional Rust impl + C backend, OQ-1 Plan B). R1 minimal type-system checks; C codegen lands with R2."
 
