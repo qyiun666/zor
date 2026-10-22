@@ -5,7 +5,7 @@
 //! `TypeTable`；表项缺失或与形态不符即 fail-closed。
 //!
 //! L2a：本模块实现 G-E-2（move／overwrite／Box 载荷）的状态机，产出显式 IR 事件；
-//! malloc／free／drop 的运行期生成归 CORE-04，不在此处发生。
+//! malloc／free／drop 的运行期生成归 `c::emit`，不在此处发生。
 
 use super::ir::{Func, Local, LocalId, Program, Stmt, StrArg, Ty};
 use super::subset::{self, SubsetError};
@@ -486,11 +486,10 @@ mod tests {
     }
 
     #[test]
-    fn box_program_reports_l2a_runtime_need() {
-        let p = ir("fn main() { let b = box 1; }");
-        assert!(p.needs_l2a_runtime());
-        assert_eq!(p.first_l2a_pos(), Some((1, 13)));
-        let hello = ir("fn main() { println(\"hi\"); }");
-        assert!(!hello.needs_l2a_runtime());
+    fn box_program_lowers_to_runtime_events() {
+        let b = body("fn main() { let b = box 1; }");
+        assert_eq!(b.len(), 2, "{b:?}");
+        assert!(matches!(b[0], Stmt::BindBox { .. }));
+        assert!(matches!(b[1], Stmt::ScopeExit { .. }));
     }
 }

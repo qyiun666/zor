@@ -1,8 +1,9 @@
-//! 0.2.0 首片最小 typed IR。
+//! 最小 typed IR。
 //!
 //! 边界：输入来自 check 之后的 parser AST，经 subset 闸与 lower 降级；
 //! L2a 起在 `[byte; N]`／unit 之上加入 `i64` 与 `Box<i64>`，以及 move／overwrite／
-//! Box 载荷的显式事件。运行期代码生成（malloc／free／drop）归 CORE-04；本层只产出事件。
+//! Box 载荷的显式事件。运行期代码生成（malloc／free／drop）见 `c::emit`；
+//! 本层只产出语义事件与静态 `drop_dst`。
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct LocalId(pub u32);
@@ -51,14 +52,14 @@ pub enum Stmt {
         line: usize,
         col: usize,
     },
-    /// `let x = box <int>;`：新建 Box 载荷（CORE-04：malloc）。
+    /// `let x = box <int>;`：新建 Box 载荷（emit：malloc）。
     BindBox {
         local: LocalId,
         value: i64,
         line: usize,
         col: usize,
     },
-    /// `x = box <int>;`：重初始化；`drop_dst` 由 lower 静态判定（CORE-04：必要时先 free）。
+    /// `x = box <int>;`：重初始化；`drop_dst` 由 lower 静态判定（emit：必要时先 free）。
     BindBoxAssign {
         local: LocalId,
         value: i64,
@@ -94,7 +95,7 @@ pub enum Stmt {
         line: usize,
         col: usize,
     },
-    /// `unbox x;`：交出／释放 Box 载荷（CORE-04：free）。
+    /// `unbox x;`：交出／释放 Box 载荷（emit：free）。
     Unbox {
         local: LocalId,
         line: usize,
@@ -106,39 +107,6 @@ pub enum Stmt {
         line: usize,
         col: usize,
     },
-}
-
-impl Stmt {
-    /// 需要 L2a 运行期（drop／Box）支持的事件；CORE-03 的守卫据此 fail-closed。
-    pub fn is_l2a_runtime(&self) -> bool {
-        matches!(
-            self,
-            Stmt::BindBox { .. }
-                | Stmt::BindBoxAssign { .. }
-                | Stmt::BindI64Deref { .. }
-                | Stmt::MoveAssign { .. }
-                | Stmt::OverwriteAssign { .. }
-                | Stmt::SelfAssign { .. }
-                | Stmt::Unbox { .. }
-                | Stmt::ScopeExit { .. }
-        )
-    }
-
-    pub fn pos(&self) -> (usize, usize) {
-        match self {
-            Stmt::BindStr { line, col, .. }
-            | Stmt::Println { line, col, .. }
-            | Stmt::BindI64 { line, col, .. }
-            | Stmt::BindBox { line, col, .. }
-            | Stmt::BindBoxAssign { line, col, .. }
-            | Stmt::BindI64Deref { line, col, .. }
-            | Stmt::MoveAssign { line, col, .. }
-            | Stmt::OverwriteAssign { line, col, .. }
-            | Stmt::SelfAssign { line, col, .. }
-            | Stmt::Unbox { line, col, .. }
-            | Stmt::ScopeExit { line, col, .. } => (*line, *col),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -153,22 +121,4 @@ pub struct Func {
 #[derive(Clone, Debug)]
 pub struct Program {
     pub funcs: Vec<Func>,
-}
-
-impl Program {
-    /// 是否含需要 L2a 运行期支持的语句（CORE-03 守卫用）。
-    pub fn needs_l2a_runtime(&self) -> bool {
-        self.funcs
-            .iter()
-            .any(|f| f.body.iter().any(Stmt::is_l2a_runtime))
-    }
-
-    /// 首条运行期事件位置（守卫诊断锚点）。
-    pub fn first_l2a_pos(&self) -> Option<(usize, usize)> {
-        self.funcs
-            .iter()
-            .flat_map(|f| f.body.iter())
-            .find(|s| s.is_l2a_runtime())
-            .map(Stmt::pos)
-    }
 }
