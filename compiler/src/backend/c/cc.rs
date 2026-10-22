@@ -70,10 +70,11 @@ fn compile_in(
     }
     if let Some(dir) = runtime_dir {
         cmd.arg("-I").arg(dir);
-        // helper TU 在前：QA cc-capture 以最后一个 .c 为生成 C
-        cmd.arg(dir.join("zor_rt.c"));
     }
     cmd.arg("-o").arg(&bin_path).arg(&c_path);
+    if let Some(dir) = runtime_dir {
+        cmd.arg(dir.join("zor_rt.c"));
+    }
 
     let out = cmd
         .output()
