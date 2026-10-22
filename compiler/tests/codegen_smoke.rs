@@ -165,25 +165,26 @@ fn empty_main_builds_and_exits_zero() {
 }
 
 #[test]
-fn struct_source_is_rejected_and_leaves_no_artifact() {
-    let d = TempDir::new("struct");
+fn unsupported_composite_leaves_no_artifact() {
+    // L2d：struct 输出已在册；仍不可打印的复合（含 Box 成员）必须 rc=1、零产物。
+    let d = TempDir::new("boxcomposite");
     let src = write(
         d.path(),
-        "mark.zor",
-        "struct Mark {}\n\nfn main() {\n    let m = Mark {};\n}\n",
+        "boxc.zor",
+        "fn main() {\n    let b = box 1;\n    println((b, 1));\n}\n",
     );
-    let out = d.path().join("mark");
+    let out = d.path().join("boxc");
     let o = run(&[src.to_str().unwrap(), "-o", out.to_str().unwrap()]);
     assert_eq!(o.status.code(), Some(1), "前端通过、子集闸必须 rc=1");
     let err = String::from_utf8_lossy(&o.stderr);
     assert!(err.contains("zorcc: codegen:"), "{err}");
-    assert!(err.contains("首片不支持") && err.contains("struct"), "{err}");
+    assert!(err.contains("首片不支持"), "{err}");
     assert!(
         !err.contains("E1") && !err.contains("E2") && !err.contains("E3"),
         "codegen 诊断不占 E 码: {err}"
     );
     assert!(!out.exists(), "失败不得留产物");
-    assert_eq!(names(d.path()), vec!["mark.zor".to_string()]);
+    assert_eq!(names(d.path()), vec!["boxc.zor".to_string()]);
 }
 
 #[test]

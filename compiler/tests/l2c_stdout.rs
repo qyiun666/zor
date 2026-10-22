@@ -279,13 +279,20 @@ fn s6_previous_output_survives_and_failing_call_writes_nothing() {
 // —— N：print／复合／不可打印 fail-closed ——
 
 #[test]
-fn n_print_and_composites_are_rc1_zero_artifact_with_codegen_prefix() {
+fn n_print_and_nonprintable_are_rc1_zero_artifact_with_codegen_prefix() {
+    // L2d：tuple／struct／enum 已转正例；此处保留 print 与含不可打印成员的复合（N-11～13）。
     for (tag, src) in [
         ("print", "fn main() { print(\"x\"); }\n"),
         ("print0", "fn main() { print(); }\n"),
-        ("tuple", "fn main() { println((1, 2)); }\n"),
-        ("struct", "struct P { x: i64 }\nfn main() { let p = P { x: 1 }; println(p); }\n"),
-        ("enum", "enum E { A }\nfn main() { let e = A(); println(e); }\n"),
+        ("tuple_box", "fn main() { let b = box 1; println((b, 1)); }\n"),
+        (
+            "nested_tuple_box",
+            "struct P { t: (i64, Box<i64>) }\nfn main() { let p = P { t: (1, box 1) }; println(p); }\n",
+        ),
+        (
+            "enum_box_variant",
+            "enum E { A(i64), B(Box<i64>) }\nfn main() { println(A(1)); }\n",
+        ),
         ("box", "fn main() { let b = box 1; println(b); }\n"),
         ("boxstruct", "struct P { x: Box<i64> }\nfn main() { let p = P { x: box 1 }; println(p); }\n"),
         ("ref", "fn main() { let x = 1; let r = &x; println(r); }\n"),

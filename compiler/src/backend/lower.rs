@@ -12,7 +12,7 @@
 
 use super::float_fmt;
 use super::ir::{
-    ArithOp, Func, IntExpr, IntTy, Local, LocalId, PrintArg, Program, Stmt, StrArg, Ty,
+    ArithOp, Func, IntExpr, IntTy, Local, LocalId, PrintArg, Program, Stmt, StrArg, Ty, Value,
 };
 use super::subset::{self, SubsetError};
 use crate::parser::{Ex, Lit, Prog, St, Ty as AstTy};
@@ -36,10 +36,21 @@ struct Slot {
     live: bool,
     /// 仅编译期标量（bool／byte／窄整型／浮点等）有值；运行期整型为 `None`。
     konst: Option<ConstVal>,
+    /// `[byte; N]` 绑定的已知字节（复合值内按原始字节展开时需要）。
+    bytes: Option<Vec<u8>>,
+}
+
+/// 复合值降级期间的可变构建面：新增的运行期整型叶子临时局部与对应语句。
+struct Build<'a> {
+    types: &'a TypeTable,
+    prog: &'a Prog,
+    slots: &'a mut Vec<Slot>,
+    locals: &'a mut Vec<Local>,
+    body: &'a mut Vec<Stmt>,
 }
 
 pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
-    subset::check(prog)?;
+    subset::check(prog, types)?;
     let mut funcs = Vec::new();
     for f in &prog.fns {
         if f.name != "main" {
@@ -49,11 +60,65 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
         let mut slots: Vec<Slot> = Vec::new();
         let mut body: Vec<Stmt> = Vec::new();
         let mut scope: HashMap<String, LocalId> = HashMap::new();
+        let mut values: HashMap<String, Value> = HashMap::new();
         let mut last_pos = f.span;
         for st in &f.body.stmts {
             match st {
                 St::Let(name, _ann, init, l, c) => {
                     last_pos = (*l, *c);
+                    let init_ty = types
+                        .expr_ty(init)
+                        .ok_or_else(|| SubsetError::new(*l, *c, "lower：let 初值缺少 type table 记录"))?
+                        .clone();
+                    if is_composite_ir_ty(&init_ty) {
+                        let recorded = types
+                            .let_ty(*l, *c)
+                            .ok_or_else(|| SubsetError::new(*l, *c, "lower：let 缺少 type table 记录"))?;
+                        if recorded != &init_ty {
+                            return Err(SubsetError::new(*l, *c, "lower：let 初值类型与绑定类型不符"));
+                        }
+                        let value = {
+                            let mut b = Build {
+                                types,
+                                prog,
+                                slots: &mut slots,
+                                locals: &mut locals,
+                                body: &mut body,
+                            };
+                            lower_value(init, &mut b, &scope, &values)?
+                        };
+                        values.insert(name.clone(), value);
+                        scope.remove(name);
+                        continue;
+                    }
+                    let byte_len = type_table::byte_array_len(&init_ty);
+                    if let (Some(n), Ex::ArrLit(..)) = (byte_len, init) {
+                        let value = {
+                            let mut b = Build {
+                                types,
+                                prog,
+                                slots: &mut slots,
+                                locals: &mut locals,
+                                body: &mut body,
+                            };
+                            lower_value(init, &mut b, &scope, &values)?
+                        };
+                        let Value::Bytes(bytes) = value else {
+                            return Err(SubsetError::new(*l, *c, "lower：字节数组初值形态"));
+                        };
+                        let id = LocalId(locals.len() as u32);
+                        body.push(Stmt::BindStr { local: id, bytes: bytes.clone(), line: *l, col: *c });
+                        locals.push(Local { id, name: name.clone(), ty: Ty::Bytes(n) });
+                        slots.push(Slot {
+                            ty: Ty::Bytes(n),
+                            live: true,
+                            konst: None,
+                            bytes: Some(bytes),
+                        });
+                        scope.insert(name.clone(), id);
+                        values.remove(name);
+                        continue;
+                    }
                     let id = LocalId(locals.len() as u32);
                     let local_ty = let_type(types, init, *l, *c)?;
                     match init {
@@ -70,8 +135,18 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     format!("lower：let 类型 [byte; {}] 与初始值 {} 字节不符", n, bytes.len()),
                                 ));
                             }
-                            body.push(Stmt::BindStr { local: id, bytes, line: *l, col: *c });
-                            slots.push(Slot { ty: Ty::Bytes(n), live: true, konst: None });
+                            body.push(Stmt::BindStr {
+                                local: id,
+                                bytes: bytes.clone(),
+                                line: *l,
+                                col: *c,
+                            });
+                            slots.push(Slot {
+                                ty: Ty::Bytes(n),
+                                live: true,
+                                konst: None,
+                                bytes: Some(bytes),
+                            });
                         }
                         Ex::Box(inner, _, _) => {
                             if local_ty != Ty::Box(Box::new(Ty::I64)) {
@@ -79,29 +154,29 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             }
                             let value = int_lit(inner)?;
                             body.push(Stmt::BindBox { local: id, value, line: *l, col: *c });
-                            slots.push(Slot { ty: local_ty, live: true, konst: None });
+                            slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
                         }
                         Ex::Lit(Lit::Int(v), il, ic) => match &local_ty {
                             Ty::I64 => {
                                 let value = i64::try_from(*v)
                                     .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i64"))?;
                                 body.push(Stmt::BindI64 { local: id, value, line: *l, col: *c });
-                                slots.push(Slot { ty: Ty::I64, live: true, konst: None });
+                                slots.push(Slot { ty: Ty::I64, live: true, konst: None, bytes: None });
                             }
                             Ty::U8 | Ty::U32 => {
                                 let ty = ir_int_ty(&local_ty).expect("u8/u32");
                                 let expr = IntExpr::Const(int_const(v, ty, init)?);
                                 body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
-                                slots.push(Slot { ty: local_ty, live: true, konst: None });
+                                slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
                             }
                             _ => {
                                 let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
-                                slots.push(Slot { ty: local_ty, live: true, konst: Some(val) });
+                                slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
                             }
                         },
                         Ex::Lit(Lit::Bool(_) | Lit::Float(_), _, _) | Ex::UnitLit(..) => {
                             let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
-                            slots.push(Slot { ty: local_ty, live: true, konst: Some(val) });
+                            slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
                         }
                         Ex::Deref(base, dl, dc) => {
                             if local_ty != Ty::I64 {
@@ -118,7 +193,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 return Err(SubsetError::new(*dl, *dc, "lower：解引用源非 Box<i64>"));
                             }
                             body.push(Stmt::BindI64Deref { local: id, src, line: *dl, col: *dc });
-                            slots.push(Slot { ty: Ty::I64, live: true, konst: None });
+                            slots.push(Slot { ty: Ty::I64, live: true, konst: None, bytes: None });
                         }
                         Ex::Path(n, nl, nc) => {
                             let src = lookup(&scope, n, *nl, *nc)?;
@@ -128,7 +203,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 }
                                 body.push(Stmt::MoveAssign { dst: id, src, line: *nl, col: *nc });
                                 set_live(&mut slots, src, false);
-                                slots.push(Slot { ty: local_ty, live: true, konst: None });
+                                slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
                             } else if let Some(ty) = ir_int_ty(&local_ty) {
                                 if slots.get(src.0 as usize).map(|s| &s.ty) != Some(&local_ty) {
                                     return Err(SubsetError::new(*nl, *nc, "lower：整型拷贝源类型与目标不符"));
@@ -140,10 +215,10 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     line: *nl,
                                     col: *nc,
                                 });
-                                slots.push(Slot { ty: local_ty, live: true, konst: None });
+                                slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
                             } else if is_const_scalar_ty(&local_ty) {
                                 let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
-                                slots.push(Slot { ty: local_ty, live: true, konst: Some(val) });
+                                slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
                             } else {
                                 return Err(SubsetError::new(*nl, *nc, "lower：移动目标类型非 Box"));
                             }
@@ -158,16 +233,16 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             })?;
                             let expr = lower_int_expr(init, ty, types, &slots, &scope)?;
                             body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
-                            slots.push(Slot { ty: local_ty, live: true, konst: None });
+                            slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
                         }
                         Ex::Un(..) => {
                             if let Some(ty) = ir_int_ty(&local_ty) {
                                 let expr = lower_int_expr(init, ty, types, &slots, &scope)?;
                                 body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
-                                slots.push(Slot { ty: local_ty, live: true, konst: None });
+                                slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
                             } else {
                                 let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
-                                slots.push(Slot { ty: local_ty, live: true, konst: Some(val) });
+                                slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
                             }
                         }
                         other => {
@@ -178,6 +253,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                     let slot = slots.last().expect("slot pushed").clone();
                     locals.push(Local { id, name: name.clone(), ty: slot.ty });
                     scope.insert(name.clone(), id);
+                    values.remove(name);
                 }
                 St::Expr(Some(Ex::Call(callee, args, l, c)), _, _) => {
                     last_pos = (*l, *c);
@@ -187,8 +263,17 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                         return Err(SubsetError::new(*l, *c, "lower：println 形态"));
                     }
                     let mut pargs = Vec::with_capacity(args.len());
-                    for arg in args {
-                        pargs.push(print_arg(arg, types, &slots, &scope)?);
+                    {
+                        let mut b = Build {
+                            types,
+                            prog,
+                            slots: &mut slots,
+                            locals: &mut locals,
+                            body: &mut body,
+                        };
+                        for arg in args {
+                            pargs.push(print_arg(arg, &mut b, &scope, &values)?);
+                        }
                     }
                     body.push(Stmt::Print { args: pargs, newline: true, line: *l, col: *c });
                 }
@@ -297,16 +382,31 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
     Ok(Program { funcs })
 }
 
-/// println 实参降级：字符串／字节串／运行期整型／编译期格式化标量。
+/// println 实参降级：字符串／字节串／运行期整型／编译期格式化标量／复合值树。
 fn print_arg(
     e: &Ex,
-    types: &TypeTable,
-    slots: &[Slot],
+    b: &mut Build,
     scope: &HashMap<String, LocalId>,
+    values: &HashMap<String, Value>,
 ) -> Result<PrintArg, SubsetError> {
+    let (el, ec) = subset::expr_span(e);
+    let expr_ty = b
+        .types
+        .expr_ty(e)
+        .ok_or_else(|| SubsetError::new(el, ec, "lower：println 实参缺少 type table 记录"))?
+        .clone();
+    // 复合值、只读投影：统一走 Value 树；标量叶子仍复用 L2c 分支。
+    if is_composite_ir_ty(&expr_ty) || matches!(e, Ex::Field(..) | Ex::Index(..)) {
+        let value = lower_value(e, b, scope, values)?;
+        return Ok(match value {
+            Value::Int { ty, expr } => PrintArg::Int { ty, expr },
+            Value::Bytes(bytes) => PrintArg::Bytes(bytes),
+            other => PrintArg::Composite(other),
+        });
+    }
     match e {
         Ex::Lit(Lit::Str(s), sl, sc) => {
-            let n = expr_byte_len(types, e, *sl, *sc, "println 实参")?;
+            let n = expr_byte_len(b.types, e, *sl, *sc, "println 实参")?;
             if n != s.len() as u64 {
                 return Err(SubsetError::new(
                     *sl,
@@ -317,31 +417,32 @@ fn print_arg(
             Ok(PrintArg::Str(StrArg::Bytes(s.as_bytes().to_vec())))
         }
         Ex::Lit(Lit::Int(_), _, _) => {
-            let ty = int_ty_of(types, e, "println 实参")?;
-            let expr = lower_int_expr(e, ty, types, slots, scope)?;
+            let ty = int_ty_of(b.types, e, "println 实参")?;
+            let expr = lower_int_expr(e, ty, b.types, b.slots, scope)?;
             Ok(PrintArg::Int { ty, expr })
         }
         Ex::Lit(Lit::Float(_) | Lit::Bool(_), _, _) | Ex::UnitLit(..) => {
-            let irt = ir_ty_of(types, e, "println 实参")?;
-            let val = const_scalar(e, &irt, types, slots, scope)?;
+            let irt = ir_ty_of(b.types, e, "println 实参")?;
+            let val = const_scalar(e, &irt, b.types, b.slots, scope)?;
             Ok(PrintArg::Bytes(format_const(&val, &irt)?))
         }
         Ex::Path(n, nl, nc) => {
             let id = lookup(scope, n, *nl, *nc)?;
-            let slot = slots
+            let slot = b
+                .slots
                 .get(id.0 as usize)
                 .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：println 实参槽位缺失"))?;
             match &slot.ty {
                 Ty::Bytes(n_bytes) => {
                     // 与 check 的类型表交叉核对（唯一类型来源）
-                    let table = expr_byte_len(types, e, *nl, *nc, "println 实参")?;
+                    let table = expr_byte_len(b.types, e, *nl, *nc, "println 实参")?;
                     if table != *n_bytes {
                         return Err(SubsetError::new(*nl, *nc, "lower：println 实参类型与局部绑定不符"));
                     }
                     Ok(PrintArg::Str(StrArg::Local(id)))
                 }
                 ty => {
-                    let irt = ir_ty_of(types, e, "println 实参")?;
+                    let irt = ir_ty_of(b.types, e, "println 实参")?;
                     if &irt != ty {
                         return Err(SubsetError::new(*nl, *nc, "lower：println 实参类型与局部绑定不符"));
                     }
@@ -362,25 +463,296 @@ fn print_arg(
                 Ex::Path(n, _, _) => lookup(scope, n, *dl, *dc)?,
                 _ => return Err(SubsetError::new(*dl, *dc, "lower：解引用源形态")),
             };
-            let irt = ir_ty_of(types, e, "println 实参")?;
+            let irt = ir_ty_of(b.types, e, "println 实参")?;
             if irt != Ty::I64 {
                 return Err(SubsetError::new(*dl, *dc, "lower：解引用结果类型非 i64"));
             }
             Ok(PrintArg::Int { ty: IntTy::I64, expr: IntExpr::Local(src) })
         }
         Ex::Un(..) | Ex::Bin(..) => {
-            let irt = ir_ty_of(types, e, "println 实参")?;
+            let irt = ir_ty_of(b.types, e, "println 实参")?;
             if let Some(ty) = ir_int_ty(&irt) {
-                let expr = lower_int_expr(e, ty, types, slots, scope)?;
+                let expr = lower_int_expr(e, ty, b.types, b.slots, scope)?;
                 Ok(PrintArg::Int { ty, expr })
             } else {
-                let val = const_scalar(e, &irt, types, slots, scope)?;
+                let val = const_scalar(e, &irt, b.types, b.slots, scope)?;
                 Ok(PrintArg::Bytes(format_const(&val, &irt)?))
             }
         }
         other => {
             let (l, c) = subset::expr_span(other);
             Err(SubsetError::new(l, c, "lower：println 实参不可打印"))
+        }
+    }
+}
+
+/// 复合类型（非 `[byte; N]`）：tuple／array／struct／enum。
+fn is_composite_ir_ty(t: &AstTy) -> bool {
+    match t {
+        AstTy::Tuple(_) | AstTy::Named(_) => true,
+        AstTy::Arr(elem, _) => !matches!(elem.as_ref(), AstTy::Prim("byte")),
+        _ => false,
+    }
+}
+
+/// 复合值降级：结构在编译期确定；运行期整型叶子先行求值进临时局部，
+/// 保证 `println` 的原子性与源序求值。
+fn lower_value(
+    e: &Ex,
+    b: &mut Build,
+    scope: &HashMap<String, LocalId>,
+    values: &HashMap<String, Value>,
+) -> Result<Value, SubsetError> {
+    let (l, c) = subset::expr_span(e);
+    // Field 的 Path 基座是纯 place root：check 不为其写 type table 项，
+    // 这里以绑定槽位（其类型同样来自 check）为准。
+    if let Ex::Path(n, nl, nc) = e {
+        if let Some(v) = values.get(n) {
+            return Ok(v.clone());
+        }
+        let id = lookup(scope, n, *nl, *nc)?;
+        let slot = b
+            .slots
+            .get(id.0 as usize)
+            .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：复合成员槽位缺失"))?;
+        if let Some(bytes) = &slot.bytes {
+            return Ok(Value::Bytes(bytes.clone()));
+        }
+        if let Some(ity) = ir_int_ty(&slot.ty) {
+            return Ok(Value::Int { ty: ity, expr: IntExpr::Local(id) });
+        }
+        let val = slot
+            .konst
+            .clone()
+            .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：复合成员缺少编译期值"))?;
+        return Ok(Value::Bytes(format_const(&val, &slot.ty)?));
+    }
+    let t = b
+        .types
+        .expr_ty(e)
+        .ok_or_else(|| SubsetError::new(l, c, "lower：复合值缺少 type table 记录"))?
+        .clone();
+    match e {
+        Ex::Lit(Lit::Str(s), _, _) => {
+            let n = type_table::byte_array_len(&t)
+                .ok_or_else(|| SubsetError::new(l, c, "lower：字符串字面量类型非 [byte; N]"))?;
+            if n != s.len() as u64 {
+                return Err(SubsetError::new(
+                    l,
+                    c,
+                    format!("lower：类型 [byte; {}] 与字面量 {} 字节不符", n, s.len()),
+                ));
+            }
+            Ok(Value::Bytes(s.as_bytes().to_vec()))
+        }
+        Ex::Lit(Lit::Int(_), _, _)
+        | Ex::Lit(Lit::Float(_) | Lit::Bool(_), _, _)
+        | Ex::UnitLit(..)
+        | Ex::Un(..)
+        | Ex::Bin(..) => lower_scalar_value(e, &t, b, scope),
+        Ex::Deref(base, dl, dc) => {
+            let src = match base.as_ref() {
+                Ex::Path(n, _, _) => lookup(scope, n, *dl, *dc)?,
+                other => {
+                    let (el, ec) = subset::expr_span(other);
+                    return Err(SubsetError::new(el, ec, "lower：解引用源形态"));
+                }
+            };
+            if b.slots.get(src.0 as usize).map(|s| &s.ty) != Some(&Ty::Box(Box::new(Ty::I64))) {
+                return Err(SubsetError::new(*dl, *dc, "lower：解引用源非 Box<i64>"));
+            }
+            if t != AstTy::Prim("i64") {
+                return Err(SubsetError::new(*dl, *dc, "lower：解引用结果类型非 i64"));
+            }
+            let id = new_temp(b, Ty::I64);
+            b.body.push(Stmt::BindI64Deref { local: id, src, line: *dl, col: *dc });
+            Ok(Value::Int { ty: IntTy::I64, expr: IntExpr::Local(id) })
+        }
+        Ex::Tup(es, _, _) => {
+            let want = match &t {
+                AstTy::Tuple(ts) => ts,
+                _ => return Err(SubsetError::new(l, c, "lower：元组初值类型记录不符")),
+            };
+            if want.len() != es.len() {
+                return Err(SubsetError::new(l, c, "lower：元组元素数量与类型不符"));
+            }
+            let mut vals = Vec::with_capacity(es.len());
+            for x in es {
+                vals.push(lower_value(x, b, scope, values)?);
+            }
+            Ok(Value::Tuple(vals))
+        }
+        Ex::ArrLit(es, _, _) => {
+            let (elem, n) = match &t {
+                AstTy::Arr(elem, n) => (elem.as_ref(), *n),
+                _ => return Err(SubsetError::new(l, c, "lower：数组初值类型记录不符")),
+            };
+            if n != es.len() as u64 {
+                return Err(SubsetError::new(l, c, "lower：数组元素数量与类型不符"));
+            }
+            if matches!(elem, AstTy::Prim("byte")) {
+                let mut bytes = Vec::with_capacity(es.len());
+                for x in es {
+                    bytes.push(byte_const(x)?);
+                }
+                return Ok(Value::Bytes(bytes));
+            }
+            let mut vals = Vec::with_capacity(es.len());
+            for x in es {
+                vals.push(lower_value(x, b, scope, values)?);
+            }
+            Ok(Value::Array(vals))
+        }
+        Ex::Record(name, fields, _, _) => {
+            let decl = b
+                .prog
+                .structs
+                .iter()
+                .find(|s| &s.name == name)
+                .ok_or_else(|| SubsetError::new(l, c, format!("lower：未知结构体 '{}'", name)))?;
+            if t != AstTy::Named(name.clone()) {
+                return Err(SubsetError::new(l, c, "lower：record 类型记录不符"));
+            }
+            // 先按源码顺序求值（运行期副作用顺序），再按声明顺序落树。
+            let mut lowered: Vec<(&str, Value)> = Vec::with_capacity(fields.len());
+            for (fname, fexpr) in fields {
+                if lowered.iter().any(|(n, _)| n == fname) {
+                    return Err(SubsetError::new(l, c, format!("lower：字段 '{}' 重复初始化", fname)));
+                }
+                let v = lower_value(fexpr, b, scope, values)?;
+                lowered.push((fname.as_str(), v));
+            }
+            let mut out_fields = Vec::with_capacity(decl.fields.len());
+            for (fname, _, _, _) in &decl.fields {
+                let v = lowered
+                    .iter()
+                    .find(|(n, _)| n == fname)
+                    .map(|(_, v)| v.clone())
+                    .ok_or_else(|| SubsetError::new(l, c, format!("lower：结构体字段 '{}' 未初始化", fname)))?;
+                out_fields.push((fname.clone(), v));
+            }
+            if out_fields.len() != lowered.len() {
+                return Err(SubsetError::new(l, c, "lower：record 字段集合不符"));
+            }
+            Ok(Value::Struct { name: name.clone(), fields: out_fields })
+        }
+        Ex::Call(callee, args, _, _) => {
+            let Ex::Path(variant, _, _) = callee.as_ref() else {
+                return Err(SubsetError::new(l, c, "lower：枚举构造形态"));
+            };
+            let AstTy::Named(en) = &t else {
+                return Err(SubsetError::new(l, c, "lower：枚举构造类型记录不符"));
+            };
+            let decl = b
+                .prog
+                .enums
+                .iter()
+                .find(|x| &x.name == en)
+                .ok_or_else(|| SubsetError::new(l, c, format!("lower：未知 enum '{}'", en)))?;
+            let (_, payload, _, _) = decl
+                .variants
+                .iter()
+                .find(|(n, _, _, _)| n == variant)
+                .ok_or_else(|| SubsetError::new(l, c, format!("lower：enum '{}' 无变体 '{}'", en, variant)))?;
+            if payload.len() != args.len() {
+                return Err(SubsetError::new(l, c, "lower：枚举变体载荷数量不符"));
+            }
+            let mut vals = Vec::with_capacity(args.len());
+            for a in args {
+                vals.push(lower_value(a, b, scope, values)?);
+            }
+            Ok(Value::Enum { variant: variant.clone(), payload: vals })
+        }
+        Ex::Field(base, fname, fl, fc) => {
+            let base_val = lower_value(base, b, scope, values)?;
+            match base_val {
+                Value::Struct { fields, .. } => fields
+                    .into_iter()
+                    .find(|(n, _)| n == fname)
+                    .map(|(_, v)| v)
+                    .ok_or_else(|| SubsetError::new(*fl, *fc, format!("lower：字段 '{}' 不存在", fname))),
+                _ => Err(SubsetError::new(*fl, *fc, "lower：字段投影源非 struct")),
+            }
+        }
+        Ex::Index(base, idx, il, ic) => {
+            let base_val = lower_value(base, b, scope, values)?;
+            let i = match idx.as_ref() {
+                Ex::Lit(Lit::Int(v), _, _) => usize::try_from(*v)
+                    .map_err(|_| SubsetError::new(*il, *ic, "lower：下标超出可用范围"))?,
+                _ => return Err(SubsetError::new(*il, *ic, "lower：下标须为整数字面量")),
+            };
+            match base_val {
+                Value::Tuple(vs) | Value::Array(vs) => vs
+                    .into_iter()
+                    .nth(i)
+                    .ok_or_else(|| SubsetError::new(*il, *ic, "lower：下标越界")),
+                Value::Bytes(bytes) => {
+                    let byte = bytes
+                        .get(i)
+                        .copied()
+                        .ok_or_else(|| SubsetError::new(*il, *ic, "lower：下标越界"))?;
+                    Ok(Value::Bytes(byte.to_string().into_bytes()))
+                }
+                _ => Err(SubsetError::new(*il, *ic, "lower：下标投影源非 tuple／array")),
+            }
+        }
+        other => {
+            let (ol, oc) = subset::expr_span(other);
+            Err(SubsetError::new(ol, oc, "lower：复合值形态不在 L2d codegen 子集"))
+        }
+    }
+}
+
+/// 标量叶子：运行期整型进 Value::Int（非常量先行求值进临时局部），
+/// 其余在册原始类型在编译期按契约格式化。
+fn lower_scalar_value(
+    e: &Ex,
+    t: &AstTy,
+    b: &mut Build,
+    scope: &HashMap<String, LocalId>,
+) -> Result<Value, SubsetError> {
+    let (l, c) = subset::expr_span(e);
+    let irt = ast_to_ir(t)
+        .ok_or_else(|| SubsetError::new(l, c, format!("lower：类型 '{}' 不在 codegen 子集", t.display())))?;
+    if let Some(ity) = ir_int_ty(&irt) {
+        let expr = lower_int_expr(e, ity, b.types, b.slots, scope)?;
+        return Ok(int_value(ity, expr, l, c, b));
+    }
+    let val = const_scalar(e, &irt, b.types, b.slots, scope)?;
+    Ok(Value::Bytes(format_const(&val, &irt)?))
+}
+
+/// 运行期整型叶子：常量直接留树；表达式先行求值到临时局部，保持原子性与源序。
+fn int_value(ity: IntTy, expr: IntExpr, l: usize, c: usize, b: &mut Build) -> Value {
+    if matches!(expr, IntExpr::Const(_)) {
+        return Value::Int { ty: ity, expr };
+    }
+    let id = new_temp(b, ity.ir_ty());
+    b.body.push(Stmt::BindInt { local: id, ty: ity, expr, line: l, col: c });
+    Value::Int { ty: ity, expr: IntExpr::Local(id) }
+}
+
+fn new_temp(b: &mut Build, ty: Ty) -> LocalId {
+    let id = LocalId(b.locals.len() as u32);
+    b.locals.push(Local { id, name: format!("zor_l2d_tmp_{}", id.0), ty: ty.clone() });
+    b.slots.push(Slot { ty, live: true, konst: None, bytes: None });
+    id
+}
+
+/// `[byte; N]` 字面量元素：Q-3 常量元素。
+fn byte_const(e: &Ex) -> Result<u8, SubsetError> {
+    match e {
+        Ex::Lit(Lit::Int(v), l, c) => {
+            let n = i128::try_from(*v)
+                .map_err(|_| SubsetError::new(*l, *c, "lower：byte 元素超出 i128"))?;
+            if !(0..=u8::MAX as i128).contains(&n) {
+                return Err(SubsetError::new(*l, *c, "lower：byte 元素超出 0..=255"));
+            }
+            Ok(n as u8)
+        }
+        other => {
+            let (l, c) = subset::expr_span(other);
+            Err(SubsetError::new(l, c, "lower：字节数组元素须为整数字面量"))
         }
     }
 }
@@ -896,7 +1268,11 @@ mod tests {
         assert!(c.diags.is_empty(), "{:?}", c.diags);
         let empty = TypeTable::new();
         let e = lower(&c.prog, &empty).expect_err("lower must fail closed without types");
-        assert!(e.what.contains("type table"), "{}", e.what);
+        assert!(
+            e.what.contains("type table") || e.what.contains("不可打印"),
+            "{}",
+            e.what
+        );
     }
 
     // —— G-E-2 状态机：6 条 manifest 样本 + 2 条矩阵空格 ——
