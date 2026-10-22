@@ -101,6 +101,19 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str) {
                     }
                 }
             }
+            // CORE-03 只产事件；运行期生成归 CORE-04。守卫在 backend::build 先行拒绝，
+            // 正常路径不可达；若绕过守卫即显式失败，避免静默生成缺语义的 C。
+            Stmt::BindI64 { .. }
+            | Stmt::BindBox { .. }
+            | Stmt::BindBoxAssign { .. }
+            | Stmt::BindI64Deref { .. }
+            | Stmt::MoveAssign { .. }
+            | Stmt::OverwriteAssign { .. }
+            | Stmt::SelfAssign { .. }
+            | Stmt::Unbox { .. }
+            | Stmt::ScopeExit { .. } => {
+                panic!("emit：L2a drop／Box 运行期语句应在 CORE-04 前被守卫拒绝")
+            }
         }
     }
     out.push_str("    return 0;\n}\n");
