@@ -4,6 +4,46 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.1] - 2026-10-22
+
+内部验证里程碑，非可用语言版本：本版为 L2b「运行期错误与溢出契约」——在 0.3.0 的运行期安全地基之上，实发 E3001／E3002 运行期诊断（rc=101、`zor:` 前缀、源行号），落整数算术 checked／wrap 双档与除零一致语义，并新增独立 Linux `runtime-codes` 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。
+
+本版口径：运行期诊断**仅**在算术真正执行且越界／除零时发出，编译期 rc 0／1／2 不变；E3001／E3002 不进入编译期 EMIT／golden，运行期期望串落 `tests/runtime/`。溢出为 checked 时（`-O0` 或内部模式覆盖位）发 E3001，wrap 时（`-O2`／缺省）按模 2^N 回绕；除零两档均 E3002。内部溢出模式覆盖位仅用于 CI 取证，不对用户暴露，未进入 `--help`、README 或用户文档。本版 `codegen` 面**仅** i64／u8／u32；其余在册整型宽度（i8／i16／i32／u16／u64／byte）参与算术时按 rc=1 fail-closed，不实发检查，**不构成全宽度覆盖承诺**。本版不新增 AC 编号；E3001／E3002 已在 R1 §8b 登记（`DECLRT=2`）并由本版起实发；计数 41／53／53／3／94 与码表 `23/23/19/1/1/2/19/19/14` 不变；`r2:9` 零触；L2a manifest 48＝41 `compile-only`＋7 `build-run` 零改。
+
+### Added
+
+- **E3001／E3002 运行期诊断**：新增 `runtime/zor_rt.c`／`runtime/zor_rt.h`，由 `zor_rt_fail(code, file, line, col)` 统一出口：先 `fflush(stdout)`，向 stderr 写**恰一行**＋一枚 LF（形如 `zor: runtime error[E3001] <file>:<line>:<col>: integer overflow`；E3002 同形，消息为 `division by zero`），再 `fflush(stderr)`，最后 `exit(101)`；不使用 `abort`／`_exit`／`exit(1)`。E30xx 字符串只存在于 runtime，生成 C 只传数值码位；stdout 不被污染。源位置由 IR 携带 line／col，生成 C 以 `#line`＋`__FILE__` 还原；路径按 `zorcc` 入参原样（相对／绝对不改写），列取操作符 token 列。
+- **checked／wrap 溢出模式**：checked 用 `__builtin_*_overflow`（i64／u8／u32，含有符号与无符号的溢出／下溢），wrap 用无符号算术＋`memcpy` 回读；`+／-／*` 溢出在 checked 发 E3001、wrap 按模 2^N；`/ 0`、`% 0` 两档均 E3002；`MIN / -1` checked E3001、wrap `MIN`；`MIN % -1` 恒 `0`；`MIN / 0` 先判除数为 0 → E3002；`-g` 与溢出模式正交。常量表达式在 checked 档保留运行期检查，不提前转为编译期错误；wrap 可模 2^N 折叠。
+- **`runtime-codes` 独立门禁**：CI 新增独立 `runtime-codes` job（`ubuntu-24.04`、`bash ci/run_ci.sh --runtime-codes`、timeout 20、strict 常驻、artifact `runtime-codes-logs-${run_id}-${attempt}` 90 天、`if: always()`、`if-no-files-found: error`）；样本面＝29 条 runtime＋6 条宽度 fail-closed＋8 条 CLI 负控，只使用 i64／u8／u32 与已接受档位（`-O0`／`-O2`／缺省／`-g`）。rc=101 只在**无 sanitizer 的普通构建**上判（LSAN 会覆盖 101）；ASAN／LSAN 退出码在 `asan-linux` 段单列；终止样本固定 `detect_leaks=0`；L2a 的 baseline 7/7、asan-linux 8/8 与 manifest 48／7 零改。
+- **规范登记转实发**：R1 §8b 标题改为「运行期诊断码位登记（L2b 起实发）」，正文补历史句；`ci/run_ci.sh` HDR 四项（新标题正／旧标题负／历史句／A8b1 归口）与本版**同一提交**收紧；`DECLRT=2`、`EMIT=19`、`GOLDEN=19`、码表九值不变；E30xx 不进入编译期 EMIT／golden。
+
+### Changed
+
+- **退出码分层**：编译期成功 0、源码诊断 1、CLI／环境误用 2 均不变；运行期 E3001／E3002 统一 101；sanitizer 工具退出码（ASAN／LSAN）单独分类，不并入 E30xx，也不作为 ZOR 运行期码。
+- **溢出语义**：无符号与有符号**同规则**——checked 档下 `+／-／*` 溢出或下溢发 E3001，不因无符号而静默回绕；wrap 档才按模 2^N。`f32／f64` 不走 E3001／E3002（IEEE754 直通）。
+- **用户 CLI 不变**：仍只接受 `-O0`（checked）／`-O2`／缺省（wrap）／`-g`；`-Og`／`-O1`／`-O3`／`-Os` 继续 rc=2、零产物；合法重复参数 last-wins（`-o` 仍为唯一重复即 rc=2 的参数）；`--output` 不作别名。用户可见 `-O*` 档位契约与白名单扩展归 L2c，不在本版。
+- **文档与门禁**：本节为 0.3.1 新增用户文档行，不含内部溢出模式覆盖位的旗标名；`F-RC-14` 以本节插入为转绿前置；历史 `[0.3.0]` 节不回改。
+
+### 门禁与回归读数
+
+- QA GATE-01（L2b）结论：⟨待回填：PASS／FAIL＋报告路径＋sha256⟩。main push run：⟨待回填：run id 与 job 结论⟩；`runtime-codes` job：⟨待回填：29＋6＋8 实测 PASS 数、两轮一致性、artifact 名⟩；baseline strict 七段：⟨待回填 7/7⟩；asan-linux 八段：⟨待回填 8/8⟩；`cargo test`：⟨待回填 n/0⟩。
+- 计数与码表：positive 41／negative 53／golden 53／compare 3／`tests/specs` `.zor` 94（期望不变，待复核）；code-table `23/23/19/1/1/2/19/19/14`（`DECLRT=2`、`EMIT=19`、`GOLDEN=19`）；L2a manifest 48／7 零改；`r2:9` 零触。
+- 退出码取证：Linux `ubuntu-24.04` x86_64 实测 `exit(101)`；ASAN UAF rc、LSAN rc 单列；⟨待回填：run id／artifact／sha256⟩。macOS 不作 rc=101 终证。
+- 零 tag／零 Release；无 `[0.3.2]`；0.3.0 历史节零改。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **整型宽度覆盖**：本版 `codegen` 仅 i64／u8／u32；i8／i16／i32／u16／u64／byte 参与算术时 rc=1 fail-closed（含 `zorcc: codegen:`、零产物）。其余宽度的 codegen 与门禁样本归后续切片；本版**不宣称**全宽度覆盖。
+- **用户可见优化档**：`-O*` 档位契约、`-Og`／`-O1`／`-O3`／`-Os` 白名单扩展归 L2c G-D-2；本版不承诺用户可选择 checked／wrap。用户可见缺省（`-O2`）语义为 wrap，而非 checked。
+- **内部溢出模式覆盖位**：仅内部／CI；不对外暴露，未进入 `--help`、README 或用户文档；非法值 rc=2、零产物。不作为用户契约。
+- **运行期终止清理**：E30xx 终止**不保证** drop／Box 释放；终止样本不纳入 ASAN／LSAN 泄漏零报告；L2a 的 7 条 `build-run` 零报告结论不外推到运行期终止样本。
+- **诊断面**：E30xx 只在运行期；编译期不报溢出／除零；不新增操作符、类型名或调用栈字段，用户据 E 码＋源位置定位。
+- **stdout 六数／CO-8／G-D-3／结构化 CLI**：L2c；`-o` 仍为唯一对外构建入口；不在本版。
+- **容器／close**：L3；**FFI／回调**：R4；**G-B-3 基准劣化门禁**：L4（`bench/` 仅骨架）；均不在本版判绿。
+- **跨平台**：本版新增 `runtime-codes` 的 Linux 宿主（`ubuntu-24.04`）；macOS 仅辅助，Windows 与其他发行版不在本版；不构成功能矩阵承诺。
+- 内存／性能：未出数，只写「目标」，不作达标承诺。
+- 零 tag／Release；不构成可安装／生产可用／对外 API 稳定承诺。
+
 ## [0.3.0] - 2026-10-22
 
 内部验证里程碑，非可用语言版本：本版为 L2a「运行期安全地基」——在 0.2.1 的 hello 闭环之上，落 typed IR／type table、E2203／E2204 借用硬闸、G-E-2 的 move／overwrite／Box 载荷状态机、drop flags 与 Box 运行期释放，以及 Linux ASAN／LSAN 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。
