@@ -308,8 +308,18 @@ stage_code_table() { # 0.1.18 项2 诊断码表不变式 A1–A7（单一实现�
   comm -12 "$td/res_rt" "$td/emit"           > "$td/v_a7"
   local n_row n_uniq; n_row=$(grep -c '' "$td/rows" || true); n_uniq=$(cut -f2 "$td/rows" | sort -u | grep -c '' || true)
   if [ "$n_row" = "$n_uniq" ]; then : > "$td/v_a5"; else printf '码位列总行=%s 去重枚数=%s\n' "$n_row" "$n_uniq" > "$td/v_a5"; fi
-  # HDR＝§8b 表头诚实句在位（冻结件 §五-3 强制句的常驻对应形；不依赖历史文本）
-  if grep -q '规范登记、未实发' specs/r1-type-system.md; then : > "$td/v_hdr"; else printf '§8b 缺"规范登记、未实发"表头句\n' > "$td/v_hdr"; fi
+  # HDR＝§8b 新句四项（L2b 起实发）：新标题唯一、旧标题不命中、历史句在位、A8b1 另判。
+  # 不做全文“未实发”缺席断言（正文历史句保留）。
+  local hdr_new hdr_old
+  hdr_new=$(grep -cE '^## 8b\. .*（L2b 起实发）' specs/r1-type-system.md || true)
+  hdr_old=$(grep -E '^## 8b\.' specs/r1-type-system.md | grep -c '（规范登记、未实发）' || true)
+  if [ "$hdr_new" = 1 ] \
+    && [ "$hdr_old" = 0 ] \
+    && grep -qF '自 L2b 起实发；0.2.x 及以前为规范登记、未实发' specs/r1-type-system.md; then
+    : > "$td/v_hdr"
+  else
+    printf '§8b HDR 四项不符：新标题数=%s 旧标题数=%s（要求 1／0 且历史句在位）\n' "$hdr_new" "$hdr_old" > "$td/v_hdr"
+  fi
   # A8b1＝新行出处闸的常驻半边（判据归口列非空）；另半边 A8b2 与搬运闸 A8a 须对 base 侧旧文核对，属升格窗一次性执行
   awk -F'\t' 'NF < 4 || $4 == "" { print $2 }' "$td/rows" > "$td/v_a8b1"
   {

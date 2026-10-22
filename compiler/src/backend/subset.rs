@@ -6,12 +6,16 @@
 use crate::parser::{Blk, Ex, FnDecl, Lit, Prog, St, Ty};
 use std::collections::HashMap;
 
-/// 首片绑定种类：字符串／Box<i64>／i64。
+/// 首片绑定种类：字符串／Box<i64>／整型（i64／u8／u32 及其他在册整型）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BindingKind {
     Str,
     BoxI64,
     I64,
+    U8,
+    U32,
+    /// 其他在册整型：subset 放行，lower 以 rc=1 fail-closed。
+    OtherInt,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -87,18 +91,48 @@ fn check_block(blk: &Blk, bindings: &mut HashMap<String, BindingKind>) -> Result
     for st in &blk.stmts {
         match st {
             St::Let(name, ann, init, l, c) => {
-                if ann.is_some() {
-                    return Err(SubsetError::new(*l, *c, "let 类型标注"));
-                }
+                // L2b：只放行整型标注（i64/u8/u32 可 codegen；其余在册整型由 lower
+                // rc=1 fail-closed）。数组／引用等标注仍按原判据拒判。
+                let ann_kind = match ann {
+                    None => None,
+                    Some(Ty::Prim(p)) => match *p {
+                        "i64" => Some(BindingKind::I64),
+                        "u8" => Some(BindingKind::U8),
+                        "u32" => Some(BindingKind::U32),
+                        _ if is_registered_int(p) => Some(BindingKind::OtherInt),
+                        _ => {
+                            return Err(SubsetError::new(
+                                *l,
+                                *c,
+                                "let 类型标注（仅整型 i64／u8／u32 可 codegen）",
+                            ))
+                        }
+                    },
+                    Some(_) => {
+                        return Err(SubsetError::new(
+                            *l,
+                            *c,
+                            "let 类型标注（仅整型 i64／u8／u32 可 codegen）",
+                        ))
+                    }
+                };
                 let kind = match init {
-                    Ex::Lit(Lit::Str(_), _, _) => BindingKind::Str,
+                    Ex::Lit(Lit::Str(_), _, _) => {
+                        if ann_kind.is_some() {
+                            return Err(SubsetError::new(*l, *c, "let 类型标注与字符串初值不符"));
+                        }
+                        BindingKind::Str
+                    }
                     Ex::Box(inner, il, ic) => {
                         if !matches!(inner.as_ref(), Ex::Lit(Lit::Int(_), _, _)) {
                             return Err(SubsetError::new(*il, *ic, "box 载荷非整型字面量"));
                         }
+                        if ann_kind.is_some() {
+                            return Err(SubsetError::new(*l, *c, "let 类型标注与 Box 初值不符"));
+                        }
                         BindingKind::BoxI64
                     }
-                    Ex::Lit(Lit::Int(_), _, _) => BindingKind::I64,
+                    Ex::Lit(Lit::Int(_), _, _) => ann_kind.unwrap_or(BindingKind::I64),
                     Ex::Deref(base, il, ic) => match base.as_ref() {
                         Ex::Path(n, _, _) if bindings.get(n) == Some(&BindingKind::BoxI64) => {
                             BindingKind::I64
@@ -109,7 +143,15 @@ fn check_block(blk: &Blk, bindings: &mut HashMap<String, BindingKind>) -> Result
                     },
                     Ex::Path(n, il, ic) => match bindings.get(n) {
                         Some(BindingKind::BoxI64) => BindingKind::BoxI64,
+                        Some(k) if is_int_kind(*k) => ann_kind.unwrap_or(*k),
                         _ => return Err(SubsetError::new(*il, *ic, "let 初始化非字符串字面量")),
+                    },
+                    Ex::Bin(..) | Ex::Un(..) => match int_expr_kind(init, bindings) {
+                        Some(k) => ann_kind.unwrap_or(k),
+                        None => {
+                            let (il, ic) = expr_span(init);
+                            return Err(SubsetError::new(il, ic, "let 初始化非整型算术表达式"));
+                        }
                     },
                     _ => {
                         let (il, ic) = expr_span(init);
@@ -158,6 +200,12 @@ fn check_block(blk: &Blk, bindings: &mut HashMap<String, BindingKind>) -> Result
                     ));
                 }
             }
+            St::Expr(Some(e), l, c) if matches!(e, Ex::Bin(..) | Ex::Un(..)) => {
+                if int_expr_kind(e, bindings).is_none() {
+                    let (el, ec) = expr_span(e);
+                    return Err(SubsetError::new(el, ec, "整型算术表达式形态"));
+                }
+            }
             St::Expr(Some(_), l, c) => {
                 return Err(SubsetError::new(*l, *c, "表达式语句（首片只支持 println 调用／unbox）"))
             }
@@ -192,6 +240,62 @@ fn check_block(blk: &Blk, bindings: &mut HashMap<String, BindingKind>) -> Result
 
 pub(crate) fn expr_span(e: &Ex) -> (usize, usize) {
     e.span()
+}
+
+fn is_registered_int(p: &str) -> bool {
+    matches!(
+        p,
+        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "byte"
+    )
+}
+
+fn is_int_kind(k: BindingKind) -> bool {
+    matches!(
+        k,
+        BindingKind::I64 | BindingKind::U8 | BindingKind::U32 | BindingKind::OtherInt
+    )
+}
+
+fn is_int_lit(e: &Ex) -> bool {
+    matches!(e, Ex::Lit(Lit::Int(_), _, _))
+}
+
+/// 整型算术的形态判定：字面量向同侧整型收敛；其他在册整型放行给 lower。
+fn int_expr_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> Option<BindingKind> {
+    match e {
+        Ex::Lit(Lit::Int(_), _, _) => Some(BindingKind::I64),
+        Ex::Path(n, _, _) => bindings.get(n).copied().filter(|k| is_int_kind(*k)),
+        Ex::Deref(base, _, _) => match base.as_ref() {
+            Ex::Path(n, _, _) if bindings.get(n) == Some(&BindingKind::BoxI64) => {
+                Some(BindingKind::I64)
+            }
+            _ => None,
+        },
+        Ex::Un(op, inner, _, _) if op == "-" => {
+            match int_expr_kind(inner, bindings)? {
+                // L2b 不支持无符号一元 `-`；subset 放行到 lower 会失去诊断，
+                // 故在此显式拒判（仍走 rc=1 fail-closed）。
+                BindingKind::U8 | BindingKind::U32 => None,
+                k => Some(k),
+            }
+        }
+        Ex::Bin(op, a, b, _, _) if matches!(op.as_str(), "+" | "-" | "*" | "/" | "%") => {
+            let ka = int_expr_kind(a, bindings)?;
+            let kb = int_expr_kind(b, bindings)?;
+            if ka == kb {
+                return Some(ka);
+            }
+            // 上下文整型字面量向另一侧收敛（与 check 的 expect 语义一致）
+            if kb == BindingKind::I64 && is_int_lit(b) {
+                return Some(ka);
+            }
+            if ka == BindingKind::I64 && is_int_lit(a) {
+                return Some(kb);
+            }
+            None
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -267,7 +371,8 @@ mod tests {
 
     #[test]
     fn non_string_let_is_rejected() {
-        assert!(err_of("fn main() { let x = 1 + 2; }").contains("非字符串"));
+        // L2b 起整型算术是受支持形态；本测试保留“非字符串、非 L2b 整型”的拒判面。
+        assert!(err_of("fn main() { let x = 1.0 + 2.0; }").contains("整型"));
     }
 
     #[test]

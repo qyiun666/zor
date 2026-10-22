@@ -12,8 +12,89 @@ pub struct LocalId(pub u32);
 pub enum Ty {
     Bytes(u64),
     I64,
+    U8,
+    U32,
     Box(Box<Ty>),
     Unit,
+}
+
+/// L2b codegen 的整型宽度（其余在册宽度由 lower fail-closed）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IntTy {
+    I64,
+    U8,
+    U32,
+}
+
+impl IntTy {
+    pub fn ir_ty(self) -> Ty {
+        match self {
+            IntTy::I64 => Ty::I64,
+            IntTy::U8 => Ty::U8,
+            IntTy::U32 => Ty::U32,
+        }
+    }
+
+    pub fn c_ty(self) -> &'static str {
+        match self {
+            IntTy::I64 => "int64_t",
+            IntTy::U8 => "uint8_t",
+            IntTy::U32 => "uint32_t",
+        }
+    }
+
+    pub fn is_signed(self) -> bool {
+        matches!(self, IntTy::I64)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ArithOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+}
+
+impl ArithOp {
+    pub fn symbol(self) -> &'static str {
+        match self {
+            ArithOp::Add => "+",
+            ArithOp::Sub => "-",
+            ArithOp::Mul => "*",
+            ArithOp::Div => "/",
+            ArithOp::Rem => "%",
+        }
+    }
+
+    pub fn checked_builtin(self) -> Option<&'static str> {
+        match self {
+            ArithOp::Add => Some("__builtin_add_overflow"),
+            ArithOp::Sub => Some("__builtin_sub_overflow"),
+            ArithOp::Mul => Some("__builtin_mul_overflow"),
+            ArithOp::Div | ArithOp::Rem => None,
+        }
+    }
+}
+
+/// 整型算术表达式树：操作数同宽（check 已判），节点带源位置。
+#[derive(Clone, Debug)]
+pub enum IntExpr {
+    Const(i128),
+    Local(LocalId),
+    Neg {
+        expr: Box<IntExpr>,
+        line: usize,
+        col: usize,
+    },
+    Bin {
+        op: ArithOp,
+        lhs: Box<IntExpr>,
+        rhs: Box<IntExpr>,
+        line: usize,
+        col: usize,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -49,6 +130,21 @@ pub enum Stmt {
     BindI64 {
         local: LocalId,
         value: i64,
+        line: usize,
+        col: usize,
+    },
+    /// `let x = <int 表达式>;`：i64／u8／u32 的算术结果（checked／wrap 见 emit）。
+    BindInt {
+        local: LocalId,
+        ty: IntTy,
+        expr: IntExpr,
+        line: usize,
+        col: usize,
+    },
+    /// 整型表达式语句（结果丢弃）：仍保留 checked 副作用。
+    EvalInt {
+        ty: IntTy,
+        expr: IntExpr,
         line: usize,
         col: usize,
     },

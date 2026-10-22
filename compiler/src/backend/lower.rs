@@ -7,7 +7,7 @@
 //! L2a：本模块实现 G-E-2（move／overwrite／Box 载荷）的状态机，产出显式 IR 事件；
 //! malloc／free／drop 的运行期生成归 `c::emit`，不在此处发生。
 
-use super::ir::{Func, Local, LocalId, Program, Stmt, StrArg, Ty};
+use super::ir::{ArithOp, Func, IntExpr, IntTy, Local, LocalId, Program, Stmt, StrArg, Ty};
 use super::subset::{self, SubsetError};
 use crate::parser::{Ex, Lit, Prog, St, Ty as AstTy};
 use crate::type_table::{self, TypeTable};
@@ -34,7 +34,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
         let mut last_pos = f.span;
         for st in &f.body.stmts {
             match st {
-                St::Let(name, None, init, l, c) => {
+                St::Let(name, _ann, init, l, c) => {
                     last_pos = (*l, *c);
                     let id = LocalId(locals.len() as u32);
                     let local_ty = let_type(types, init, *l, *c)?;
@@ -63,15 +63,21 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             body.push(Stmt::BindBox { local: id, value, line: *l, col: *c });
                             slots.push(Slot { ty: local_ty, live: true });
                         }
-                        Ex::Lit(Lit::Int(v), _, _) => {
-                            if local_ty != Ty::I64 {
-                                return Err(SubsetError::new(*l, *c, "lower：整型绑定类型非 i64"));
+                        Ex::Lit(Lit::Int(v), il, ic) => match &local_ty {
+                            Ty::I64 => {
+                                let value = i64::try_from(*v)
+                                    .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i64"))?;
+                                body.push(Stmt::BindI64 { local: id, value, line: *l, col: *c });
+                                slots.push(Slot { ty: Ty::I64, live: true });
                             }
-                            let value = i64::try_from(*v)
-                                .map_err(|_| SubsetError::new(*l, *c, "lower：整型字面量超出 i64"))?;
-                            body.push(Stmt::BindI64 { local: id, value, line: *l, col: *c });
-                            slots.push(Slot { ty: Ty::I64, live: true });
-                        }
+                            Ty::U8 | Ty::U32 => {
+                                let ty = ir_int_ty(&local_ty).expect("u8/u32");
+                                let expr = IntExpr::Const(int_const(v, ty, init)?);
+                                body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
+                                slots.push(Slot { ty: local_ty, live: true });
+                            }
+                            _ => return Err(SubsetError::new(*l, *c, "lower：整型绑定类型不在 L2b codegen 子集")),
+                        },
                         Ex::Deref(base, dl, dc) => {
                             if local_ty != Ty::I64 {
                                 return Err(SubsetError::new(*l, *c, "lower：解引用结果类型非 i64"));
@@ -91,14 +97,39 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                         }
                         Ex::Path(n, nl, nc) => {
                             let src = lookup(&scope, n, *nl, *nc)?;
-                            if !matches!(local_ty, Ty::Box(_)) {
+                            if matches!(local_ty, Ty::Box(_)) {
+                                if slots.get(src.0 as usize).map(|s| &s.ty) != Some(&local_ty) {
+                                    return Err(SubsetError::new(*nl, *nc, "lower：移动源类型与目标不符"));
+                                }
+                                body.push(Stmt::MoveAssign { dst: id, src, line: *nl, col: *nc });
+                                set_live(&mut slots, src, false);
+                                slots.push(Slot { ty: local_ty, live: true });
+                            } else if let Some(ty) = ir_int_ty(&local_ty) {
+                                if slots.get(src.0 as usize).map(|s| &s.ty) != Some(&local_ty) {
+                                    return Err(SubsetError::new(*nl, *nc, "lower：整型拷贝源类型与目标不符"));
+                                }
+                                body.push(Stmt::BindInt {
+                                    local: id,
+                                    ty,
+                                    expr: IntExpr::Local(src),
+                                    line: *nl,
+                                    col: *nc,
+                                });
+                                slots.push(Slot { ty: local_ty, live: true });
+                            } else {
                                 return Err(SubsetError::new(*nl, *nc, "lower：移动目标类型非 Box"));
                             }
-                            if slots.get(src.0 as usize).map(|s| &s.ty) != Some(&local_ty) {
-                                return Err(SubsetError::new(*nl, *nc, "lower：移动源类型与目标不符"));
-                            }
-                            body.push(Stmt::MoveAssign { dst: id, src, line: *nl, col: *nc });
-                            set_live(&mut slots, src, false);
+                        }
+                        Ex::Bin(..) | Ex::Un(..) => {
+                            let ty = ir_int_ty(&local_ty).ok_or_else(|| {
+                                SubsetError::new(
+                                    *l,
+                                    *c,
+                                    "lower：算术绑定类型不在 L2b codegen 子集（仅 i64／u8／u32）",
+                                )
+                            })?;
+                            let expr = lower_int_expr(init, ty, types, &slots, &scope)?;
+                            body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
                             slots.push(Slot { ty: local_ty, live: true });
                         }
                         other => {
@@ -157,6 +188,31 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                     }
                     body.push(Stmt::Unbox { local: id, line: *ul, col: *uc });
                     set_live(&mut slots, id, false);
+                }
+                St::Expr(Some(e @ (Ex::Bin(..) | Ex::Un(..))), l, c) => {
+                    last_pos = (*l, *c);
+                    let t = types.expr_ty(e).ok_or_else(|| {
+                        SubsetError::new(*l, *c, "lower：算术语句缺少 type table 记录")
+                    })?;
+                    let irt = ast_to_ir(t).ok_or_else(|| {
+                        SubsetError::new(
+                            *l,
+                            *c,
+                            "lower：算术语句类型不在 L2b codegen 子集（仅 i64／u8／u32）",
+                        )
+                    })?;
+                    let ty = ir_int_ty(&irt).ok_or_else(|| {
+                        SubsetError::new(
+                            *l,
+                            *c,
+                            "lower：算术语句类型不在 L2b codegen 子集（仅 i64／u8／u32）",
+                        )
+                    })?;
+                    if matches!(e, Ex::Un(..)) && ty != IntTy::I64 {
+                        return Err(SubsetError::new(*l, *c, "lower：无符号一元 '-' 不在 L2b codegen 子集"));
+                    }
+                    let expr = lower_int_expr(e, ty, types, &slots, &scope)?;
+                    body.push(Stmt::EvalInt { ty, expr, line: *l, col: *c });
                 }
                 St::Assign(lhs, rhs, l, c) => {
                     last_pos = (*l, *c);
@@ -265,7 +321,7 @@ fn let_type(types: &TypeTable, init: &Ex, l: usize, c: usize) -> Result<Ty, Subs
         .let_ty(l, c)
         .ok_or_else(|| SubsetError::new(l, c, "lower：let 缺少 type table 记录"))?;
     let ir = ast_to_ir(t)
-        .ok_or_else(|| SubsetError::new(l, c, format!("lower：let 类型 '{}' 不在 L2a 子集", t.display())))?;
+        .ok_or_else(|| SubsetError::new(l, c, format!("lower：let 类型 '{}' 不在 L2b codegen 子集", t.display())))?;
     let init_t = types
         .expr_ty(init)
         .ok_or_else(|| SubsetError::new(l, c, "lower：let 初值缺少 type table 记录"))?;
@@ -294,10 +350,101 @@ fn ast_to_ir(t: &AstTy) -> Option<Ty> {
     match t {
         AstTy::Arr(elem, n) if matches!(elem.as_ref(), AstTy::Prim("byte")) => Some(Ty::Bytes(*n)),
         AstTy::Prim("i64") => Some(Ty::I64),
+        AstTy::Prim("u8") => Some(Ty::U8),
+        AstTy::Prim("u32") => Some(Ty::U32),
         AstTy::BoxTy(inner) if matches!(inner.as_ref(), AstTy::Prim("i64")) => {
             Some(Ty::Box(Box::new(Ty::I64)))
         }
         _ => None,
+    }
+}
+
+fn ir_int_ty(t: &Ty) -> Option<IntTy> {
+    match t {
+        Ty::I64 => Some(IntTy::I64),
+        Ty::U8 => Some(IntTy::U8),
+        Ty::U32 => Some(IntTy::U32),
+        _ => None,
+    }
+}
+
+fn int_const(v: &u128, ty: IntTy, e: &Ex) -> Result<i128, SubsetError> {
+    let (l, c) = subset::expr_span(e);
+    let n = i128::try_from(*v)
+        .map_err(|_| SubsetError::new(l, c, "lower：整型字面量超出 i128"))?;
+    let fits = match ty {
+        IntTy::I64 => n <= i64::MAX as i128,
+        IntTy::U8 => n <= u8::MAX as i128,
+        IntTy::U32 => n <= u32::MAX as i128,
+    };
+    if fits {
+        Ok(n)
+    } else {
+        Err(SubsetError::new(l, c, "lower：整型字面量超出声明宽度"))
+    }
+}
+
+fn arith_op(op: &str) -> Option<ArithOp> {
+    match op {
+        "+" => Some(ArithOp::Add),
+        "-" => Some(ArithOp::Sub),
+        "*" => Some(ArithOp::Mul),
+        "/" => Some(ArithOp::Div),
+        "%" => Some(ArithOp::Rem),
+        _ => None,
+    }
+}
+
+/// 算术表达式降级：类型唯一来源仍是 TypeTable；每个节点与期望宽度交叉核对。
+fn lower_int_expr(
+    e: &Ex,
+    ty: IntTy,
+    types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
+) -> Result<IntExpr, SubsetError> {
+    let (el, ec) = subset::expr_span(e);
+    let recorded = types.expr_ty(e).ok_or_else(|| {
+        SubsetError::new(el, ec, "lower：算术节点缺少 type table 记录")
+    })?;
+    if ast_to_ir(recorded) != Some(ty.ir_ty()) {
+        return Err(SubsetError::new(
+            el,
+            ec,
+            format!("lower：算术节点类型 '{}' 与期望 '{}' 不符", recorded.display(), ty.c_ty()),
+        ));
+    }
+    match e {
+        Ex::Lit(Lit::Int(v), _, _) => Ok(IntExpr::Const(int_const(v, ty, e)?)),
+        Ex::Path(n, nl, nc) => {
+            let id = lookup(scope, n, *nl, *nc)?;
+            if slots.get(id.0 as usize).map(|s| &s.ty) != Some(&ty.ir_ty()) {
+                return Err(SubsetError::new(*nl, *nc, "lower：算术操作数与绑定类型不符"));
+            }
+            Ok(IntExpr::Local(id))
+        }
+        Ex::Un(op, inner, l, c) if op == "-" => {
+            if ty != IntTy::I64 {
+                return Err(SubsetError::new(*l, *c, "lower：无符号一元 '-' 不在 L2b codegen 子集"));
+            }
+            let inner = lower_int_expr(inner, ty, types, slots, scope)?;
+            Ok(IntExpr::Neg { expr: Box::new(inner), line: *l, col: *c })
+        }
+        Ex::Bin(op, a, b, l, c) => {
+            let op = arith_op(op).ok_or_else(|| {
+                SubsetError::new(*l, *c, format!("lower：算术运算符 '{}' 不在 L2b 子集", op))
+            })?;
+            let lhs = lower_int_expr(a, ty, types, slots, scope)?;
+            let rhs = lower_int_expr(b, ty, types, slots, scope)?;
+            Ok(IntExpr::Bin {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                line: *l,
+                col: *c,
+            })
+        }
+        _ => Err(SubsetError::new(el, ec, "lower：算术操作数形态不在 L2b 子集")),
     }
 }
 
@@ -315,7 +462,7 @@ fn int_lit(e: &Ex) -> Result<i64, SubsetError> {
 #[cfg(test)]
 mod tests {
     use super::lower;
-    use crate::backend::ir::{LocalId, Stmt, StrArg, Ty};
+    use crate::backend::ir::{ArithOp, IntExpr, IntTy, LocalId, Stmt, StrArg, Ty};
     use crate::type_table::TypeTable;
     use crate::compile_typed;
 
@@ -491,5 +638,45 @@ mod tests {
         assert_eq!(b.len(), 2, "{b:?}");
         assert!(matches!(b[0], Stmt::BindBox { .. }));
         assert!(matches!(b[1], Stmt::ScopeExit { .. }));
+    }
+
+    // —— L2b 整型算术 ——
+
+    #[test]
+    fn u8_annotation_and_arithmetic_lower_to_bind_int() {
+        let p = ir("fn main() {\n    let a: u8 = 250;\n    let c = a + 10;\n}\n");
+        assert_eq!(p.funcs[0].locals[0].ty, Ty::U8);
+        assert_eq!(p.funcs[0].locals[1].ty, Ty::U8);
+        match &p.funcs[0].body[1] {
+            Stmt::BindInt { ty, expr: IntExpr::Bin { op: ArithOp::Add, .. }, .. } => {
+                assert_eq!(*ty, IntTy::U8);
+            }
+            other => panic!("expected BindInt(u8 add), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unsupported_width_fails_closed_before_codegen() {
+        let c = compile_typed("fn main() {\n    let a: i8 = 127;\n    let c = a + 1;\n}\n");
+        assert!(c.diags.is_empty(), "{:?}", c.diags);
+        let e = lower(&c.prog, &c.types).expect_err("i8 must fail closed");
+        assert!(e.what.contains("i8") && e.what.contains("L2b"), "{}", e.what);
+    }
+
+    #[test]
+    fn bare_arithmetic_statement_lowers_to_eval_int() {
+        let b = body("fn main() {\n    let a = 1;\n    a + 1;\n}\n");
+        assert!(matches!(b[1], Stmt::EvalInt { ty: IntTy::I64, .. }), "{b:?}");
+    }
+
+    #[test]
+    fn unary_minus_lowers_to_neg_node() {
+        let b = body("fn main() {\n    let max = 9223372036854775807;\n    let c = -max - 2;\n}\n");
+        match &b[1] {
+            Stmt::BindInt { ty: IntTy::I64, expr: IntExpr::Bin { op: ArithOp::Sub, lhs, .. }, .. } => {
+                assert!(matches!(lhs.as_ref(), IntExpr::Neg { .. }), "{lhs:?}");
+            }
+            other => panic!("expected BindInt(Sub(Neg)), got {other:?}"),
+        }
     }
 }
