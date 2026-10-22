@@ -34,4 +34,4 @@
 ## L2b runtime-codes（0.3.1 起）
 - `bash ci/run_ci.sh --runtime-codes`：独立模式（不可与 `--strict／--asan／--bench` 组合），只执行宿主检查＋`stage_runtime_codes`，输出单段 `summary.txt`；baseline 七段、asan-linux 八段零改
 - job：`ubuntu-24.04`＋clang-18、timeout 20、无 sanitizer（rc=101 只在此判）；29 runtime＋6 width fail-closed＋8 CLI；artifact `runtime-codes-logs-<run_id>-<attempt>` 90 天；fail-closed F-RC-1～14，不得 SKIP／`continue-on-error`／重跑洗绿
-- 资产由 QA 提供：`tests/runtime/runtime-codes.tsv`、`width-failclosed.tsv`、`cli-cases.tsv`、`expected/`；缺件即 FAIL
+- 资产与判据脚本由 QA 提供：`tests/runtime/runtime-codes.tsv`、`width-failclosed.tsv`、`cli-cases.tsv`、`expected/`、`run_runtime_codes.sh`、`cc-capture`；`--runtime-codes` 直调 QA 脚本，CI 不自维护第二套判据；缺件即 FAIL

@@ -80,8 +80,6 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # 供 F-RC-14 对 base 新增文档行做 diff 检查
       - name: Build zorcc (release)
         working-directory: compiler
         run: cargo build --release
@@ -89,7 +87,6 @@ jobs:
         env:
           ZORC_BIN: ${{ github.workspace }}/compiler/target/release/zorcc
           CC: clang-18
-          RUNTIME_CODES_BASE_REF: ${{ github.event.pull_request.base.sha || 'origin/main' }}
         run: bash ci/run_ci.sh --runtime-codes
       - name: Upload runtime-codes evidence (ci/logs)
         if: always()

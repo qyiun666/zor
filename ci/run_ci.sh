@@ -662,19 +662,23 @@ stage_asan() { # L2a CI-01：宿主固定 + QA-01 ASAN/LSAN 脚本；fail-closed
   fi
 }
 
-stage_runtime_codes() { # L2b CI-01：独立 Linux job；无 sanitizer；fail-closed；单段 summary
+stage_runtime_codes() { # L2b CI-01：独立 Linux job；直调 QA 判据脚本；无 sanitizer；fail-closed
   local log; log="$(new_log runtime-codes)"
   local out="$LOG_DIR/runtime-codes"
   mkdir -p "$out"
+  if [ -z "$ZORC" ]; then
+    echo "zorcc 未安装：runtime-codes 判 FAIL（不可 SKIP 洗绿）" > "$log"
+    record runtime-codes FAIL 1 "$log"
+    return
+  fi
+  if [ ! -f tests/runtime/run_runtime_codes.sh ]; then
+    echo "runtime-codes 判据脚本缺失：tests/runtime/run_runtime_codes.sh（QA-01 未合入）" > "$log"
+    record runtime-codes FAIL 1 "$log"
+    return
+  fi
   local rc=0
-  ZORC="$ZORC" CC="${CC:-cc}" OUT_DIR="$out" \
-    RUNTIME_CODES_MANIFEST="${RUNTIME_CODES_MANIFEST:-tests/runtime/runtime-codes.tsv}" \
-    WIDTH_FAILCLOSED_MANIFEST="${WIDTH_FAILCLOSED_MANIFEST:-tests/runtime/width-failclosed.tsv}" \
-    CLI_CASES_MANIFEST="${CLI_CASES_MANIFEST:-tests/runtime/cli-cases.tsv}" \
-    RUNTIME_EXPECTED_DIR="${RUNTIME_EXPECTED_DIR:-tests/runtime/expected}" \
-    RUNTIME_CODES_BASE_REF="${RUNTIME_CODES_BASE_REF:-origin/main}" \
-    RUNTIME_CODES_CLI_SRC="${RUNTIME_CODES_CLI_SRC:-tests/runtime/cases/l2b/no-overflow-ops-o0.zor}" \
-    bash ci/runtime-codes/run_runtime_codes.sh >>"$log" 2>&1 || rc=$?
+  CC="${CC:-cc}" ZORC_BIN="$ZORC" OUT_DIR="$out" \
+    bash tests/runtime/run_runtime_codes.sh --strict --out "$out" --zorc "$ZORC" >>"$log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "[runtime-codes] 判定=PASS" >> "$log"
     record runtime-codes PASS 0 "$log"
