@@ -1,0 +1,4 @@
+fn main() {
+    let a: i16 = 32767;
+    let c: i16 = a + 1;
+}

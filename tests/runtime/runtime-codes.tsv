@@ -1,0 +1,30 @@
+case_id	source_path	opt	overflow	extra_flags	expect_rc	expect_code	expect_stdout_sha256	kind	notes
+e3001-add-o0	tests/runtime/cases/l2b/e3001-add-o0.zor	O0	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	i64 checked add
+e3001-sub-o0	tests/runtime/cases/l2b/e3001-sub-o0.zor	O0	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	i64 checked sub
+e3001-mul-o0	tests/runtime/cases/l2b/e3001-mul-o0.zor	O0	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	i64 checked mul
+e3001-min-div-neg1-o0	tests/runtime/cases/l2b/e3001-min-div-neg1-o0.zor	O0	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	MIN / -1
+e3001-const-add-o0	tests/runtime/cases/l2b/e3001-const-add-o0.zor	O0	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	const max+1 checked
+e3002-div-zero-o0	tests/runtime/cases/l2b/e3002-div-zero-o0.zor	O0	check		101	E3002	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	runtime-error	i64 div zero
+e3002-mod-zero-o0	tests/runtime/cases/l2b/e3002-mod-zero-o0.zor	O0	check		101	E3002	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	runtime-error	i64 mod zero
+e3001-flush-o0	tests/runtime/cases/l2b/e3001-flush-o0.zor	O0	check		101	E3001	9160d4be34c8695bd172a76c7c7966587ea5a4d991ad22c87b2b91af54aa9ebb	checked	stdout flush
+e3001-wrap-o2	tests/runtime/cases/l2b/e3001-wrap-o2.zor	O2	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	O2 wrap
+e3001-wrap-default	tests/runtime/cases/l2b/e3001-wrap-default.zor	default	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	default wrap
+e3001-wrap-o0-explicit	tests/runtime/cases/l2b/e3001-wrap-o0-explicit.zor	O0	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	O0 explicit wrap
+e3001-check-o2-explicit	tests/runtime/cases/l2b/e3001-check-o2-explicit.zor	O2	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	O2 explicit check
+no-overflow-ops-o0	tests/runtime/cases/l2b/no-overflow-ops-o0.zor	O0	none		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	control	i64 no overflow
+no-overflow-ops-o2	tests/runtime/cases/l2b/no-overflow-ops-o2.zor	O2	none		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	control	i64 no overflow O2
+min-mod-neg1-o0	tests/runtime/cases/l2b/min-mod-neg1-o0.zor	O0	check		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	MIN%-1=0
+e3001-g-o0	tests/runtime/cases/l2b/e3001-g-o0.zor	O0	check	-g	101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	-g checked
+e3001-g-o2	tests/runtime/cases/l2b/e3001-g-o2.zor	O2	wrap	-g	0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	-g wrap
+e3001-u8-add-o0	tests/runtime/cases/l2b/e3001-u8-add-o0.zor	O0	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	u8 checked add
+e3001-u8-sub-o0	tests/runtime/cases/l2b/e3001-u8-sub-o0.zor	O0	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	u8 checked sub
+e3001-u8-mul-o0	tests/runtime/cases/l2b/e3001-u8-mul-o0.zor	O0	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	u8 checked mul
+e3001-u8-wrap-o2	tests/runtime/cases/l2b/e3001-u8-wrap-o2.zor	O2	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	u8 wrap O2
+e3001-u8-wrap-o0-explicit	tests/runtime/cases/l2b/e3001-u8-wrap-o0-explicit.zor	O0	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	u8 explicit wrap
+e3001-u32-add-o0	tests/runtime/cases/l2b/e3001-u32-add-o0.zor	O0	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	u32 checked add
+e3001-u32-wrap-o2	tests/runtime/cases/l2b/e3001-u32-wrap-o2.zor	O2	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	u32 wrap O2
+e3002-u8-div-zero-o0	tests/runtime/cases/l2b/e3002-u8-div-zero-o0.zor	O0	check		101	E3002	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	runtime-error	u8 div zero
+e3002-u32-mod-zero-o2	tests/runtime/cases/l2b/e3002-u32-mod-zero-o2.zor	O2	wrap		101	E3002	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	runtime-error	u32 mod zero O2
+no-overflow-unsigned-o0	tests/runtime/cases/l2b/no-overflow-unsigned-o0.zor	O0	none		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	control	unsigned no overflow
+e3001-const-add-o2	tests/runtime/cases/l2b/e3001-const-add-o2.zor	O2	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	const max+1 wrap
+e3002-const-div-zero-o2	tests/runtime/cases/l2b/e3002-const-div-zero-o2.zor	O2	wrap		101	E3002	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	runtime-error	const div zero O2

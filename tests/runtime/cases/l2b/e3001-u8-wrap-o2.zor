@@ -1,0 +1,4 @@
+fn main() {
+    let a: u8 = 250;
+    let c: u8 = a + 10;
+}

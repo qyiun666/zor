@@ -1,0 +1,9 @@
+fn main() {
+    let a: i64 = 6;
+    let b: i64 = 2;
+    let c: i64 = a + b;
+    let d: i64 = a - b;
+    let e: i64 = a * b;
+    let f: i64 = a / b;
+    let g: i64 = a % b;
+}

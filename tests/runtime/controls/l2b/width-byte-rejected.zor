@@ -1,0 +1,4 @@
+fn main() {
+    let a: byte = 255;
+    let c: byte = a + 1;
+}

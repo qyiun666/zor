@@ -1,0 +1,9 @@
+case_id	args	expect_rc	expect_artifact	expect_stdout_not_contains	expect_stderr_contains	notes
+zoverflow-invalid	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -Zoverflow=bogus	2	none	-	-Zoverflow	invalid overflow value
+zoverflow-empty	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -Zoverflow=	2	none	-	-Zoverflow	empty overflow value
+zoverflow-check-mode	tests/runtime/cases/l2b/e3001-add-o0.zor -Zoverflow=check	0	none	-	-	compile-only accepted
+og-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -Og	2	none	-	未知选项	Og rejected
+o1-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -O1	2	none	-	未知选项	O1 rejected
+o3-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -O3	2	none	-	未知选项	O3 rejected
+os-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -Os	2	none	-	未知选项	Os rejected
+usage-no-internal-flag		2	none	-Zoverflow	usage: zorcc	no-arg usage

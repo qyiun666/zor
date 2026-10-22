@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# tests/runtime/cc-capture — QA 证据 wrapper：捕获 zorcc 生成的临时 C，再调用真实 CC。
+# 仅由 run_runtime_codes.sh 使用；不改变编译参数与编译器行为。
+set -uo pipefail
+if [ -n "${ZOR_CAPTURE_DIR:-}" ]; then
+  mkdir -p "$ZOR_CAPTURE_DIR" 2>/dev/null || true
+  for a in "$@"; do
+    case "$a" in
+      *.c)
+        if [ -f "$a" ]; then
+          cp "$a" "$ZOR_CAPTURE_DIR/out.c" 2>/dev/null || true
+        fi
+        ;;
+    esac
+  done
+fi
+exec "${ZOR_REAL_CC:-cc}" "$@"
