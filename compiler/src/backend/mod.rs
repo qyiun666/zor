@@ -18,10 +18,27 @@ pub enum OptLevel {
     O2,
 }
 
+/// 算术模式：`-O0` 缺省 checked；`-O2`／缺省 wrap；`-Zoverflow` 显式覆盖。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OverflowMode {
+    Check,
+    Wrap,
+}
+
+impl OverflowMode {
+    pub fn from_opt(opt: OptLevel) -> Self {
+        match opt {
+            OptLevel::O0 => OverflowMode::Check,
+            OptLevel::O2 => OverflowMode::Wrap,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BuildOptions {
     pub opt: OptLevel,
     pub debug: bool,
+    pub overflow: OverflowMode,
 }
 
 impl Default for BuildOptions {
@@ -29,6 +46,7 @@ impl Default for BuildOptions {
         BuildOptions {
             opt: OptLevel::O2,
             debug: false,
+            overflow: OverflowMode::Wrap,
         }
     }
 }
@@ -94,9 +112,61 @@ pub fn build(
             msg: format!("输出路径与源文件相同：'{}'", output.display()),
         });
     }
-    let c_src = c::emit::emit(&ir, source_str);
-    c::cc::compile(&c_src, output, opts.opt, opts.debug)
+    let c_src = c::emit::emit(&ir, source_str, opts.overflow);
+    let runtime_dir = if c_src.contains("#include \"zor_rt.h\"") {
+        Some(resolve_runtime_dir()?)
+    } else {
+        None
+    };
+    c::cc::compile(&c_src, output, opts, runtime_dir.as_deref())
         .map_err(|msg| BuildError::Toolchain { msg })
+}
+
+/// 运行期 helper 定位：环境变量优先；否则按可执行文件／仓根候选查找。
+/// 缺件即 rc=2（Toolchain），不得退化为编译成功但链接失败。
+fn resolve_runtime_dir() -> Result<std::path::PathBuf, BuildError> {
+    use std::path::PathBuf;
+
+    fn valid(dir: &Path) -> bool {
+        dir.join("zor_rt.c").is_file() && dir.join("zor_rt.h").is_file()
+    }
+
+    if let Ok(v) = std::env::var("ZOR_RUNTIME_DIR") {
+        let dir = PathBuf::from(v);
+        if valid(&dir) {
+            return Ok(dir);
+        }
+        return Err(BuildError::Toolchain {
+            msg: format!(
+                "ZOR_RUNTIME_DIR='{}' 缺少 zor_rt.c／zor_rt.h",
+                dir.display()
+            ),
+        });
+    }
+
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("runtime"));
+            candidates.push(dir.join("../runtime"));
+            candidates.push(dir.join("../../runtime"));
+            candidates.push(dir.join("../../../runtime"));
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("runtime"));
+    }
+    candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../runtime"));
+
+    for dir in candidates {
+        if valid(&dir) {
+            return Ok(dir);
+        }
+    }
+    Err(BuildError::Toolchain {
+        msg: "找不到运行期 helper runtime/zor_rt.{c,h}；请设置 ZOR_RUNTIME_DIR"
+            .to_string(),
+    })
 }
 
 fn same_file(source: &Path, output: &Path) -> bool {
@@ -124,7 +194,7 @@ fn same_file(source: &Path, output: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{build, BuildOptions};
+    use super::{build, BuildOptions, OverflowMode};
     use crate::compile_typed;
     use std::path::Path;
 
@@ -161,7 +231,7 @@ mod tests {
         let c = compile_typed("fn main() { let s = \"hi\"; println(s); }");
         assert!(c.diags.is_empty(), "{:?}", c.diags);
         let ir = super::lower::lower(&c.prog, &c.types).expect("lower");
-        let src = super::c::emit::emit(&ir, "t.zor");
+        let src = super::c::emit::emit(&ir, "t.zor", OverflowMode::Wrap);
         assert!(!src.contains("malloc"), "{src}");
         assert!(!src.contains("free("), "{src}");
     }

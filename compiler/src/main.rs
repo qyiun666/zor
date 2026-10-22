@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::process::exit;
 
-use zorcc::backend::{BuildOptions, OptLevel};
+use zorcc::backend::{BuildOptions, OptLevel, OverflowMode};
 
 #[derive(Debug, PartialEq, Eq)]
 enum Cli {
@@ -16,12 +16,13 @@ enum Cli {
         out: String,
         opt: OptLevel,
         debug: bool,
+        overflow: OverflowMode,
     },
 }
 
 /// C-1 白名单（冻结件 §〇-3／§三 C-1 逐字照录）：仍为接受。
-/// `-O0`／`-O2`／`-g` 在构建模式实映射到 C 编译器；`-Zoverflow=*` 首片接受并忽略（溢出归 L2）。
-/// 这些是 ci/run_ci.sh:30-31 的在册注入位与 ASAN 判据句要求，非本窗用户 CLI 契约。
+/// `-O0`／`-O2`／`-g` 在构建模式实映射到 C 编译器；`-Zoverflow=*` 是 L2b 内部／CI 位，
+/// 仅接受 check／wrap，不进 help／用户文档。这些是 ci/run_ci.sh 的在册注入位与 ASAN 判据句要求。
 fn is_whitelisted_flag(f: &str) -> bool {
     matches!(
         f,
@@ -39,6 +40,7 @@ fn parse_cli(args: &[String]) -> Result<Cli, String> {
     let mut out: Option<String> = None;
     let mut opt = OptLevel::O2;
     let mut debug = false;
+    let mut overflow_explicit: Option<OverflowMode> = None;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         if a == "-o" {
@@ -73,12 +75,20 @@ fn parse_cli(args: &[String]) -> Result<Cli, String> {
                 "-O0" => opt = OptLevel::O0,
                 "-O2" => opt = OptLevel::O2,
                 "-g" => debug = true,
+                "-Zoverflow=check" => overflow_explicit = Some(OverflowMode::Check),
+                "-Zoverflow=wrap" => overflow_explicit = Some(OverflowMode::Wrap),
                 _ => {}
             }
             continue;
         }
+        if a.starts_with("-Zoverflow") {
+            return Err(format!(
+                "未知选项 '{a}'：'-Zoverflow' 仅接受 'check' 或 'wrap'（内部／CI 位，不对外）"
+            ));
+        }
         return Err(format!("未知选项 '{a}'：不在本窗白名单内，不予静默接受"));
     }
+    let overflow = overflow_explicit.unwrap_or_else(|| OverflowMode::from_opt(opt));
     match (positional.len(), out) {
         (0, _) => Ok(Cli::Usage),
         (1, None) => Ok(Cli::Compile(positional[0].to_string())),
@@ -87,6 +97,7 @@ fn parse_cli(args: &[String]) -> Result<Cli, String> {
             out: o,
             opt,
             debug,
+            overflow,
         }),
         (n, _) => Err(format!(
             "只接受一个源文件，收到 {n} 枚：{}（第二枚起显式拒判，静默丢弃会漏检未检查的源文件）",
@@ -145,6 +156,7 @@ fn main() {
             out,
             opt,
             debug,
+            overflow,
         } => {
             let src = read_source(&path);
             let c = zorcc::compile_typed(&src);
@@ -154,7 +166,13 @@ fn main() {
             }
             let source = std::path::Path::new(&path);
             let output = std::path::Path::new(&out);
-            match zorcc::backend::build(&c.prog, &c.types, source, output, BuildOptions { opt, debug }) {
+            match zorcc::backend::build(
+                &c.prog,
+                &c.types,
+                source,
+                output,
+                BuildOptions { opt, debug, overflow },
+            ) {
                 Ok(()) => exit(0),
                 Err(e) => {
                     eprintln!("{}", e.render(source));
@@ -167,18 +185,19 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_cli, Cli, OptLevel};
+    use super::{parse_cli, Cli, OptLevel, OverflowMode};
 
     fn v(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
     }
 
-    fn build(src: &str, out: &str, opt: OptLevel, debug: bool) -> Cli {
+    fn build(src: &str, out: &str, opt: OptLevel, debug: bool, overflow: OverflowMode) -> Cli {
         Cli::Build {
             src: src.to_string(),
             out: out.to_string(),
             opt,
             debug,
+            overflow,
         }
     }
 
@@ -226,17 +245,17 @@ mod tests {
         ] {
             assert_eq!(
                 parse_cli(&argv),
-                Ok(build("a.zor", "out.bin", OptLevel::O2, false)),
+                Ok(build("a.zor", "out.bin", OptLevel::O2, false, OverflowMode::Wrap)),
                 "{argv:?}"
             );
         }
         assert_eq!(
             parse_cli(&v(&["-O0", "a.zor", "-o", "out.bin"])),
-            Ok(build("a.zor", "out.bin", OptLevel::O0, false))
+            Ok(build("a.zor", "out.bin", OptLevel::O0, false, OverflowMode::Check))
         );
         assert_eq!(
             parse_cli(&v(&["-g", "a.zor", "-o", "out.bin"])),
-            Ok(build("a.zor", "out.bin", OptLevel::O2, true))
+            Ok(build("a.zor", "out.bin", OptLevel::O2, true, OverflowMode::Wrap))
         );
     }
 
@@ -286,6 +305,73 @@ mod tests {
         assert!(matches!(parse_cli(&v(&["-O2"])), Ok(Cli::Usage)));
         assert!(matches!(parse_cli(&v(&["-Zoverflow=check"])), Ok(Cli::Usage)));
         assert!(matches!(parse_cli(&v(&["-o", "out.bin"])), Ok(Cli::Usage)));
+    }
+
+    /// L2b：非法 `-Zoverflow` 值一律 rc=2，且保留“未知选项＋仅接受”指名句。
+    #[test]
+    fn zoverflow_invalid_values_are_named_rc2_path() {
+        for f in [
+            "-Zoverflow",
+            "-Zoverflow=",
+            "-Zoverflow=CHECK",
+            "-Zoverflow=Wrap",
+            "-Zoverflow=check=wrap",
+            "-Zoverflow=bogus",
+        ] {
+            let e = parse_cli(&v(&["a.zor", "-o", "out", f])).unwrap_err();
+            assert!(e.contains("未知选项") && e.contains(f), "{f} → {e}");
+            assert!(e.contains("-Zoverflow") && e.contains("check") && e.contains("wrap"), "{f} → {e}");
+        }
+        // 非法值先出现时也不被后值覆盖
+        let e = parse_cli(&v(&["-Zoverflow=bogus", "-Zoverflow=check", "a.zor"])).unwrap_err();
+        assert!(e.contains("-Zoverflow"), "{e}");
+    }
+
+    /// L2b：合法重复 last-wins；显式覆盖与顺序无关；-O0/-O2 重复 last-wins。
+    #[test]
+    fn zoverflow_precedence_and_duplicate_semantics() {
+        assert_eq!(
+            parse_cli(&v(&["-Zoverflow=check", "-Zoverflow=wrap", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O2, false, OverflowMode::Wrap))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-Zoverflow=wrap", "-Zoverflow=check", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O2, false, OverflowMode::Check))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-Zoverflow=check", "-O2", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O2, false, OverflowMode::Check))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-O0", "-Zoverflow=wrap", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O0, false, OverflowMode::Wrap))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-O0", "-O2", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O2, false, OverflowMode::Wrap))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-O2", "-O0", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O0, false, OverflowMode::Check))
+        );
+    }
+
+    /// L2b：O-2 不扩白名单；-Og/-O1/-O3/-Os 即使伴随合法 -Zoverflow 也 rc=2。
+    #[test]
+    fn l2b_does_not_expand_opt_whitelist() {
+        for f in ["-Og", "-O1", "-O3", "-Os"] {
+            let e = parse_cli(&v(&[f, "-Zoverflow=check", "a.zor", "-o", "out"])).unwrap_err();
+            assert!(e.contains("未知选项") && e.contains(f), "{f} → {e}");
+        }
+    }
+
+    /// 版本短路在一切校验之前；L2b 不改 0.1.2 在册语义。
+    #[test]
+    fn version_short_circuit_precedes_zoverflow_validation() {
+        assert!(matches!(
+            parse_cli(&v(&["-V", "-Zoverflow=bogus"])),
+            Ok(Cli::Version)
+        ));
     }
 
     /// C-2：CLI 面诊断不占语言诊断码位（红线 2），也不写成 E1xxx/E2xxx 串。

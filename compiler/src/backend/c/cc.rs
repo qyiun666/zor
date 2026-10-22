@@ -3,7 +3,7 @@
 //! 安全纪律：`Command` 参数数组、不经 shell；临时件在目标同目录的独占临时目录内；
 //! 成功后 rename 原子发布；任何失败清理临时目录且不改动既有目标。
 
-use super::super::OptLevel;
+use super::super::{BuildOptions, OptLevel};
 use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -12,9 +12,12 @@ use std::process::Command;
 pub fn compile(
     c_source: &str,
     output: &Path,
-    opt: OptLevel,
-    debug: bool,
+    opts: BuildOptions,
+    runtime_dir: Option<&Path>,
 ) -> Result<(), String> {
+    if c_source.contains("#include \"zor_rt.h\"") && runtime_dir.is_none() {
+        return Err("生成 C 需要运行期 helper，但 runtime 目录未解析".to_string());
+    }
     let parent = output
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -30,7 +33,7 @@ pub fn compile(
     }
     let tmpdir = create_tmpdir(parent)
         .map_err(|e| format!("无法在输出目录创建临时件：{}", e))?;
-    let result = compile_in(&tmpdir, c_source, output, opt, debug);
+    let result = compile_in(&tmpdir, c_source, output, opts, runtime_dir);
     let _ = fs::remove_dir_all(&tmpdir);
     result
 }
@@ -39,8 +42,8 @@ fn compile_in(
     tmpdir: &Path,
     c_source: &str,
     output: &Path,
-    opt: OptLevel,
-    debug: bool,
+    opts: BuildOptions,
+    runtime_dir: Option<&Path>,
 ) -> Result<(), String> {
     let c_path = tmpdir.join("out.c");
     let bin_path = tmpdir.join("out.bin");
@@ -58,14 +61,20 @@ fn compile_in(
     let cc = cc_program();
     let mut cmd = Command::new(&cc);
     cmd.arg("-std=c11");
-    cmd.arg(match opt {
+    cmd.arg(match opts.opt {
         OptLevel::O0 => "-O0",
         OptLevel::O2 => "-O2",
     });
-    if debug {
+    if opts.debug {
         cmd.arg("-g");
     }
+    if let Some(dir) = runtime_dir {
+        cmd.arg("-I").arg(dir);
+    }
     cmd.arg("-o").arg(&bin_path).arg(&c_path);
+    if let Some(dir) = runtime_dir {
+        cmd.arg(dir.join("zor_rt.c"));
+    }
 
     let out = cmd
         .output()
