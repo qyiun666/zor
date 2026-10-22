@@ -187,15 +187,21 @@ fn struct_source_is_rejected_and_leaves_no_artifact() {
 }
 
 #[test]
-fn non_string_println_is_rejected_by_subset() {
+fn int_println_builds_and_prints_decimal() {
     let d = TempDir::new("printint");
-    let src = write(d.path(), "p.zor", "fn main() {\n    println(42);\n}\n");
+    let src = write(d.path(), "p.zor", "fn main() {\n    println(42, -7, true);\n}\n");
     let out = d.path().join("p");
     let o = run(&[src.to_str().unwrap(), "-o", out.to_str().unwrap()]);
-    assert_eq!(o.status.code(), Some(1));
-    let err = String::from_utf8_lossy(&o.stderr);
-    assert!(err.contains("zorcc: codegen:") && err.contains("首片不支持"), "{err}");
-    assert!(!out.exists());
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let r = Command::new(&out).output().expect("run artifact");
+    assert_eq!(r.status.code(), Some(0));
+    assert_eq!(r.stdout, b"42 -7 true\n");
+    assert!(r.stderr.is_empty(), "{:?}", r.stderr);
 }
 
 #[test]

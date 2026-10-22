@@ -4,6 +4,7 @@
 //! 首片只有 C 后端；未来后端在同一 IR 接口后追加，不重写前端。
 
 pub mod c;
+pub mod float_fmt;
 pub mod ir;
 pub mod lower;
 pub mod subset;

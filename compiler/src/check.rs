@@ -562,11 +562,49 @@ impl<'a> Ck<'a> {
             }
             Ex::Bin(op, a, b, l, c) => self.check_bin(op, a, b, *l, *c, env),
             Ex::Un(op, a, l, c) => {
-                let t = self.check_expr(a, None, env);
                 match op.as_str() {
-                    "-" => { if !t.is_num() && t != Ty::Bad { self.d("E1201", *l, *c, format!("一元 '-' 要求数值类型，实际 '{}'", t.display())); } t }
-                    "!" => { if !t.is_bool() && t != Ty::Bad { self.d("E1201", *l, *c, format!("'!' 要求 bool，实际 '{}'", t.display())); } Ty::Prim("bool") }
-                    _ => t,
+                    "-" => {
+                        // L2c：负字面量按期望宽度收敛（含补码最小值），不新增 E 码。
+                        if let Ex::Lit(Lit::Int(v), ll, lc) = a.as_ref() {
+                            let target: Option<Ty> = match expect {
+                                Some(Ty::Prim(p)) if int_bits(p).is_some() => Some(Ty::Prim(*p)),
+                                Some(Ty::Bad) => Some(Ty::Bad),
+                                None => Some(Ty::Prim("i64")),
+                                Some(_) => None,
+                            };
+                            if let Some(t) = target {
+                                if let Ty::Prim(p) = &t {
+                                    if int_bits(p).is_some() && !neg_int_fits(p, *v) {
+                                        self.d(
+                                            "E1201",
+                                            *ll,
+                                            *lc,
+                                            format!("字面量 -{} 超出 '{}' 范围", v, p),
+                                        );
+                                    }
+                                }
+                                self.types.insert_expr(a, t.clone());
+                                return t;
+                            }
+                        }
+                        if let Ex::Lit(Lit::Float(_), _, _) = a.as_ref() {
+                            if let Some(Ty::Prim(p)) = expect {
+                                if matches!(*p, "f32" | "f64") {
+                                    let t = Ty::Prim(*p);
+                                    self.check_expr(a, Some(&t), env);
+                                    return t;
+                                }
+                            }
+                            return self.check_expr(a, None, env);
+                        }
+                        let t = self.check_expr(a, expect.filter(|x| x.is_num()), env);
+                        if !t.is_num() && t != Ty::Bad {
+                            self.d("E1201", *l, *c, format!("一元 '-' 要求数值类型，实际 '{}'", t.display()));
+                        }
+                        t
+                    }
+                    "!" => { let t = self.check_expr(a, None, env); if !t.is_bool() && t != Ty::Bad { self.d("E1201", *l, *c, format!("'!' 要求 bool，实际 '{}'", t.display())); } Ty::Prim("bool") }
+                    _ => self.check_expr(a, None, env),
                 }
             }
             Ex::Deref(base, l, c) => {
@@ -999,6 +1037,18 @@ fn fits_int(p: &str, v: u128) -> bool {
         "i8" => v <= 127, "i16" => v <= 32767, "i32" => v <= i32::MAX as u128, "i64" => v <= i64::MAX as u128,
         "u8" | "byte" => v <= u8::MAX as u128, "u16" => v <= u16::MAX as u128, "u32" => v <= u32::MAX as u128, "u64" => v <= u64::MAX as u128,
         _ => true,
+    }
+}
+
+/// 前缀一元 `-` 的字面量范围：有符号类型允许补码最小值；无符号仅允许 `-0`。
+fn neg_int_fits(p: &str, v: u128) -> bool {
+    match p {
+        "i8" => v <= 128,
+        "i16" => v <= 32768,
+        "i32" => v <= (i32::MAX as u128) + 1,
+        "i64" => v <= (i64::MAX as u128) + 1,
+        "u8" | "u16" | "u32" | "u64" | "byte" => v == 0,
+        _ => false,
     }
 }
 

@@ -7,7 +7,9 @@
 use std::collections::HashMap;
 use std::fmt::Write as _;
 
-use super::super::ir::{ArithOp, Func, IntExpr, IntTy, LocalId, Program, Stmt, StrArg};
+use super::super::ir::{
+    ArithOp, Func, IntExpr, IntTy, LocalId, PrintArg, Program, Stmt, StrArg,
+};
 use crate::backend::OverflowMode;
 
 pub fn emit(prog: &Program, source_path: &str, overflow: OverflowMode) -> String {
@@ -29,9 +31,17 @@ pub fn emit(prog: &Program, source_path: &str, overflow: OverflowMode) -> String
 
 fn prog_uses_int_arith(prog: &Program) -> bool {
     prog.funcs.iter().any(|f| {
-        f.body
-            .iter()
-            .any(|s| matches!(s, Stmt::BindInt { .. } | Stmt::EvalInt { .. }))
+        f.body.iter().any(|s| match s {
+            Stmt::BindInt { .. } | Stmt::EvalInt { .. } => true,
+            Stmt::Print { args, .. } => args.iter().any(|a| {
+                matches!(
+                    a,
+                    PrintArg::Int { expr, .. }
+                        if !matches!(expr, IntExpr::Const(_) | IntExpr::Local(_))
+                )
+            }),
+            _ => false,
+        })
     })
 }
 
@@ -97,7 +107,7 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
     let _ = writeln!(out, "#line {} \"{}\"", f.line.max(1), src);
     let _ = writeln!(out, "int {cname}(void) {{");
 
-    // 预扫分配标签，保证 Println 引用的数组必然已声明。
+    // 预扫分配标签，保证 Print 引用的数组必然已声明。
     let mut labels: HashMap<LocalId, (String, usize)> = HashMap::new();
     let mut counter = 0usize;
     for st in &f.body {
@@ -126,26 +136,52 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
                     emit_array(out, label, bytes);
                 }
             }
-            Stmt::Println { arg, line, .. } => {
+            Stmt::Print { args, newline, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
-                match arg {
-                    StrArg::Local(id) => {
-                        if let Some((label, len)) = labels.get(id) {
-                            let _ = writeln!(out, "    fwrite({label}, 1, {len}, stdout);");
-                            let _ = writeln!(out, "    fputc('\\n', stdout);");
+                // 原子性：先求值全部运行期实参（E30xx 在此终止，stdout 零字节），再统一写出。
+                enum Part {
+                    Bytes(String, usize),
+                    Int(IntTy, String),
+                }
+                let mut parts: Vec<Part> = Vec::with_capacity(args.len());
+                for arg in args {
+                    match arg {
+                        PrintArg::Int { ty, expr } => {
+                            let v = emit_int_expr(out, expr, *ty, overflow, &mut tmp_counter);
+                            parts.push(Part::Int(*ty, v));
+                        }
+                        PrintArg::Str(StrArg::Local(id)) => {
+                            let (label, len) = labels
+                                .get(id)
+                                .unwrap_or_else(|| panic!("missing string label for local {}", id.0));
+                            parts.push(Part::Bytes(label.clone(), *len));
+                        }
+                        PrintArg::Str(StrArg::Bytes(bytes)) | PrintArg::Bytes(bytes) => {
+                            let label = mangle("str", counter, "");
+                            counter += 1;
+                            emit_array(out, &label, bytes);
+                            parts.push(Part::Bytes(label, bytes.len()));
                         }
                     }
-                    StrArg::Bytes(bytes) => {
-                        let label = mangle("str", counter, "");
-                        counter += 1;
-                        emit_array(out, &label, bytes);
-                        let _ = writeln!(
-                            out,
-                            "    fwrite({label}, 1, {}, stdout);",
-                            bytes.len()
-                        );
-                        let _ = writeln!(out, "    fputc('\\n', stdout);");
+                }
+                for (i, part) in parts.iter().enumerate() {
+                    if i > 0 {
+                        out.push_str("    fputc(' ', stdout);\n");
                     }
+                    match part {
+                        Part::Bytes(label, len) => {
+                            let _ = writeln!(out, "    fwrite({label}, 1, {len}, stdout);");
+                        }
+                        Part::Int(IntTy::I64, v) => {
+                            let _ = writeln!(out, "    printf(\"%lld\", (long long)({}));", v);
+                        }
+                        Part::Int(IntTy::U8, v) | Part::Int(IntTy::U32, v) => {
+                            let _ = writeln!(out, "    printf(\"%u\", (unsigned)({}));", v);
+                        }
+                    }
+                }
+                if *newline {
+                    out.push_str("    fputc('\\n', stdout);\n");
                 }
             }
             Stmt::BindI64 { local, value, line, .. } => {
@@ -428,7 +464,7 @@ fn box_locals(f: &Func) -> Vec<LocalId> {
                 }
             }
             Stmt::BindStr { .. }
-            | Stmt::Println { .. }
+            | Stmt::Print { .. }
             | Stmt::BindI64 { .. }
             | Stmt::BindInt { .. }
             | Stmt::EvalInt { .. }
@@ -522,6 +558,67 @@ mod tests {
         let c = emit(&p, "t.zor");
         assert!(c.contains("zor_str_0[2] = {0x68, 0x69}"), "{c}");
         assert!(c.contains("fwrite(zor_str_0, 1, 2, stdout);"), "{c}");
+    }
+
+    #[test]
+    fn multi_arg_print_emits_exact_separators_and_lf() {
+        let p = ir("fn main() { println(\"a\", 1, true); }");
+        let c = emit(&p, "t.zor");
+        let a = c.find("fwrite(zor_str_0, 1, 1, stdout);").expect("a");
+        let one = c.find("printf(\"%lld\", (long long)(zor_tmp_").expect("1");
+        let t = c.find("fwrite(zor_str_1, 1, 4, stdout);").expect("true");
+        assert!(a < one && one < t, "{c}");
+        assert_eq!(c.matches("fputc(' ', stdout);").count(), 2, "{c}");
+        assert_eq!(c.matches("fputc('\\n', stdout);").count(), 1, "{c}");
+    }
+
+    #[test]
+    fn print_evaluates_all_int_args_before_writing_any_byte() {
+        let p = ir("fn main() { println(\"a\", 1 / 0); }");
+        let c = emit_check(&p, "t.zor");
+        let eval = c.find("zor_rt_div_i64_checked(").expect("div helper");
+        let write = c.find("fwrite(zor_str_0").expect("fwrite");
+        assert!(eval < write, "原子性被破坏（先写后算）：{c}");
+    }
+
+    #[test]
+    fn runtime_int_print_uses_printf_formats() {
+        let p = ir("fn main() { let a = 9223372036854775807; let b: u8 = 250; let c: u32 = 4294967295; println(a, b, c); }");
+        let c = emit(&p, "t.zor");
+        assert!(c.contains("printf(\"%lld\", (long long)(zor_i64_0));"), "{c}");
+        assert!(c.contains("printf(\"%u\", (unsigned)(zor_u8_1));"), "{c}");
+        assert!(c.contains("printf(\"%u\", (unsigned)(zor_u32_2));"), "{c}");
+    }
+
+    #[test]
+    fn const_primitives_emit_preformatted_byte_arrays() {
+        let p = ir("fn main() { let a: i8 = -128; let b: f32 = 1.1; let c: byte = 255; println(a, b, c); }");
+        let c = emit(&p, "t.zor");
+        // b"-128"
+        assert!(c.contains("{0x2d, 0x31, 0x32, 0x38}"), "{c}");
+        // b"1.1"
+        assert!(c.contains("{0x31, 0x2e, 0x31}"), "{c}");
+        // b"255"
+        assert!(c.contains("{0x32, 0x35, 0x35}"), "{c}");
+        assert_eq!(c.matches("fwrite(").count(), 3, "{c}");
+    }
+
+    #[test]
+    fn simple_int_print_does_not_require_runtime_helper() {
+        let p = ir("fn main() { println(1); }");
+        let c = emit(&p, "t.zor");
+        assert!(!c.contains("zor_rt.h"), "{c}");
+        assert!(!c.contains("string.h"), "{c}");
+        assert!(c.contains("printf(\"%lld\""), "{c}");
+    }
+
+    #[test]
+    fn float_print_emits_contract_bytes() {
+        let p = ir("fn main() { println(1e16); }");
+        let c = emit(&p, "t.zor");
+        // b"1e+16"
+        assert!(c.contains("{0x31, 0x65, 0x2b, 0x31, 0x36}"), "{c}");
+        assert!(c.contains("fwrite(zor_str_0, 1, 5, stdout);"), "{c}");
     }
 
     #[test]

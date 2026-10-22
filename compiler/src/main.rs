@@ -9,7 +9,7 @@ enum Cli {
     /// 缺源文件：保留 0.1.2 在册 usage 句原样，不加前缀
     Usage,
     /// 无 `-o`：0.1.x 检查模式（零产物）
-    Compile(String),
+    Compile(String, bool),
     /// 有 `-o`：0.2.0 构建模式（显式产出原生可执行文件）
     Build {
         src: String,
@@ -17,6 +17,7 @@ enum Cli {
         opt: OptLevel,
         debug: bool,
         overflow: OverflowMode,
+        diag_json: bool,
     },
 }
 
@@ -41,8 +42,18 @@ fn parse_cli(args: &[String]) -> Result<Cli, String> {
     let mut opt = OptLevel::O2;
     let mut debug = false;
     let mut overflow_explicit: Option<OverflowMode> = None;
+    let mut diag_json = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
+        if a == "--diag=json" {
+            diag_json = true;
+            continue;
+        }
+        if a == "--diag" || a.starts_with("--diag=") {
+            return Err(format!(
+                "未知选项 '{a}'：'--diag' 仅接受 'json'（NDJSON 写 stderr）"
+            ));
+        }
         if a == "-o" {
             if out.is_some() {
                 return Err("'-o' 重复：只允许一次，避免产物路径歧义".to_string());
@@ -91,13 +102,14 @@ fn parse_cli(args: &[String]) -> Result<Cli, String> {
     let overflow = overflow_explicit.unwrap_or_else(|| OverflowMode::from_opt(opt));
     match (positional.len(), out) {
         (0, _) => Ok(Cli::Usage),
-        (1, None) => Ok(Cli::Compile(positional[0].to_string())),
+        (1, None) => Ok(Cli::Compile(positional[0].to_string(), diag_json)),
         (1, Some(o)) => Ok(Cli::Build {
             src: positional[0].to_string(),
             out: o,
             opt,
             debug,
             overflow,
+            diag_json,
         }),
         (n, _) => Err(format!(
             "只接受一个源文件，收到 {n} 枚：{}（第二枚起显式拒判，静默丢弃会漏检未检查的源文件）",
@@ -116,11 +128,15 @@ fn read_source(path: &str) -> String {
     }
 }
 
-fn render_diags(path: &str, diags: &[zorcc::diag::Diag]) {
+fn render_diags(path: &str, diags: &[zorcc::diag::Diag], json: bool) {
     let err = std::io::stderr();
     let mut w = err.lock();
     for d in diags {
-        let _ = writeln!(w, "{}", d.render(path));
+        if json {
+            let _ = writeln!(w, "{}", d.render_json(path));
+        } else {
+            let _ = writeln!(w, "{}", d.render(path));
+        }
     }
 }
 
@@ -142,13 +158,13 @@ fn main() {
             eprintln!("usage: zorcc [flags] <file.zor>");
             exit(2);
         }
-        Cli::Compile(path) => {
+        Cli::Compile(path, diag_json) => {
             let src = read_source(&path);
             let diags = zorcc::compile_to_diags(&src);
             if diags.is_empty() {
                 exit(0);
             }
-            render_diags(&path, &diags);
+            render_diags(&path, &diags, diag_json);
             exit(1);
         }
         Cli::Build {
@@ -157,11 +173,12 @@ fn main() {
             opt,
             debug,
             overflow,
+            diag_json,
         } => {
             let src = read_source(&path);
             let c = zorcc::compile_typed(&src);
             if !c.diags.is_empty() {
-                render_diags(&path, &c.diags);
+                render_diags(&path, &c.diags, diag_json);
                 exit(1);
             }
             let source = std::path::Path::new(&path);
@@ -198,6 +215,7 @@ mod tests {
             opt,
             debug,
             overflow,
+            diag_json: false,
         }
     }
 
@@ -207,7 +225,7 @@ mod tests {
         for f in ["-O0", "-O2", "-Zoverflow=check", "-Zoverflow=wrap", "-g"] {
             assert_eq!(
                 parse_cli(&v(&[f, "a.zor"])),
-                Ok(Cli::Compile("a.zor".to_string())),
+                Ok(Cli::Compile("a.zor".to_string(), false)),
                 "在册注入位 {f} 不得被拒判（拒了 CI 七段当场全红）"
             );
         }
@@ -402,8 +420,46 @@ mod tests {
                 "tests/specs/positive/r1-01-prim-declare.zor"
             ])),
             Ok(Cli::Compile(
-                "tests/specs/positive/r1-01-prim-declare.zor".to_string()
+                "tests/specs/positive/r1-01-prim-declare.zor".to_string(),
+                false
             ))
         );
+    }
+
+    /// L2c：`--diag=json` 进入编译／构建路径；其余 `--diag` 值仍 rc=2 文本。
+    #[test]
+    fn diag_json_is_accepted_and_other_values_rejected() {
+        assert_eq!(
+            parse_cli(&v(&["--diag=json", "a.zor"])),
+            Ok(Cli::Compile("a.zor".to_string(), true))
+        );
+        assert_eq!(
+            parse_cli(&v(&["a.zor", "-o", "out", "--diag=json"])),
+            Ok(Cli::Build {
+                src: "a.zor".to_string(),
+                out: "out".to_string(),
+                opt: OptLevel::O2,
+                debug: false,
+                overflow: OverflowMode::Wrap,
+                diag_json: true,
+            })
+        );
+        for f in ["--diag", "--diag=text", "--diag=", "--diag=jsonl"] {
+            let e = parse_cli(&v(&["a.zor", f])).unwrap_err();
+            assert!(e.contains("未知选项") && e.contains("--diag"), "{f} → {e}");
+        }
+    }
+
+    /// L2c：版本短路优先于 `--diag=json`／未知 flag／不存在源。
+    #[test]
+    fn version_wins_over_diag_json_and_bad_flags() {
+        assert!(matches!(
+            parse_cli(&v(&["--version", "--diag=json", "missing.zor", "--bogus"])),
+            Ok(Cli::Version)
+        ));
+        assert!(matches!(
+            parse_cli(&v(&["-V", "--diag=text"])),
+            Ok(Cli::Version)
+        ));
     }
 }
