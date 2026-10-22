@@ -1,0 +1,31 @@
+name: l2e-gcc-probe
+# 一次性证据：Linux x86_64 + GCC 六档 -O*；不进入 main、不建 opt-matrix job。
+on:
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build zorcc (release)
+        working-directory: compiler
+        run: cargo build --release
+      - name: GCC six-level probe
+        env:
+          ZORC_BIN: ${{ github.workspace }}/compiler/target/release/zorcc
+          LC_ALL: C
+          TZ: UTC
+        run: |
+          mkdir -p ci/logs/gcc-probe
+          bash ci/probes/opt_levels_gcc.sh | tee ci/logs/gcc-probe/probe.log
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcc-probe-logs-${{ github.run_id }}
+          path: ci/logs/gcc-probe/
+          retention-days: 30
+          if-no-files-found: error
