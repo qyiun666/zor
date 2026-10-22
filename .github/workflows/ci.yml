@@ -96,3 +96,34 @@ jobs:
           path: ci/logs/
           retention-days: 90
           if-no-files-found: error
+
+  # L2c CI-01：Linux stdout／CLI 字节级契约门禁（stdout 五面＋结构化 CLI）。
+  # 独立于 baseline／asan-linux／runtime-codes：只判 stdout 字节与顺序，rc=101／E30xx 仍归 runtime-codes。
+  # 实施 PR 内 advisory（不设为 required）；QA 资产合流前预期红，不得 continue-on-error 或重跑洗绿。
+  stdout-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build zorcc (release)
+        working-directory: compiler
+        run: cargo build --release
+      - name: stdout + CLI contract (Linux, no sanitizers)
+        env:
+          ZORC_BIN: ${{ github.workspace }}/compiler/target/release/zorcc
+          CC: clang-18
+          LC_ALL: C
+          TZ: UTC
+          TERM: dumb
+          NO_COLOR: "1"
+        run: env -u ZOR_RUNTIME_DIR bash ci/run_ci.sh --stdout-contract
+      - name: Upload stdout-contract evidence (ci/logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stdout-contract-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci/logs/
+          retention-days: 90
+          if-no-files-found: error

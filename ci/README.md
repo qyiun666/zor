@@ -35,3 +35,10 @@
 - `bash ci/run_ci.sh --runtime-codes`：独立模式（不可与 `--strict／--asan／--bench` 组合），只执行宿主检查＋`stage_runtime_codes`，输出单段 `summary.txt`；baseline 七段、asan-linux 八段零改
 - job：`ubuntu-24.04`＋clang-18、timeout 20、无 sanitizer（rc=101 只在此判）；29 runtime＋6 width fail-closed＋8 CLI；artifact `runtime-codes-logs-<run_id>-<attempt>` 90 天；fail-closed F-RC-1～14，不得 SKIP／`continue-on-error`／重跑洗绿
 - 资产与判据脚本由 QA 提供：`tests/runtime/runtime-codes.tsv`、`width-failclosed.tsv`、`cli-cases.tsv`、`expected/`、`run_runtime_codes.sh`、`cc-capture`；`--runtime-codes` 直调 QA 脚本，CI 不自维护第二套判据；缺件即 FAIL
+
+## L2c stdout-contract（0.3.2 起）
+- `bash ci/run_ci.sh --stdout-contract`：独立模式（不可与 `--strict／--asan／--bench／--runtime-codes` 组合），只执行 `stage_stdout_contract`，输出 `stdout-contract`＋`cli-contract` 两段 `summary.txt`；baseline 七段、asan-linux 八段、runtime-codes 单段零改
+- job：`ubuntu-24.04` x86_64、timeout 20、无 sanitizer；确定性环境 `LC_ALL=C`／`TZ=UTC`／`TERM=dumb`／`NO_COLOR=1`，并 `env -u ZOR_RUNTIME_DIR`；artifact `stdout-contract-logs-<run_id>-<attempt>` 90 天
+- 资产与判据脚本由 QA 提供：`tests/stdout/`（`manifest.tsv`、`negative.tsv`、`cli-cases.tsv`、`cases/`、`controls/`、`expected/`、`run_stdout_contract.sh`、`new-cases.tsv`）；`--stdout-contract` 直调 QA 脚本（env：`ZORC_BIN`／`CC`／`OUT_DIR`），CI 不自维护第二套矩阵／expected；缺件或空集即 FAIL，不得 SKIP／`continue-on-error`／重跑洗绿
+- 判据边界：rc=101／E30xx／stderr 仍归 `runtime-codes`；本 job 只判 stdout 字节与顺序（S6 不复制 E30xx 判据）；stdout 失败按脚本显式 `PASS|FAIL|` 判词分段落账，缺判词按 FAIL
+- required 时机：实施 PR 内 advisory；QA GATE PASS 与 0.3.2 账本合入后再设为 required
