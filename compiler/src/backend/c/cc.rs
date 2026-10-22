@@ -3,7 +3,7 @@
 //! 安全纪律：`Command` 参数数组、不经 shell；临时件在目标同目录的独占临时目录内；
 //! 成功后 rename 原子发布；任何失败清理临时目录且不改动既有目标。
 
-use super::super::{BuildOptions, OptLevel};
+use super::super::BuildOptions;
 use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -61,10 +61,7 @@ fn compile_in(
     let cc = cc_program();
     let mut cmd = Command::new(&cc);
     cmd.arg("-std=c11");
-    cmd.arg(match opts.opt {
-        OptLevel::O0 => "-O0",
-        OptLevel::O2 => "-O2",
-    });
+    cmd.arg(opts.opt.cc_flag());
     if opts.debug {
         cmd.arg("-g");
     }

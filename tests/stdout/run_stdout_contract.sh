@@ -42,10 +42,10 @@ OUT_DIR="${OUT_DIR:-}"
 STRICT=0
 VALIDATE_ONLY=0
 ALLOW_NONLINUX=0
-EXPECT_RUNTIME=62
-EXPECT_NEGATIVE=10
-EXPECT_CLI=14
-EXPECT_TOTAL=86
+EXPECT_RUNTIME=65
+EXPECT_NEGATIVE=12
+EXPECT_CLI=17
+EXPECT_TOTAL=94
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -129,7 +129,7 @@ validate_assets() {
     [ -n "$cid" ] || continue
     case "$seen" in *" $cid "*) so_fail_msg "重复 ID:$cid"; bad=1 ;; esac
     seen="$seen$cid "
-    case "$cid" in S[1-7]-*) ;; *) so_fail_msg "非法 runtime ID:$cid"; bad=1 ;; esac
+    case "$cid" in S[1-8]-*) ;; *) so_fail_msg "非法 runtime ID:$cid"; bad=1 ;; esac
     case "$src" in tests/stdout/cases/*) ;; *) so_fail_msg "$cid 源路径不在 tests/stdout/cases"; bad=1 ;; esac
     [ -f "$REPO_ROOT/$src" ] || { so_fail_msg "$cid 源缺件:$src"; bad=1; }
     case "$exp" in expected/*) ;; *) so_fail_msg "$cid expected 路径非法"; bad=1 ;; esac
@@ -156,7 +156,7 @@ validate_assets() {
     [ -n "$cid" ] || continue
     case "$seen" in *" $cid "*) so_fail_msg "重复 ID:$cid"; bad=1 ;; esac
     seen="$seen$cid "
-    case "$mode" in ndjson-one|ndjson-two|ndjson-escape|ndjson-utf8|ndjson-o|ndjson-check|version|version-short|version-json|o-ok|o-fail|o-missing|usage|usage-flags) ;; *) so_fail_msg "$cid CLI mode 非法:$mode"; bad=1 ;; esac
+    case "$mode" in ndjson-one|ndjson-two|ndjson-escape|ndjson-utf8|ndjson-o|ndjson-check|version|version-short|version-json|o-ok|o-fail|o-missing|usage|usage-flags|help|help-precedence|help-version) ;; *) so_fail_msg "$cid CLI mode 非法:$mode"; bad=1 ;; esac
     case "$erc" in 0|1|2) ;; *) so_fail_msg "$cid CLI expect_rc 非法"; bad=1 ;; esac
   done < "$CLI_TSV"
   [ "$bad" = 0 ] || return 1
@@ -195,9 +195,9 @@ validate_legacy_counts() {
   runtime="$(awk 'NR>1 && NF {n++} END{print n+0}' "$REPO_ROOT/tests/runtime/runtime-codes.tsv")"
   width="$(awk 'NR>1 && NF {n++} END{print n+0}' "$REPO_ROOT/tests/runtime/width-failclosed.tsv")"
   rcli="$(awk 'NR>1 && NF {n++} END{print n+0}' "$REPO_ROOT/tests/runtime/cli-cases.tsv")"
-  [ "$runtime" = 29 ] || { so_fail_msg "runtime-codes=$runtime 期望 29"; bad=1; }
+  [ "$runtime" = 39 ] || { so_fail_msg "runtime-codes=$runtime 期望 39"; bad=1; }
   [ "$width" = 6 ] || { so_fail_msg "width=$width 期望 6"; bad=1; }
-  [ "$rcli" = 8 ] || { so_fail_msg "runtime CLI=$rcli 期望 8"; bad=1; }
+  [ "$rcli" = 19 ] || { so_fail_msg "runtime CLI=$rcli 期望 19"; bad=1; }
   [ "$bad" = 0 ]
 }
 
@@ -490,11 +490,39 @@ run_cli() {
   cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC"
   local leak=0 tok
-  for tok in "-Zoverflow" "-Og" "-O1" "-O3" "-Os"; do
+  for tok in "-Zoverflow"; do
     grep -qF -- "$tok" "$d/err" && leak=1
   done
-  if [ "$leak" = 1 ]; then cli_fail_msg "C4-02 usage 泄露内部/未开放旗标"
+  if [ "$leak" = 1 ]; then cli_fail_msg "C4-02 usage 泄露内部位"
   else echo "[cli-contract] PASS C4-02"; fi
+
+  # C5 help
+  d="$W/C5-01"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
+  run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" --help
+  if [ "$(cat "$d/rc")" != 0 ]; then cli_fail_msg "C5-01 --help rc 非 0"
+  elif [ -s "$d/err" ]; then cli_fail_msg "C5-01 --help stderr 非空"
+  elif [ ! -f "$STDOUT_DIR/expected/help.stdout" ]; then cli_fail_msg "C5-01 缺 expected/help.stdout"
+  elif ! cmp -s "$d/out" "$STDOUT_DIR/expected/help.stdout"; then cli_fail_msg "C5-01 --help 与固定文本不一致"
+  elif grep -qF -- "-Zoverflow" "$d/out"; then cli_fail_msg "C5-01 help 泄露 -Zoverflow"
+  else echo "[cli-contract] PASS C5-01"; fi
+
+  d="$W/C5-02"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
+  run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" --help --bogus "$NOFILE" -o
+  if [ "$(cat "$d/rc")" != 0 ]; then cli_fail_msg "C5-02 help 未优先于非法 flag／-o 缺值"
+  elif [ -s "$d/err" ]; then cli_fail_msg "C5-02 help 优先路径 stderr 非空"
+  elif [ ! -f "$STDOUT_DIR/expected/help.stdout" ] || ! cmp -s "$d/out" "$STDOUT_DIR/expected/help.stdout"; then
+    cli_fail_msg "C5-02 help 优先路径输出非固定文本"
+  else echo "[cli-contract] PASS C5-02"; fi
+
+  d="$W/C5-03"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
+  run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" --version --help
+  if [ "$(cat "$d/rc")" != 0 ]; then cli_fail_msg "C5-03 版本未优先于 help"
+  elif [ "$(cat "$d/out")" != "zorcc $ver" ] || [ -s "$d/err" ]; then
+    cli_fail_msg "C5-03 版本优先路径输出不符"
+  else echo "[cli-contract] PASS C5-03"; fi
 }
 
 # ---------- main ----------

@@ -452,17 +452,18 @@ fn l2b_width_failclosed_is_rc1_zero_artifact() {
 }
 
 #[test]
-fn l2b_invalid_zoverflow_and_unaccepted_opt_are_rc2_zero_artifact() {
-    let d = TempDir::new("l2b-cli");
+fn l2e_invalid_zoverflow_and_invalid_opt_are_rc2_zero_artifact() {
+    let d = TempDir::new("l2e-cli");
     let src = write(d.path(), "case.zor", L2B_OVERFLOW);
     for flag in [
         "-Zoverflow=bogus",
         "-Zoverflow=",
         "-Zoverflow",
-        "-Og",
-        "-O1",
-        "-O3",
-        "-Os",
+        "-O4",
+        "-O9",
+        "-Ofast",
+        "-O2x",
+        "-O",
     ] {
         let out = d.path().join("case-out");
         let o = run(&[src.to_str().unwrap(), "-o", out.to_str().unwrap(), flag]);

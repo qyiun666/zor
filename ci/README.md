@@ -49,3 +49,10 @@
 - `bash ci/install.sh --prefix <绝对前缀> [--destdir <根>] [--zorcc <路径>] [--runtime <目录>]`：安装树构造（CI smoke 用，非用户安装承诺）；canonical 布局 `<DESTDIR><prefix>/bin/zorcc`＋`<DESTDIR><prefix>/share/zor/runtime/{zor_rt.c,h}`；缺 zorcc／helper 或前缀非绝对路径 rc=2
 - job：`packaging-smoke`（`ubuntu-24.04`、timeout 20、无 sanitizer、`env -u ZOR_RUNTIME_DIR`），artifact `packaging-logs-<run_id>-<attempt>` 90 天、仅文本；实施期 advisory，required 仍仅 `stdout-contract`；baseline 七段、asan-linux 八段、runtime-codes、stdout-contract 结构零改
 - `-O*`／G-D-2 不属本版（L2e）；不建 `opt-matrix` job
+
+## L2e `-O*` 与 CLI 扩展（0.3.4 起）
+- `--stdout-contract` 判词同步为 **runtime 65／negative 12／CLI 17**（stdout 94）；CI 校验 `PASS|stdout-contract|runtime=65 negative=12 fail=0 ran=65/12` 与 `PASS|cli-contract|cases=17 fail=0 ran=17`，不符即 FAIL
+- `--runtime-codes` 判词同步为 **runtime_rows=39／width_rows=6／cli_rows=19／fail=0**；CI 在 QA 脚本 rc=0 后校验 `ci/logs/<run>/runtime-codes/runtime-codes.log` 的这四行，缺行或计数不符即 FAIL
+- `-O*` 六档接受、缺省 `-O2`、last-wins；overflow：`-O0/-O1/-Og` checked、`-O2/-O3/-Os` wrap；`--help` 仅长旗标（`-h` rc=2）；`-Zoverflow` 仍为内部位
+- **不建 `opt-matrix` job**：接受／拒绝／cc 映射／输出不变性由现有 `stdout-contract` CLI 段与 `runtime-codes` CLI 段覆盖
+- `packaging-smoke` 4 条不变；required 切换只在 0.3.4 账本合并＋连续两次 main 全绿后 PATCH ruleset `25633324`，回退一条 PATCH；切换前保持 advisory

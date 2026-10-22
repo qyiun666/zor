@@ -1,0 +1,6 @@
+fn main() {
+    let b = box 42;
+    println(*b);
+    println(*b);
+    unbox b;
+}

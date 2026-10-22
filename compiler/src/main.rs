@@ -6,6 +6,8 @@ use zorcc::backend::{BuildOptions, OptLevel, OverflowMode};
 #[derive(Debug, PartialEq, Eq)]
 enum Cli {
     Version,
+    /// L2e：`--help` 任意位置短路；固定文本、rc=0、stdout。
+    Help,
     /// 缺源文件：保留 0.1.2 在册 usage 句原样，不加前缀
     Usage,
     /// 无 `-o`：0.1.x 检查模式（零产物）
@@ -21,13 +23,41 @@ enum Cli {
     },
 }
 
-/// C-1 白名单（冻结件 §〇-3／§三 C-1 逐字照录）：仍为接受。
-/// `-O0`／`-O2`／`-g` 在构建模式实映射到 C 编译器；`-Zoverflow=*` 是 L2b 内部／CI 位，
-/// 仅接受 check／wrap，不进 help／用户文档。这些是 ci/run_ci.sh 的在册注入位与 ASAN 判据句要求。
+/// L2e 固定帮助文本（PRD §3.2 逐字）：15 行／706 B，LF、无尾随空格、末行 LF。
+/// 不含版本号、`-Zoverflow`、`-Ofast`／`-O4`／`print`、`-h`。
+const HELP: &str = "\
+usage: zorcc [flags] <file.zor>
+       zorcc [flags] <file.zor> -o <output>
+
+flags:
+  -o <output>       build a native executable (atomic publish)
+  -O0               no optimization; checked overflow
+  -O1               basic optimization; checked overflow
+  -O2               standard optimization; wrapping overflow (default)
+  -O3               aggressive optimization; wrapping overflow
+  -Os               optimize for size; wrapping overflow
+  -Og               debug-friendly optimization; checked overflow
+  -g                emit debug information
+  --diag=json       compile diagnostics as NDJSON on stderr
+  --version, -V     print version and exit
+  --help            print this help and exit
+";
+
+/// L2e 白名单：六档 `-O*`、`-g` 与内部 `-Zoverflow=*`。
+/// `-O*` 在构建模式实映射到 C 编译器同名旗标；`-Zoverflow=*` 是内部／CI 位，
+/// 仅接受 check／wrap，不进 help／用户文档。这些是 ci/run_ci.sh 的在册注入位。
 fn is_whitelisted_flag(f: &str) -> bool {
     matches!(
         f,
-        "-O0" | "-O2" | "-Zoverflow=check" | "-Zoverflow=wrap" | "-g"
+        "-O0"
+            | "-O1"
+            | "-O2"
+            | "-O3"
+            | "-Os"
+            | "-Og"
+            | "-Zoverflow=check"
+            | "-Zoverflow=wrap"
+            | "-g"
     )
 }
 
@@ -36,6 +66,10 @@ fn parse_cli(args: &[String]) -> Result<Cli, String> {
     // 0.1.2 在册短路语义原样保留：-V/--version 在 argv 任意位置先于文件处理命中
     if args.iter().any(|a| a == "--version" || a == "-V") {
         return Ok(Cli::Version);
+    }
+    // L2e：--help 任意位置短路，且仅长旗标；-h 仍按未知选项 rc=2。
+    if args.iter().any(|a| a == "--help") {
+        return Ok(Cli::Help);
     }
     let mut positional: Vec<&str> = Vec::new();
     let mut out: Option<String> = None;
@@ -84,7 +118,11 @@ fn parse_cli(args: &[String]) -> Result<Cli, String> {
         if is_whitelisted_flag(a) {
             match a.as_str() {
                 "-O0" => opt = OptLevel::O0,
+                "-O1" => opt = OptLevel::O1,
                 "-O2" => opt = OptLevel::O2,
+                "-O3" => opt = OptLevel::O3,
+                "-Os" => opt = OptLevel::Os,
+                "-Og" => opt = OptLevel::Og,
                 "-g" => debug = true,
                 "-Zoverflow=check" => overflow_explicit = Some(OverflowMode::Check),
                 "-Zoverflow=wrap" => overflow_explicit = Some(OverflowMode::Wrap),
@@ -154,6 +192,12 @@ fn main() {
             println!("zorcc {}", env!("CARGO_PKG_VERSION"));
             exit(0);
         }
+        Cli::Help => {
+            let mut out = std::io::stdout();
+            let _ = out.write_all(HELP.as_bytes());
+            let _ = out.flush();
+            exit(0);
+        }
         Cli::Usage => {
             eprintln!("usage: zorcc [flags] <file.zor>");
             exit(2);
@@ -202,7 +246,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_cli, Cli, OptLevel, OverflowMode};
+    use super::{parse_cli, Cli, OptLevel, OverflowMode, HELP};
 
     fn v(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
@@ -219,10 +263,21 @@ mod tests {
         }
     }
 
-    /// C-1：白名单逐枚仍接受并忽略，且 --version/-V 短路先于文件处理
+    /// L2e：六档 `-O*`、`-g` 与内部 `-Zoverflow=*` 在检查模式逐枚接受并忽略；
+    /// `--version`／`-V` 短路先于文件处理。
     #[test]
     fn c1_whitelisted_flags_still_accepted_and_rc_path_unchanged() {
-        for f in ["-O0", "-O2", "-Zoverflow=check", "-Zoverflow=wrap", "-g"] {
+        for f in [
+            "-O0",
+            "-O1",
+            "-O2",
+            "-O3",
+            "-Os",
+            "-Og",
+            "-Zoverflow=check",
+            "-Zoverflow=wrap",
+            "-g",
+        ] {
             assert_eq!(
                 parse_cli(&v(&[f, "a.zor"])),
                 Ok(Cli::Compile("a.zor".to_string(), false)),
@@ -271,6 +326,18 @@ mod tests {
             parse_cli(&v(&["-O0", "a.zor", "-o", "out.bin"])),
             Ok(build("a.zor", "out.bin", OptLevel::O0, false, OverflowMode::Check))
         );
+        for (f, opt, ov) in [
+            ("-O1", OptLevel::O1, OverflowMode::Check),
+            ("-O3", OptLevel::O3, OverflowMode::Wrap),
+            ("-Os", OptLevel::Os, OverflowMode::Wrap),
+            ("-Og", OptLevel::Og, OverflowMode::Check),
+        ] {
+            assert_eq!(
+                parse_cli(&v(&[f, "a.zor", "-o", "out.bin"])),
+                Ok(build("a.zor", "out.bin", opt, false, ov)),
+                "{f}"
+            );
+        }
         assert_eq!(
             parse_cli(&v(&["-g", "a.zor", "-o", "out.bin"])),
             Ok(build("a.zor", "out.bin", OptLevel::O2, true, OverflowMode::Wrap))
@@ -287,13 +354,18 @@ mod tests {
         assert!(e.contains("重复"), "{e}");
     }
 
-    /// 形②：未列入 C-1 白名单的任意 flag 一律拒判
+    /// 形②：未列入 L2e 白名单的任意 flag 一律拒判；非法 `-O*` 逐 token 拒判。
     #[test]
     fn form2_unknown_flag_rejected() {
         for f in [
             "--emit-wasm=nonsense",
-            "-O1",
-            "-Os",
+            "-O4",
+            "-O9",
+            "-Ofast",
+            "-O2x",
+            "-O",
+            "-Oz",
+            "-O10",
             "-g=1",
             "-Zoverflow=bogus",
             "-Z",
@@ -372,12 +444,58 @@ mod tests {
             parse_cli(&v(&["-O2", "-O0", "a.zor", "-o", "out"])),
             Ok(build("a.zor", "out", OptLevel::O0, false, OverflowMode::Check))
         );
+        assert_eq!(
+            parse_cli(&v(&["-O1", "-O3", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O3, false, OverflowMode::Wrap))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-O3", "-O1", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O1, false, OverflowMode::Check))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-Og", "-O2", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O2, false, OverflowMode::Wrap))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-O2", "-Og", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::Og, false, OverflowMode::Check))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-O1", "-Zoverflow=wrap", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O1, false, OverflowMode::Wrap))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-Og", "-Zoverflow=wrap", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::Og, false, OverflowMode::Wrap))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-O3", "-Zoverflow=check", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::O3, false, OverflowMode::Check))
+        );
+        assert_eq!(
+            parse_cli(&v(&["-Os", "-Zoverflow=check", "a.zor", "-o", "out"])),
+            Ok(build("a.zor", "out", OptLevel::Os, false, OverflowMode::Check))
+        );
     }
 
-    /// L2b：O-2 不扩白名单；-Og/-O1/-O3/-Os 即使伴随合法 -Zoverflow 也 rc=2。
+    /// L2e：白名单扩为六档；每档缺省 overflow 按产品矩阵；非法后缀仍 rc=2。
     #[test]
-    fn l2b_does_not_expand_opt_whitelist() {
-        for f in ["-Og", "-O1", "-O3", "-Os"] {
+    fn l2e_opt_whitelist_expands_to_six() {
+        for (f, opt, ov) in [
+            ("-O0", OptLevel::O0, OverflowMode::Check),
+            ("-O1", OptLevel::O1, OverflowMode::Check),
+            ("-O2", OptLevel::O2, OverflowMode::Wrap),
+            ("-O3", OptLevel::O3, OverflowMode::Wrap),
+            ("-Os", OptLevel::Os, OverflowMode::Wrap),
+            ("-Og", OptLevel::Og, OverflowMode::Check),
+        ] {
+            assert_eq!(
+                parse_cli(&v(&[f, "a.zor", "-o", "out"])),
+                Ok(build("a.zor", "out", opt, false, ov)),
+                "{f}"
+            );
+        }
+        for f in ["-O4", "-O9", "-Ofast", "-O2x", "-O", "-Oz", "-O10"] {
             let e = parse_cli(&v(&[f, "-Zoverflow=check", "a.zor", "-o", "out"])).unwrap_err();
             assert!(e.contains("未知选项") && e.contains(f), "{f} → {e}");
         }
@@ -390,6 +508,61 @@ mod tests {
             parse_cli(&v(&["-V", "-Zoverflow=bogus"])),
             Ok(Cli::Version)
         ));
+    }
+
+    /// L2e：`--help` 任意位置短路，且优先于非法 flag／`-o` 缺值／不存在的源。
+    #[test]
+    fn help_short_circuits_anywhere_and_precedes_other_parse() {
+        for argv in [
+            v(&["--help"]),
+            v(&["--help", "a.zor"]),
+            v(&["a.zor", "--help"]),
+            v(&["-o", "--help", "a.zor"]),
+            v(&["--help", "--bogus"]),
+            v(&["--help", "-o"]),
+            v(&["--help", "missing.zor"]),
+            v(&["--diag=json", "--help"]),
+        ] {
+            assert_eq!(parse_cli(&argv), Ok(Cli::Help), "{argv:?}");
+        }
+    }
+
+    /// L2e：`--version`／`-V` 优先于 `--help`（0.1.2 短路契约不变）。
+    #[test]
+    fn version_precedes_help() {
+        assert_eq!(parse_cli(&v(&["--version", "--help"])), Ok(Cli::Version));
+        assert_eq!(parse_cli(&v(&["--help", "-V"])), Ok(Cli::Version));
+    }
+
+    /// L2e：`--help` 仅长旗标；`-h`／拼写变体仍 rc=2 指名拒判。
+    #[test]
+    fn help_is_long_flag_only() {
+        for f in ["-h", "-help", "--help=1", "--Help"] {
+            let e = parse_cli(&v(&[f, "a.zor"])).unwrap_err();
+            assert!(e.contains("未知选项") && e.contains(f), "{f} → {e}");
+        }
+    }
+
+    /// L2e：固定帮助文本的字节级约束（15 行／706 B；无 CR／内部位／`-h`）。
+    #[test]
+    fn help_text_is_fixed_contract_bytes() {
+        assert_eq!(HELP.len(), 706);
+        assert_eq!(HELP.lines().count(), 15);
+        assert!(HELP.ends_with('\n'));
+        assert!(!HELP.contains('\r'));
+        assert!(!HELP.contains("-Zoverflow"));
+        assert!(!HELP.contains("\n  -h "));
+        assert!(HELP.contains("  -O0               no optimization; checked overflow\n"));
+        assert!(HELP.contains("  -O1               basic optimization; checked overflow\n"));
+        assert!(HELP.contains(
+            "  -O2               standard optimization; wrapping overflow (default)\n"
+        ));
+        assert!(HELP.contains("  -O3               aggressive optimization; wrapping overflow\n"));
+        assert!(HELP.contains("  -Os               optimize for size; wrapping overflow\n"));
+        assert!(HELP.contains("  -Og               debug-friendly optimization; checked overflow\n"));
+        assert!(HELP.contains("  --diag=json       compile diagnostics as NDJSON on stderr\n"));
+        assert!(HELP.contains("  --version, -V     print version and exit\n"));
+        assert!(HELP.contains("  --help            print this help and exit\n"));
     }
 
     /// C-2：CLI 面诊断不占语言诊断码位（红线 2），也不写成 E1xxx/E2xxx 串。

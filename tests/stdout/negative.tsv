@@ -9,3 +9,5 @@ N-10	tests/stdout/cases/N-10.zor	1	none	zorcc: codegen:	zor: runtime error	&mut 
 N-11	tests/stdout/cases/N-11.zor	1	none	zorcc: codegen:	zor: runtime error	tuple containing Box fail-closed
 N-12	tests/stdout/cases/N-12.zor	1	none	zorcc: codegen:	zor: runtime error	struct nested tuple containing Box fail-closed
 N-13	tests/stdout/cases/N-13.zor	1	none	zorcc: codegen:	zor: runtime error	enum any-variant Box type-level fail-closed
+N-14	tests/stdout/cases/N-14.zor	1	none	zorcc: codegen:	zor: runtime error	Box direct arg fail-closed
+N-15	tests/stdout/cases/N-15.zor	1	none	zorcc: codegen:	zor: runtime error	Box<Box<i64>> deref fail-closed

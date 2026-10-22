@@ -428,7 +428,7 @@ fn c4_usage_is_text_and_does_not_leak_internal_flags() {
     assert_eq!(o.status.code(), Some(2));
     let err = String::from_utf8_lossy(&o.stderr);
     assert!(err.contains("usage: zorcc"), "{err}");
-    for leak in ["-Zoverflow", "-Og", "-O1", "-O3", "-Os", "--diag=json"] {
+    for leak in ["-Zoverflow", "--diag=json"] {
         assert!(!err.contains(leak), "usage 泄露 {leak}: {err}");
     }
 }

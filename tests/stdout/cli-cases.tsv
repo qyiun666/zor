@@ -12,4 +12,7 @@ C3-01	o-ok	$GOOD|-o|$OUT	0	successful atomic publish; binary runs
 C3-02	o-fail	$BAD1|-o|$OUT	1	failure: zero artifact; text stderr identical to no -o
 C3-03	o-missing	$GOOD|-o	2	missing -o value rc2, no artifact
 C4-01	usage	-	2	no args: usage rc2
-C4-02	usage-flags	-	2	usage does not expose -Zoverflow or unopened -O*
+C4-02	usage-flags	-	2	no-arg usage hides -Zoverflow; -O* opened (help asserted by C5-01)
+C5-01	help	--help	0	--help fixed text, rc0, stderr 0
+C5-02	help-precedence	--help|--bogus|$NOFILE|-o	0	help wins over invalid flag/missing -o
+C5-03	help-version	--version|--help	0	version wins over help
