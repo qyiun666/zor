@@ -1,0 +1,5 @@
+case_id	mode	expect_rc	expect_artifact	notes
+P-01	install-success	0	none	canonical prefix bin+share runtime; cwd outside source; no ZOR_RUNTIME_DIR
+P-02	missing-helper	2	none	remove installed runtime; searched paths in stderr; no link failure
+P-03	destdir-layout	n/a	none	exact bin+share/zor/runtime file set and executable bit; tree manifest sha
+P-04	invalid-env	2	none	invalid ZOR_RUNTIME_DIR; no fallback to source/cwd

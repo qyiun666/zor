@@ -1,0 +1,6 @@
+enum Shape { Circle(i64), Rect(i64, i64) }
+
+fn main() {
+    let c = Circle(3);
+    println(c);
+}

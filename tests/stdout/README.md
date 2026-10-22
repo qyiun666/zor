@@ -1,19 +1,22 @@
-# tests/stdout — L2c stdout／CLI 契约门禁（QA）
+# tests/stdout — L2d stdout／CLI 契约门禁（QA）
 
-归属：ZOR质量保障。入口由 `ci/run_ci.sh --stdout-contract` 直调；CI 不维护第二套矩阵。
+归属：ZOR质量保障。入口由 `ci/run_ci.sh --stdout-contract` 直调；CI 不维护第二套矩阵。S5 11＋S7 3 expected 已在 PR #114 head `2a92902` 两轮捕获并 byte-SAME；本地 `--strict --allow-nonlinux` 得 62/10/14 PASS，**Linux x86_64 CI 与产品会签为门禁前提**。
 
-## 计数
+## 计数（冻结 90＝86 stdout＋4 packaging）
 
 | 段 | 条数 | 矩阵 |
 |---|---:|---|
-| stdout runtime | 48 | `stdout-cases.tsv`（S1 6／S2 4／S3 29／S4 5／S6 4） |
-| stdout 编译负控 | 10 | `negative.tsv`（N-01～N-10） |
-| CLI | 14 | `cli-cases.tsv`（C1 6／C2 3／C3 3／C4 2） |
-| 合计 | **72** | `new-cases.tsv` |
+| stdout runtime | **62** | `stdout-cases.tsv`（S1 6／S2 4／S3 29／S4 5／S5 11／S6 4／S7 3） |
+| stdout 编译负控 | **10** | `negative.tsv`（N-01～03、N-07～13；N-04～06 退役归档） |
+| CLI | **14** | `cli-cases.tsv`（C1 6／C2 3／C3 3／C4 2，零改） |
+| stdout 合计 | **86** | `new-cases.tsv` |
+| packaging | **4** | `tests/packaging/packaging-cases.tsv`（独立 job） |
 
-- D-L2c-12：f64 `nan` 无源形态，S3-27 以 `1e-5` 替代；NaN 输出契约由 `backend::float_fmt` 单测覆盖。
-- 浮点整组拆 L2d 时删除 S3-22～S3-29 与 S3-27 的替换行，计数变为 **64**（40＋10＋14），脚本内 `EXPECT_RUNTIME`／`EXPECT_TOTAL` 同步改。
-- N-09／N-10 为 F-2 条件负控：`&T`／`&mut T` 实参在 println 处 fail-closed；`Handle<T>`／fn 无语法，记 N/A。
+- **S5-04 N/A**：1 元组无源形态，不建 case、不计数；不得写“1 元组已支持”。
+- N-04／05／06 退役转正例，归档 `retired/l2c/`；不得继续 fail-closed。
+- `l2c-baseline.tsv` 锁 69 条未变用例（48＋7＋14）；`l2c-baseline.sha256` 为标准清单（105 行），`shasum -a 256 -c tests/stdout/l2c-baseline.sha256` 可复算。
+- D-L2c-12：NaN 无端到端源形态；浮点契约由 `backend::float_fmt` 单测覆盖，S3-27 以 `1e-5` 替代。
+- N-09／N-10 为 `&T`／`&mut T` 条件负控；`Handle<T>`／fn 无语法，记 N/A。
 
 ## 入口
 
@@ -23,7 +26,7 @@ bash tests/stdout/run_stdout_contract.sh --strict
 
 - env：`ZORC_BIN`（zorcc 路径）、`CC`（C 编译器，CI 为 clang-18）、`OUT_DIR`（证据目录）。
 - 输出：恰一行 `PASS|stdout-contract|…` 或 `FAIL|stdout-contract|…`，以及 `PASS|cli-contract|…` 或 `FAIL|cli-contract|…`；任一段 FAIL → rc=1。显式 FAIL 优先。
-- 宿主：默认只允许 Linux x86_64（O-L2c-04）；`--allow-nonlinux` 仅供本地预检，CI 不传。
+- 宿主：默认只允许 Linux x86_64；`--allow-nonlinux` 仅供本地预检，CI 不传。
 - `--validate-only`：只做静态校验（矩阵／路径／expected／旧资产快照），不需 zorcc。
 
 ## 判据
@@ -35,6 +38,7 @@ bash tests/stdout/run_stdout_contract.sh --strict
 
 ## 资产说明
 
-- `expected/<case>.stdout`：逐字节期望；S6 只含终止前 stdout。
+- `expected/<case>.stdout`：逐字节期望；S6 只含终止前 stdout；L2d 新 expected 14 条已按 PR #114 head 捕获（待产品会签）。
 - `cases/S4-05.zor`：源文件内含原始 NUL 字节（`\0` 转义不是 NUL），按二进制资产处理。
 - S6-03／S6-04 使用 `-O0` 触发 E3001；其余 runtime 用默认 `-O2`。
+- `S5-09` 源写 `Red()`，输出 `Red`；`S5-10` `Circle(3)`；`S7` 为 `[u8;N]` 数组形态，与 S4 `[byte;N]` 原始字节严格区分。

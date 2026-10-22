@@ -1,0 +1,7 @@
+struct Holder { a: [u8; 2], b: i64 }
+
+fn main() {
+    let h = Holder { a: [1, 2], b: 3 };
+    println(h);
+    println(h.a[0]);
+}

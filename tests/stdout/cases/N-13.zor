@@ -1,0 +1,6 @@
+enum E { A(Box<i64>), B() }
+
+fn main() {
+    let x = B();
+    println(x);
+}

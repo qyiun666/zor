@@ -1,0 +1,4 @@
+fn main() {
+    let t = (box 1, 2);
+    println(t);
+}

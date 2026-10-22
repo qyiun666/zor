@@ -1,0 +1,5 @@
+fn main() {
+    println("before");
+    let a: i64 = 9223372036854775807;
+    println(a + 1);
+}

@@ -47,3 +47,17 @@ S6-01	tests/stdout/cases/S6-01.zor	stdout-terminate	101	expected/S6-01.stdout	-	
 S6-02	tests/stdout/cases/S6-02.zor	stdout-terminate	101	expected/S6-02.stdout	-	multi-arg call emits zero bytes on arg termination
 S6-03	tests/stdout/cases/S6-03.zor	stdout-terminate	101	expected/S6-03.stdout	-O0	prior println retained; E3001 under -O0
 S6-04	tests/stdout/cases/S6-04.zor	stdout-terminate	101	expected/S6-04.stdout	-O0	multi-arg call zero bytes on arg overflow
+S5-01	tests/stdout/cases/S5-01.zor	run	0	expected/S5-01.stdout	-	2-tuple
+S5-02	tests/stdout/cases/S5-02.zor	run	0	expected/S5-02.stdout	-	3-tuple
+S5-03	tests/stdout/cases/S5-03.zor	run	0	expected/S5-03.stdout	-	unit tuple regression
+S5-05	tests/stdout/cases/S5-05.zor	run	0	expected/S5-05.stdout	-	array
+S5-06	tests/stdout/cases/S5-06.zor	run	0	expected/S5-06.stdout	-	empty array
+S5-07	tests/stdout/cases/S5-07.zor	run	0	expected/S5-07.stdout	-	struct 2 fields
+S5-08	tests/stdout/cases/S5-08.zor	run	0	expected/S5-08.stdout	-	empty struct
+S5-09	tests/stdout/cases/S5-09.zor	run	0	expected/S5-09.stdout	-	enum no-payload
+S5-10	tests/stdout/cases/S5-10.zor	run	0	expected/S5-10.stdout	-	enum tuple variant
+S5-11	tests/stdout/cases/S5-11.zor	run	0	expected/S5-11.stdout	-	nested mixed struct
+S5-12	tests/stdout/cases/S5-12.zor	run	0	expected/S5-12.stdout	-	struct-in-tuple
+S7-01	tests/stdout/cases/S7-01.zor	run	0	expected/S7-01.stdout	-	[u8;N] array form
+S7-02	tests/stdout/cases/S7-02.zor	run	0	expected/S7-02.stdout	-	[u8;N] array form
+S7-03	tests/stdout/cases/S7-03.zor	run	0	expected/S7-03.stdout	-	[u8;N] array form
