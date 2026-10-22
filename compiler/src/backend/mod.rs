@@ -143,23 +143,49 @@ fn resolve_runtime_dir() -> Result<std::path::PathBuf, BuildError> {
         });
     }
 
-    let exe_dir = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(Path::to_path_buf));
+    let exe = std::env::current_exe().ok();
+    let exe_dir = exe
+        .as_ref()
+        .and_then(|p| p.parent().map(Path::to_path_buf));
     let cwd = std::env::current_dir().ok();
-    for dir in runtime_candidates(exe_dir.as_deref(), cwd.as_deref()) {
-        if valid(&dir) {
-            return Ok(dir);
+    // 构建树回退仅对构建树内的 exe 生效：安装树外置时不得命中构建机绝对路径。
+    let build_tree = exe.as_deref().is_some_and(exe_in_build_tree);
+    let candidates = runtime_candidates(exe_dir.as_deref(), cwd.as_deref(), build_tree);
+    for dir in &candidates {
+        if valid(dir) {
+            return Ok(dir.clone());
         }
     }
+    let searched = candidates
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect::<Vec<_>>()
+        .join("，");
     Err(BuildError::Toolchain {
-        msg: "找不到运行期 helper runtime/zor_rt.{c,h}；请设置 ZOR_RUNTIME_DIR"
-            .to_string(),
+        msg: format!(
+            "找不到运行期 helper zor_rt.c／zor_rt.h；已搜索：{}；请设置 ZOR_RUNTIME_DIR",
+            searched
+        ),
     })
 }
 
-/// 候选顺序：exe 邻接（含 R-1 canonical `exe/../share/zor/runtime`）、cwd、源树回退。
-fn runtime_candidates(exe_dir: Option<&Path>, cwd: Option<&Path>) -> Vec<std::path::PathBuf> {
+/// exe 是否位于编译期记录的构建树（`CARGO_MANIFEST_DIR`）内。
+fn exe_in_build_tree(exe: &Path) -> bool {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let exe = exe.canonicalize().unwrap_or_else(|_| exe.to_path_buf());
+    let manifest = manifest
+        .canonicalize()
+        .unwrap_or_else(|_| manifest.to_path_buf());
+    exe.starts_with(manifest)
+}
+
+/// 候选顺序：exe 邻接（含 R-1 canonical `exe/../share/zor/runtime`）、cwd、
+/// 仅在构建树内 exe 时追加源树回退。
+fn runtime_candidates(
+    exe_dir: Option<&Path>,
+    cwd: Option<&Path>,
+    build_tree_fallback: bool,
+) -> Vec<std::path::PathBuf> {
     let mut candidates: Vec<std::path::PathBuf> = Vec::new();
     if let Some(dir) = exe_dir {
         candidates.push(dir.join("runtime"));
@@ -172,7 +198,9 @@ fn runtime_candidates(exe_dir: Option<&Path>, cwd: Option<&Path>) -> Vec<std::pa
     if let Some(cwd) = cwd {
         candidates.push(cwd.join("runtime"));
     }
-    candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../runtime"));
+    if build_tree_fallback {
+        candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../runtime"));
+    }
     candidates
 }
 
@@ -208,11 +236,29 @@ mod tests {
     #[test]
     fn r1_canonical_share_candidate_is_present() {
         let exe_dir = Path::new("/opt/zor/bin");
-        let candidates = runtime_candidates(Some(exe_dir), None);
+        let candidates = runtime_candidates(Some(exe_dir), None, false);
         let share = exe_dir.join("../share/zor/runtime");
         assert!(candidates.contains(&share), "{candidates:?}");
         // ZOR_RUNTIME_DIR 优先级不变：候选表只在 env 未设置时使用。
         assert_eq!(candidates[0], exe_dir.join("runtime"));
+        // 安装树外置：不得命中构建机绝对路径。
+        let manifest_fallback = Path::new(env!("CARGO_MANIFEST_DIR")).join("../runtime");
+        assert!(!candidates.contains(&manifest_fallback), "{candidates:?}");
+        let in_tree = runtime_candidates(Some(exe_dir), None, true);
+        assert!(in_tree.contains(&manifest_fallback), "{in_tree:?}");
+    }
+
+    #[test]
+    fn r1_missing_runtime_error_lists_searched_candidates() {
+        let exe_dir = Path::new("/opt/zor/bin");
+        let candidates = runtime_candidates(Some(exe_dir), Some(Path::new("/tmp")), false);
+        let searched = candidates
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join("，");
+        assert!(searched.contains("/opt/zor/bin/../share/zor/runtime"), "{searched}");
+        assert!(searched.contains("/tmp/runtime"), "{searched}");
     }
 
     #[test]
