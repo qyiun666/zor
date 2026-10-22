@@ -83,8 +83,10 @@ elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_BIN="gtimeout"
 else echo "[stdout-contract] WARN: 无 timeout/gtimeout，本地预检改为直接执行（CI 必须有 timeout）"
 fi
 
-so_fail=(); so_n=0
-cli_fail=(); cli_n=0
+so_fail=(); so_n=0; so_ran=0; neg_ran=0
+cli_fail=(); cli_n=0; cli_ran=0
+LOCALE_AVAILABLE=unknown
+LOCALE_RESULT=not-run
 so_fail_msg() { so_fail+=("$1"); so_n=$((so_n+1)); }
 cli_fail_msg() { cli_fail+=("$1"); cli_n=$((cli_n+1)); }
 
@@ -231,6 +233,7 @@ run_runtime() {
   while IFS=$'\t' read -r cid src mode erc exp flags note; do
     [ "$cid" = "case_id" ] && continue
     [ -n "$cid" ] || continue
+    so_ran=$((so_ran+1))
     local ok=1
     for round in 1 2; do
       work="$OUT_DIR/runtime/$cid/round$round"
@@ -280,6 +283,7 @@ run_negative() {
   while IFS=$'\t' read -r cid src erc artifact contains notc note; do
     [ "$cid" = "case_id" ] && continue
     [ -n "$cid" ] || continue
+    neg_ran=$((neg_ran+1))
     local ok=1
     for round in 1 2; do
       work="$OUT_DIR/negative/$cid/round$round"
@@ -301,6 +305,34 @@ run_negative() {
     done
     [ "$ok" = 1 ] && echo "[stdout-contract] PASS $cid"
   done < "$NEGATIVE_TSV"
+}
+
+# ---------- locale（D-L2c-15，仅浮点 8 条；不改 CI job） ----------
+run_locale_check() {
+  if [ "$so_n" -ne 0 ]; then LOCALE_RESULT="skipped-stdout-fail"; return; fi
+  local locales
+  locales="$(locale -a 2>/dev/null || true)"
+  if printf '%s\n' "$locales" | grep -Ei '^en_US\.(utf-8|utf8)$' >/dev/null 2>&1; then
+    LOCALE_AVAILABLE=yes
+  else
+    LOCALE_AVAILABLE=no
+    LOCALE_RESULT="unavailable-path-analysis"
+    echo "[stdout-contract] WARN: en_US.UTF-8 未安装；浮点字节以编译期格式化路径分析为主证据"
+    return
+  fi
+  local cid bin d rc out_c out_u
+  LOCALE_RESULT=SAME
+  for cid in S3-22 S3-23 S3-24 S3-25 S3-26 S3-27 S3-28 S3-29; do
+    bin="$OUT_DIR/runtime/$cid/round1/case.bin"
+    d="$OUT_DIR/locale/$cid"; mkdir -p "$d"
+    if [ ! -x "$bin" ]; then so_fail_msg "$cid locale 二进制缺失"; LOCALE_RESULT=FAIL; continue; fi
+    run_capture "$d/c.rc" "$d/c.out" "$d/c.err" 10 env LC_ALL=C "$bin"
+    run_capture "$d/u.rc" "$d/u.out" "$d/u.err" 10 env LC_ALL=en_US.UTF-8 "$bin"
+    rc="$(cat "$d/c.rc")"; [ "$rc" = 0 ] || { so_fail_msg "$cid LC_ALL=C rc=$rc"; LOCALE_RESULT=FAIL; }
+    rc="$(cat "$d/u.rc")"; [ "$rc" = 0 ] || { so_fail_msg "$cid en_US.UTF-8 rc=$rc"; LOCALE_RESULT=FAIL; }
+    cmp -s "$d/c.out" "$d/u.out" || { so_fail_msg "$cid 两 locale stdout 不一致"; LOCALE_RESULT=FAIL; }
+  done
+  echo "[stdout-contract] locale_available=yes locale_float_cases=8 locale_float_bytes=$LOCALE_RESULT"
 }
 
 # ---------- CLI ----------
@@ -327,6 +359,7 @@ run_cli() {
 
   # C1-01 one JSON line + text-mode parity
   local d="$W/C1-01"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc1" "$d/out1" "$d/err1" 30 "$ZORC" --diag=json "$BAD1"
   run_capture "$d/rc2" "$d/out2" "$d/err2" 30 "$ZORC" "$BAD1"
   if [ "$(cat "$d/rc1")" != 1 ] || [ "$(cat "$d/rc2")" != 1 ]; then
@@ -337,6 +370,7 @@ run_cli() {
 
   # C1-02 two lines, source order
   d="$W/C1-02"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc1" "$d/out1" "$d/err1" 30 "$ZORC" --diag=json "$BAD2"
   run_capture "$d/rc2" "$d/out2" "$d/err2" 30 "$ZORC" "$BAD2"
   if [ "$(cat "$d/rc1")" != 1 ] || [ "$(cat "$d/rc2")" != 1 ]; then
@@ -347,6 +381,7 @@ run_cli() {
 
   # C1-03 escaped path
   d="$W/C1-03"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" --diag=json "$ESCAPE"
   if [ "$(cat "$d/rc")" != 1 ]; then cli_fail_msg "C1-03 rc 非 1"
   elif ! python3 "$NDJSON_CHECK" path "$d/err" "$ESCAPE" escape >"$d/check.log" 2>&1; then
@@ -355,6 +390,7 @@ run_cli() {
 
   # C1-04 UTF-8 path
   d="$W/C1-04"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" --diag=json "$UTF8"
   if [ "$(cat "$d/rc")" != 1 ]; then cli_fail_msg "C1-04 rc 非 1"
   elif ! python3 "$NDJSON_CHECK" path "$d/err" "$UTF8" utf8 >"$d/check.log" 2>&1; then
@@ -363,6 +399,7 @@ run_cli() {
 
   # C1-05 with -o: zero artifact
   d="$W/C1-05"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" --diag=json "$BAD1" -o "$d/artifact"
   if [ "$(cat "$d/rc")" != 1 ]; then cli_fail_msg "C1-05 rc 非 1"
   elif [ -e "$d/artifact" ]; then cli_fail_msg "C1-05 失败留产物"
@@ -372,6 +409,7 @@ run_cli() {
 
   # C1-06 check-mode success: rc0, stderr 0 B; failure still rc1
   d="$W/C1-06"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc1" "$d/out1" "$d/err1" 30 "$ZORC" --diag=json "$GOOD"
   run_capture "$d/rc2" "$d/out2" "$d/err2" 30 "$ZORC" --diag=json "$BAD1"
   if [ "$(cat "$d/rc1")" != 0 ] || [ -s "$d/err1" ] || [ -s "$d/out1" ]; then
@@ -382,6 +420,7 @@ run_cli() {
 
   # C2 version cases
   d="$W/C2-01"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" --version
   if [ "$(cat "$d/rc")" != 0 ]; then cli_fail_msg "C2-01 rc 非 0"
   elif [ "$(cat "$d/out")" != "zorcc $ver" ] || [ -s "$d/err" ]; then
@@ -389,6 +428,7 @@ run_cli() {
   else echo "[cli-contract] PASS C2-01"; fi
 
   d="$W/C2-02"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" -V --bogus "$NOFILE"
   if [ "$(cat "$d/rc")" != 0 ]; then cli_fail_msg "C2-02 版本未短路 rc 非 0"
   elif [ "$(cat "$d/out")" != "zorcc $ver" ] || [ -s "$d/err" ]; then
@@ -396,6 +436,7 @@ run_cli() {
   else echo "[cli-contract] PASS C2-02"; fi
 
   d="$W/C2-03"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" --version --diag=json
   if [ "$(cat "$d/rc")" != 0 ]; then cli_fail_msg "C2-03 版本未短路 rc 非 0"
   elif [ "$(cat "$d/out")" != "zorcc $ver" ] || [ -s "$d/err" ]; then
@@ -404,6 +445,7 @@ run_cli() {
 
   # C3 -o cases
   d="$W/C3-01"; mkdir -p "$d/outdir"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" "$GOOD" -o "$d/outdir/out"
   local nfiles; nfiles="$(find "$d/outdir" -maxdepth 1 -type f | wc -l | tr -d ' ')"
   if [ "$(cat "$d/rc")" != 0 ] || [ ! -x "$d/outdir/out" ] || [ "$nfiles" != 1 ]; then
@@ -416,6 +458,7 @@ run_cli() {
   fi
 
   d="$W/C3-02"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc1" "$d/out1" "$d/err1" 30 "$ZORC" "$BAD1" -o "$d/artifact"
   run_capture "$d/rc2" "$d/out2" "$d/err2" 30 "$ZORC" "$BAD1"
   if [ "$(cat "$d/rc1")" != 1 ] || [ -e "$d/artifact" ]; then
@@ -425,6 +468,7 @@ run_cli() {
   else echo "[cli-contract] PASS C3-02"; fi
 
   d="$W/C3-03"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC" "$GOOD" -o
   if [ "$(cat "$d/rc")" != 2 ]; then cli_fail_msg "C3-03 -o 缺值 rc 非 2"
   elif ! grep -qF -- "-o" "$d/err"; then cli_fail_msg "C3-03 stderr 未指认 -o"
@@ -432,12 +476,14 @@ run_cli() {
 
   # C4 usage
   d="$W/C4-01"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC"
   if [ "$(cat "$d/rc")" != 2 ] || ! grep -qF -- "usage: zorcc" "$d/err"; then
     cli_fail_msg "C4-01 无参 usage 不符"
   else echo "[cli-contract] PASS C4-01"; fi
 
   d="$W/C4-02"; mkdir -p "$d"
+  cli_ran=$((cli_ran+1))
   run_capture "$d/rc" "$d/out" "$d/err" 30 "$ZORC"
   local leak=0 tok
   for tok in "-Zoverflow" "-Og" "-O1" "-O3" "-Os"; do
@@ -462,8 +508,8 @@ if [ "$VALIDATE_ONLY" = 1 ]; then
   echo "[stdout-contract] validate-only static_bad=$static_bad" | tee -a "$OUT_DIR/validate-only.log"
   if [ "$so_n" -gt 0 ]; then for m in "${so_fail[@]}"; do echo "[stdout-contract] STATIC_FAIL: $m" | tee -a "$OUT_DIR/validate-only.log"; done; fi
   if [ "$static_bad" = 0 ]; then
-    echo "PASS|stdout-contract|validate-only runtime=$EXPECT_RUNTIME negative=$EXPECT_NEGATIVE"
-    echo "PASS|cli-contract|validate-only cases=$EXPECT_CLI"
+    echo "PASS|stdout-contract|validate-only static=ok executed=0"
+    echo "PASS|cli-contract|validate-only static=ok executed=0"
     exit 0
   fi
   echo "FAIL|stdout-contract|validate-only"
@@ -485,12 +531,29 @@ if [ "$VALIDATE_ONLY" = 0 ] && [ -z "$TIMEOUT_BIN" ] && [ "$ALLOW_NONLINUX" = 0 
   cli_fail_msg "缺 timeout 命令"
 fi
 
-if [ "$so_n" -eq 0 ]; then run_runtime; fi
-if [ "$so_n" -eq 0 ]; then run_negative; fi
+if [ "$static_bad" = 0 ] && [ "$so_n" -eq 0 ]; then
+  run_runtime
+  run_negative
+fi
+if [ "$static_bad" = 0 ] && [ "$so_n" -eq 0 ]; then
+  run_locale_check
+fi
 # CLI 独立于 stdout 段：即使 runtime 失败也继续，便于一次看全两段。
+if [ "$static_bad" = 0 ] && [ "$cli_n" -eq 0 ]; then
+  run_cli
+fi
+if [ "$so_ran" -ne "$EXPECT_RUNTIME" ]; then
+  so_fail_msg "runtime 执行数=$so_ran 期望 $EXPECT_RUNTIME（禁止空集/跳过洗绿）"
+fi
+if [ "$neg_ran" -ne "$EXPECT_NEGATIVE" ]; then
+  so_fail_msg "negative 执行数=$neg_ran 期望 $EXPECT_NEGATIVE（禁止空集/跳过洗绿）"
+fi
+if [ "$cli_ran" -ne "$EXPECT_CLI" ]; then
+  cli_fail_msg "执行数=$cli_ran 期望 $EXPECT_CLI（禁止空集/跳过洗绿）"
+fi
 
 if [ "$so_n" -eq 0 ]; then
-  echo "PASS|stdout-contract|runtime=$EXPECT_RUNTIME negative=$EXPECT_NEGATIVE fail=0"
+  echo "PASS|stdout-contract|runtime=$EXPECT_RUNTIME negative=$EXPECT_NEGATIVE fail=0 ran=$so_ran/$neg_ran"
   so_rc=0
 else
   for m in "${so_fail[@]}"; do echo "[stdout-contract] FAIL_DETAIL: $m"; done
@@ -498,7 +561,7 @@ else
   so_rc=1
 fi
 if [ "$cli_n" -eq 0 ]; then
-  echo "PASS|cli-contract|cases=$EXPECT_CLI fail=0"
+  echo "PASS|cli-contract|cases=$EXPECT_CLI fail=0 ran=$cli_ran"
   cli_rc=0
 else
   for m in "${cli_fail[@]}"; do echo "[cli-contract] FAIL_DETAIL: $m"; done
@@ -508,7 +571,7 @@ fi
 {
   echo "--- summary $now_utc ---"
   echo "host=$(uname -s)/$(uname -m) explicit_allow_nonlinux=$ALLOW_NONLINUX"
-  echo "stdout_fail=$so_n cli_fail=$cli_n"
+  echo "stdout_fail=$so_n cli_fail=$cli_n ran_stdout=$so_ran ran_negative=$neg_ran ran_cli=$cli_ran locale_available=$LOCALE_AVAILABLE locale_float_bytes=$LOCALE_RESULT"
   echo "out=$OUT_DIR"
 } | tee "$OUT_DIR/summary.txt"
 [ "$so_rc" -eq 0 ] && [ "$cli_rc" -eq 0 ] && exit 0
