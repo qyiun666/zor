@@ -1,0 +1,15 @@
+usage: zorcc [flags] <file.zor>
+       zorcc [flags] <file.zor> -o <output>
+
+flags:
+  -o <output>       build a native executable (atomic publish)
+  -O0               no optimization; checked overflow
+  -O1               basic optimization; checked overflow
+  -O2               standard optimization; wrapping overflow (default)
+  -O3               aggressive optimization; wrapping overflow
+  -Os               optimize for size; wrapping overflow
+  -Og               debug-friendly optimization; checked overflow
+  -g                emit debug information
+  --diag=json       compile diagnostics as NDJSON on stderr
+  --version, -V     print version and exit
+  --help            print this help and exit
