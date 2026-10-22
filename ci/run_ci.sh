@@ -4,6 +4,7 @@
 # 设计依据：shared/ZOR-0.1x-CI基线-设计草案-v1.md；QA 门禁 v2；排期验收单 V-3/M-1
 #
 # 阶段：cargo(可选,OQ-1方案B参考实现) → compile(debug/release 双模式,OQ-2) → unit-test → golden → code-table → rust-compare → run-smoke → [asan(Linux,--asan)] → [bench]
+# L2b：--runtime-codes 为独立模式（单段 summary），只执行宿主检查＋runtime-codes 判据；不改既有七段／八段语义。
 set -uo pipefail
 shopt -s nullglob  # S-1：未命中 glob 展开为空数组，杜绝字面 glob 进循环的旁路
 
@@ -74,16 +75,22 @@ asan_host_pin_check() {
   return 0
 }
 
-STRICT=0; WITH_BENCH=0; WITH_ASAN=0; ASAN_HOST_CHECK=0
+STRICT=0; WITH_BENCH=0; WITH_ASAN=0; ASAN_HOST_CHECK=0; WITH_RUNTIME_CODES=0
 for arg in "$@"; do
   case "$arg" in
     --strict) STRICT=1 ;;
     --bench) WITH_BENCH=1 ;;
     --asan) WITH_ASAN=1 ;;
     --asan-host-check) WITH_ASAN=1; ASAN_HOST_CHECK=1 ;;
-    *) echo "[ci] 未知参数 $arg (可用: --strict --bench --asan --asan-host-check)"; exit 2 ;;
+    --runtime-codes) WITH_RUNTIME_CODES=1 ;;
+    *) echo "[ci] 未知参数 $arg (可用: --strict --bench --asan --asan-host-check --runtime-codes)"; exit 2 ;;
   esac
 done
+
+if [ "$WITH_RUNTIME_CODES" = 1 ] && { [ "$STRICT" = 1 ] || [ "$WITH_ASAN" = 1 ] || [ "$WITH_BENCH" = 1 ]; }; then
+  echo "[ci] --runtime-codes 为独立模式，不可与 --strict／--asan／--bench 组合" >&2
+  exit 2
+fi
 
 if [ "$ASAN_HOST_CHECK" = 1 ]; then
   if asan_host_pin_check; then exit 0; fi
@@ -654,6 +661,42 @@ stage_asan() { # L2a CI-01：宿主固定 + QA-01 ASAN/LSAN 脚本；fail-closed
     [ "$STRICT" = 1 ] && record asan FAIL 1 "$log" || record asan SKIP 0 "$log"
   fi
 }
+
+stage_runtime_codes() { # L2b CI-01：独立 Linux job；直调 QA 判据脚本；无 sanitizer；fail-closed
+  local log; log="$(new_log runtime-codes)"
+  local out="$LOG_DIR/runtime-codes"
+  mkdir -p "$out"
+  if [ -z "$ZORC" ]; then
+    echo "zorcc 未安装：runtime-codes 判 FAIL（不可 SKIP 洗绿）" > "$log"
+    record runtime-codes FAIL 1 "$log"
+    return
+  fi
+  if [ ! -f tests/runtime/run_runtime_codes.sh ]; then
+    echo "runtime-codes 判据脚本缺失：tests/runtime/run_runtime_codes.sh（QA-01 未合入）" > "$log"
+    record runtime-codes FAIL 1 "$log"
+    return
+  fi
+  local rc=0
+  CC="${CC:-cc}" ZORC_BIN="$ZORC" OUT_DIR="$out" \
+    bash tests/runtime/run_runtime_codes.sh --strict --out "$out" --zorc "$ZORC" >>"$log" 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "[runtime-codes] 判定=PASS" >> "$log"
+    record runtime-codes PASS 0 "$log"
+  else
+    echo "[runtime-codes] 判定=FAIL rc=$rc" >> "$log"
+    record runtime-codes FAIL 1 "$log"
+  fi
+}
+
+if [ "$WITH_RUNTIME_CODES" = 1 ]; then
+  stage_runtime_codes
+  {
+    echo "--- stage summary ($RUN_ID) ---"
+    for s in "${summary[@]}"; do echo "$s"; done
+  } | tee "$LOG_DIR/summary.txt"
+  echo "[ci] 证据目录: $LOG_DIR"
+  exit "$overall"
+fi
 
 echo "[ci] run=$RUN_ID strict=$STRICT bench=$WITH_BENCH modes='$MODES' pos='$TESTS_POS_DIR' neg='$TESTS_NEG_DIR'"
 stage_cargo
