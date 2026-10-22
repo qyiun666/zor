@@ -30,3 +30,8 @@
 - n_pos 对称判据：strict 下正/负任一侧用例集为空即 FAIL（M-1 双侧对称）
 - 回归夹具：tests/specs/{positive,m1-s1-passthrough.zor|negative,m1-s1-negative.zor}（AC 用例批量落码前保持套件非空，不计入 AC-R1-2 计数）
 - 外部 CI（D-020）：workflow 发布——push/PR 默认模式；strict/bench 经 workflow_dispatch 演练；ci/logs 以 artifact 上传（30 天）
+
+## L2b runtime-codes（0.3.1 起）
+- `bash ci/run_ci.sh --runtime-codes`：独立模式（不可与 `--strict／--asan／--bench` 组合），只执行宿主检查＋`stage_runtime_codes`，输出单段 `summary.txt`；baseline 七段、asan-linux 八段零改
+- job：`ubuntu-24.04`＋clang-18、timeout 20、无 sanitizer（rc=101 只在此判）；29 runtime＋6 width fail-closed＋8 CLI；artifact `runtime-codes-logs-<run_id>-<attempt>` 90 天；fail-closed F-RC-1～14，不得 SKIP／`continue-on-error`／重跑洗绿
+- 资产由 QA 提供：`tests/runtime/runtime-codes.tsv`、`width-failclosed.tsv`、`cli-cases.tsv`、`expected/`；缺件即 FAIL
