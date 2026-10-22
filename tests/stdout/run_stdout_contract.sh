@@ -16,8 +16,9 @@
 #   显式 FAIL 优先；任一段 FAIL → 脚本 rc=1。
 #
 # 判据：
-#   - 静态：48 runtime＋10 negative＋14 CLI＝72；new-cases 72；schema／路径／重复／expected 缺件。
-#   - 旧资产快照：legacy-snapshot.sha256 逐文件 sha256；旧五值／runtime-codes／manifest 计数复核。
+#   - 静态：62 runtime＋10 negative＋14 CLI＝86；new-cases 86；schema／路径／重复／expected 缺件。
+#   - 旧资产快照：legacy-snapshot.sha256 逐文件 sha256；l2c-baseline.sha256 锁 69 条未变用例；
+#     旧五值／runtime-codes／manifest 计数复核。
 #   - runtime：两轮构建＋运行；stdout 逐字节 cmp；run 模式 stderr 0 B；terminate 模式 rc=101 且只判 stdout。
 #   - negative：两轮 rc=1、零产物、stderr 含判词；不新增 E 码。
 #   - CLI：NDJSON 六键固定序／行序／文本对照；版本短路；-o 零残留；usage 不泄露内部位。
@@ -33,6 +34,7 @@ NEGATIVE_TSV="$STDOUT_DIR/negative.tsv"
 CLI_TSV="$STDOUT_DIR/cli-cases.tsv"
 NEW_TSV="$STDOUT_DIR/new-cases.tsv"
 SNAPSHOT="$STDOUT_DIR/legacy-snapshot.sha256"
+L2C_BASELINE="$STDOUT_DIR/l2c-baseline.sha256"
 NDJSON_CHECK="$STDOUT_DIR/ndjson_check.py"
 ZORC="${ZORC_BIN:-zorcc}"
 CC_REAL="${CC:-cc}"
@@ -40,10 +42,10 @@ OUT_DIR="${OUT_DIR:-}"
 STRICT=0
 VALIDATE_ONLY=0
 ALLOW_NONLINUX=0
-EXPECT_RUNTIME=48
+EXPECT_RUNTIME=62
 EXPECT_NEGATIVE=10
 EXPECT_CLI=14
-EXPECT_TOTAL=72
+EXPECT_TOTAL=86
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -93,7 +95,7 @@ cli_fail_msg() { cli_fail+=("$1"); cli_n=$((cli_n+1)); }
 # ---------- 静态校验 ----------
 validate_assets() {
   local bad=0
-  for f in "$RUNTIME_TSV" "$NEGATIVE_TSV" "$CLI_TSV" "$NEW_TSV" "$SNAPSHOT" "$NDJSON_CHECK"; do
+  for f in "$RUNTIME_TSV" "$NEGATIVE_TSV" "$CLI_TSV" "$NEW_TSV" "$SNAPSHOT" "$L2C_BASELINE" "$NDJSON_CHECK"; do
     if [ ! -f "$f" ]; then
       so_fail_msg "缺件:${f#$REPO_ROOT/}"
       bad=1
@@ -127,7 +129,7 @@ validate_assets() {
     [ -n "$cid" ] || continue
     case "$seen" in *" $cid "*) so_fail_msg "重复 ID:$cid"; bad=1 ;; esac
     seen="$seen$cid "
-    case "$cid" in S[1-6]-*) ;; *) so_fail_msg "非法 runtime ID:$cid"; bad=1 ;; esac
+    case "$cid" in S[1-7]-*) ;; *) so_fail_msg "非法 runtime ID:$cid"; bad=1 ;; esac
     case "$src" in tests/stdout/cases/*) ;; *) so_fail_msg "$cid 源路径不在 tests/stdout/cases"; bad=1 ;; esac
     [ -f "$REPO_ROOT/$src" ] || { so_fail_msg "$cid 源缺件:$src"; bad=1; }
     case "$exp" in expected/*) ;; *) so_fail_msg "$cid expected 路径非法"; bad=1 ;; esac
@@ -168,8 +170,10 @@ validate_snapshot() {
   fi
   if command -v sha256sum >/dev/null 2>&1; then
     ( cd "$REPO_ROOT" && sha256sum -c --quiet "$SNAPSHOT" ) >/dev/null 2>&1 || { so_fail_msg "旧资产快照不一致"; return 1; }
+    ( cd "$REPO_ROOT" && sha256sum -c --quiet "$L2C_BASELINE" ) >/dev/null 2>&1 || { so_fail_msg "L2c 未变用例快照不一致"; return 1; }
   else
     ( cd "$REPO_ROOT" && shasum -a 256 -c "$SNAPSHOT" ) >/dev/null 2>&1 || { so_fail_msg "旧资产快照不一致"; return 1; }
+    ( cd "$REPO_ROOT" && shasum -a 256 -c "$L2C_BASELINE" ) >/dev/null 2>&1 || { so_fail_msg "L2c 未变用例快照不一致"; return 1; }
   fi
   return 0
 }

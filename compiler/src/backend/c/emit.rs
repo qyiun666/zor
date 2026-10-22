@@ -8,9 +8,15 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 
 use super::super::ir::{
-    ArithOp, Func, IntExpr, IntTy, LocalId, PrintArg, Program, Stmt, StrArg,
+    ArithOp, Func, IntExpr, IntTy, LocalId, PrintArg, Program, Stmt, StrArg, Value,
 };
 use crate::backend::OverflowMode;
+
+/// `println` 的原子写出单元：编译期字节片段或运行期整型表达式。
+enum Part {
+    Bytes(String, usize),
+    Int(IntTy, String),
+}
 
 pub fn emit(prog: &Program, source_path: &str, overflow: OverflowMode) -> String {
     let mut out = String::new();
@@ -33,12 +39,12 @@ fn prog_uses_int_arith(prog: &Program) -> bool {
     prog.funcs.iter().any(|f| {
         f.body.iter().any(|s| match s {
             Stmt::BindInt { .. } | Stmt::EvalInt { .. } => true,
-            Stmt::Print { args, .. } => args.iter().any(|a| {
-                matches!(
-                    a,
-                    PrintArg::Int { expr, .. }
-                        if !matches!(expr, IntExpr::Const(_) | IntExpr::Local(_))
-                )
+            Stmt::Print { args, .. } => args.iter().any(|a| match a {
+                PrintArg::Int { expr, .. } => {
+                    !matches!(expr, IntExpr::Const(_) | IntExpr::Local(_))
+                }
+                PrintArg::Composite(v) => value_needs_arith_helpers(v),
+                _ => false,
             }),
             _ => false,
         })
@@ -97,6 +103,102 @@ pub fn escape_line_filename(path: &str) -> String {
     out
 }
 
+/// 复合值的编译期结构：按契约模板递归展开为字节片段与运行期整型单元。
+/// 空字节片段（空 `[byte; N]`／空字符串）不产生写调用，但位置与分隔符不变。
+fn flatten_value(
+    v: &Value,
+    parts: &mut Vec<Part>,
+    out: &mut String,
+    counter: &mut usize,
+    overflow: OverflowMode,
+    tmp_counter: &mut usize,
+) {
+    match v {
+        Value::Int { ty, expr } => {
+            let val = emit_int_expr(out, expr, *ty, overflow, tmp_counter);
+            parts.push(Part::Int(*ty, val));
+        }
+        Value::Bytes(bytes) => push_bytes_part(parts, out, counter, bytes),
+        Value::Tuple(vs) => {
+            if vs.is_empty() {
+                push_bytes_part(parts, out, counter, b"()");
+                return;
+            }
+            push_bytes_part(parts, out, counter, b"(");
+            for (i, x) in vs.iter().enumerate() {
+                if i > 0 {
+                    push_bytes_part(parts, out, counter, b", ");
+                }
+                flatten_value(x, parts, out, counter, overflow, tmp_counter);
+            }
+            push_bytes_part(parts, out, counter, b")");
+        }
+        Value::Array(vs) => {
+            push_bytes_part(parts, out, counter, b"[");
+            for (i, x) in vs.iter().enumerate() {
+                if i > 0 {
+                    push_bytes_part(parts, out, counter, b", ");
+                }
+                flatten_value(x, parts, out, counter, overflow, tmp_counter);
+            }
+            push_bytes_part(parts, out, counter, b"]");
+        }
+        Value::Struct { name, fields } => {
+            if fields.is_empty() {
+                push_bytes_part(parts, out, counter, format!("{} {{}}", name).as_bytes());
+                return;
+            }
+            push_bytes_part(parts, out, counter, format!("{} {{ ", name).as_bytes());
+            for (i, (fname, fv)) in fields.iter().enumerate() {
+                if i > 0 {
+                    push_bytes_part(parts, out, counter, b", ");
+                }
+                push_bytes_part(parts, out, counter, format!("{}: ", fname).as_bytes());
+                flatten_value(fv, parts, out, counter, overflow, tmp_counter);
+            }
+            push_bytes_part(parts, out, counter, b" }");
+        }
+        Value::Enum { variant, payload } => {
+            if payload.is_empty() {
+                push_bytes_part(parts, out, counter, variant.as_bytes());
+                return;
+            }
+            push_bytes_part(parts, out, counter, format!("{}(", variant).as_bytes());
+            for (i, x) in payload.iter().enumerate() {
+                if i > 0 {
+                    push_bytes_part(parts, out, counter, b", ");
+                }
+                flatten_value(x, parts, out, counter, overflow, tmp_counter);
+            }
+            push_bytes_part(parts, out, counter, b")");
+        }
+    }
+}
+
+fn push_bytes_part(parts: &mut Vec<Part>, out: &mut String, counter: &mut usize, bytes: &[u8]) {
+    if bytes.is_empty() {
+        return;
+    }
+    let label = mangle("str", *counter, "");
+    *counter += 1;
+    emit_array(out, &label, bytes);
+    parts.push(Part::Bytes(label, bytes.len()));
+}
+
+fn value_needs_arith_helpers(v: &Value) -> bool {
+    match v {
+        Value::Int { expr, .. } => {
+            !matches!(expr, IntExpr::Const(_) | IntExpr::Local(_))
+        }
+        Value::Tuple(vs) | Value::Array(vs) => vs.iter().any(value_needs_arith_helpers),
+        Value::Struct { fields, .. } => {
+            fields.iter().any(|(_, x)| value_needs_arith_helpers(x))
+        }
+        Value::Enum { payload, .. } => payload.iter().any(value_needs_arith_helpers),
+        Value::Bytes(_) => false,
+    }
+}
+
 fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMode) {
     let src = escape_line_filename(source_path);
     let cname = if f.name == "main" {
@@ -139,12 +241,9 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
             Stmt::Print { args, newline, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
                 // 原子性：先求值全部运行期实参（E30xx 在此终止，stdout 零字节），再统一写出。
-                enum Part {
-                    Bytes(String, usize),
-                    Int(IntTy, String),
-                }
-                let mut parts: Vec<Part> = Vec::with_capacity(args.len());
+                let mut arg_parts: Vec<Vec<Part>> = Vec::with_capacity(args.len());
                 for arg in args {
+                    let mut parts: Vec<Part> = Vec::new();
                     match arg {
                         PrintArg::Int { ty, expr } => {
                             let v = emit_int_expr(out, expr, *ty, overflow, &mut tmp_counter);
@@ -162,21 +261,34 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
                             emit_array(out, &label, bytes);
                             parts.push(Part::Bytes(label, bytes.len()));
                         }
+                        PrintArg::Composite(value) => {
+                            flatten_value(
+                                value,
+                                &mut parts,
+                                out,
+                                &mut counter,
+                                overflow,
+                                &mut tmp_counter,
+                            );
+                        }
                     }
+                    arg_parts.push(parts);
                 }
-                for (i, part) in parts.iter().enumerate() {
+                for (i, parts) in arg_parts.iter().enumerate() {
                     if i > 0 {
                         out.push_str("    fputc(' ', stdout);\n");
                     }
-                    match part {
-                        Part::Bytes(label, len) => {
-                            let _ = writeln!(out, "    fwrite({label}, 1, {len}, stdout);");
-                        }
-                        Part::Int(IntTy::I64, v) => {
-                            let _ = writeln!(out, "    printf(\"%lld\", (long long)({}));", v);
-                        }
-                        Part::Int(IntTy::U8, v) | Part::Int(IntTy::U32, v) => {
-                            let _ = writeln!(out, "    printf(\"%u\", (unsigned)({}));", v);
+                    for part in parts {
+                        match part {
+                            Part::Bytes(label, len) => {
+                                let _ = writeln!(out, "    fwrite({label}, 1, {len}, stdout);");
+                            }
+                            Part::Int(IntTy::I64, v) => {
+                                let _ = writeln!(out, "    printf(\"%lld\", (long long)({}));", v);
+                            }
+                            Part::Int(IntTy::U8, v) | Part::Int(IntTy::U32, v) => {
+                                let _ = writeln!(out, "    printf(\"%u\", (unsigned)({}));", v);
+                            }
                         }
                     }
                 }

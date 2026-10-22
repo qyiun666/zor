@@ -1,0 +1,4 @@
+fn main() {
+    let a: [u8; 0] = [];
+    println(a);
+}

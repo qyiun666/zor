@@ -120,13 +120,27 @@ pub enum StrArg {
     Bytes(Vec<u8>),
 }
 
+/// L2d 打印值树：结构在编译期确定；运行期整型叶子引用已求值的局部。
+/// 可打印复合全部是 Copy，树不承载所有权／drop 语义。
+#[derive(Clone, Debug)]
+pub enum Value {
+    Int { ty: IntTy, expr: IntExpr },
+    Bytes(Vec<u8>),
+    Tuple(Vec<Value>),
+    Array(Vec<Value>),
+    Struct { name: String, fields: Vec<(String, Value)> },
+    Enum { variant: String, payload: Vec<Value> },
+}
+
 /// L2c 打印实参：字符串／字节串、三宽度运行期整型、编译期格式化字节。
+/// L2d 增加复合值树；标量分支保持零回退。
 #[derive(Clone, Debug)]
 pub enum PrintArg {
     Str(StrArg),
     Int { ty: IntTy, expr: IntExpr },
     /// 布尔／byte／unit／窄整型／浮点的契约格式化结果（编译期确定）。
     Bytes(Vec<u8>),
+    Composite(Value),
 }
 
 #[derive(Clone, Debug)]

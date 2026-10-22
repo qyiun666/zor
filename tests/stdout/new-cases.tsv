@@ -50,9 +50,6 @@ S6-04	S6	runtime	tests/stdout/cases/S6-04.zor	expected/S6-04.stdout	multi-arg ca
 N-01	NEGATIVE	compile-negative	tests/stdout/cases/N-01.zor	-	zero-arg println stays E1601
 N-02	NEGATIVE	compile-negative	tests/stdout/cases/N-02.zor	-	print with arg fail-closed
 N-03	NEGATIVE	compile-negative	tests/stdout/cases/N-03.zor	-	print zero-arg fail-closed
-N-04	NEGATIVE	compile-negative	tests/stdout/cases/N-04.zor	-	tuple fail-closed
-N-05	NEGATIVE	compile-negative	tests/stdout/cases/N-05.zor	-	struct fail-closed
-N-06	NEGATIVE	compile-negative	tests/stdout/cases/N-06.zor	-	enum fail-closed
 N-07	NEGATIVE	compile-negative	tests/stdout/cases/N-07.zor	-	Box fail-closed
 N-08	NEGATIVE	compile-negative	tests/stdout/cases/N-08.zor	-	struct with Box field fail-closed
 C1-01	CLI	cli	-	-	single diagnostic: six keys fixed order, stderr NDJSON, rc1
@@ -71,3 +68,20 @@ C4-01	CLI	cli	-	-	no args: usage rc2
 C4-02	CLI	cli	-	-	usage does not expose -Zoverflow or unopened -O*
 N-09	NEGATIVE	compile-negative	tests/stdout/cases/N-09.zor	-	&T argument fail-closed at println (conditional F-2)
 N-10	NEGATIVE	compile-negative	tests/stdout/cases/N-10.zor	-	&mut T argument fail-closed at println (conditional F-2)
+S5-01	S5	runtime	tests/stdout/cases/S5-01.zor	expected/S5-01.stdout	2-tuple
+S5-02	S5	runtime	tests/stdout/cases/S5-02.zor	expected/S5-02.stdout	3-tuple
+S5-03	S5	runtime	tests/stdout/cases/S5-03.zor	expected/S5-03.stdout	unit tuple regression
+S5-05	S5	runtime	tests/stdout/cases/S5-05.zor	expected/S5-05.stdout	array
+S5-06	S5	runtime	tests/stdout/cases/S5-06.zor	expected/S5-06.stdout	empty array
+S5-07	S5	runtime	tests/stdout/cases/S5-07.zor	expected/S5-07.stdout	struct 2 fields
+S5-08	S5	runtime	tests/stdout/cases/S5-08.zor	expected/S5-08.stdout	empty struct
+S5-09	S5	runtime	tests/stdout/cases/S5-09.zor	expected/S5-09.stdout	enum no-payload
+S5-10	S5	runtime	tests/stdout/cases/S5-10.zor	expected/S5-10.stdout	enum tuple variant
+S5-11	S5	runtime	tests/stdout/cases/S5-11.zor	expected/S5-11.stdout	nested mixed struct
+S5-12	S5	runtime	tests/stdout/cases/S5-12.zor	expected/S5-12.stdout	struct-in-tuple
+S7-01	S7	runtime	tests/stdout/cases/S7-01.zor	expected/S7-01.stdout	[u8;N] array form
+S7-02	S7	runtime	tests/stdout/cases/S7-02.zor	expected/S7-02.stdout	[u8;N] array form
+S7-03	S7	runtime	tests/stdout/cases/S7-03.zor	expected/S7-03.stdout	[u8;N] array form
+N-11	N	compile-negative	tests/stdout/cases/N-11.zor	-	tuple containing Box fail-closed
+N-12	N	compile-negative	tests/stdout/cases/N-12.zor	-	struct nested tuple containing Box fail-closed
+N-13	N	compile-negative	tests/stdout/cases/N-13.zor	-	enum any-variant Box type-level fail-closed

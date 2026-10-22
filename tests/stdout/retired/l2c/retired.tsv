@@ -1,0 +1,4 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-04	tests/stdout/cases/N-04.zor	1	none	zorcc: codegen:	zor: runtime error	tuple fail-closed
+N-05	tests/stdout/cases/N-05.zor	1	none	zorcc: codegen:	zor: runtime error	struct fail-closed
+N-06	tests/stdout/cases/N-06.zor	1	none	zorcc: codegen:	zor: runtime error	enum fail-closed

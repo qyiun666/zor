@@ -1,0 +1,5 @@
+fn main() {
+    let t = (1, true);
+    println(t);
+    println(t[0]);
+}

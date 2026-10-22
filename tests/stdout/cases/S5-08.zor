@@ -1,0 +1,6 @@
+struct Empty {}
+
+fn main() {
+    let e = Empty {};
+    println(e);
+}
