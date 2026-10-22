@@ -26,9 +26,9 @@
 
 ### 门禁与回归读数
 
-- QA GATE-01（L2b）结论：⟨待回填：PASS／FAIL＋报告路径＋sha256⟩。main push run：⟨待回填：run id 与 job 结论⟩；`runtime-codes` job：⟨待回填：29＋6＋8 实测 PASS 数、两轮一致性、artifact 名⟩；baseline strict 七段：⟨待回填 7/7⟩；asan-linux 八段：⟨待回填 8/8⟩；`cargo test`：⟨待回填 n/0⟩。
-- 计数与码表：positive 41／negative 53／golden 53／compare 3／`tests/specs` `.zor` 94（期望不变，待复核）；code-table `23/23/19/1/1/2/19/19/14`（`DECLRT=2`、`EMIT=19`、`GOLDEN=19`）；L2a manifest 48／7 零改；`r2:9` 零触。
-- 退出码取证：Linux `ubuntu-24.04` x86_64 实测 `exit(101)`；ASAN UAF rc、LSAN rc 单列；⟨待回填：run id／artifact／sha256⟩。macOS 不作 rc=101 终证。
+- QA GATE-01（L2b）结论：**PASS**——`shared/ZOR-L2b-GATE-01-20261022/ZOR-L2b-GATE-01终报告-QA-v1.md`（sha256 `5aa0597a14abaf4f6ece8b5bb1f83545c3b7141f0baea014acf539a0aac649ed`；证据包 49 文件 `900a1ae981ad7c6371ac1400c55ccefa099df57ead94cd96a661003585582c5e`）。main push run：`39756401504`（head `0b00eb2`），baseline／asan-linux／runtime-codes 三 job success；`runtime-codes` job：runtime 58/58（29×2）、width 12/12（6×2）、CLI 8/8、`fail=0`、两轮 summary SAME、artifact `runtime-codes-logs-39756401504-1`；baseline strict 七段：7/7（artifact `ci-logs-39756401504-1`）；asan-linux 八段：8/8（artifact `asan-logs-39756401504-1`）；`cargo test`：191/0。
+- 计数与码表：positive 41／negative 53／golden 53／compare 3／`tests/specs` `.zor` 94（已复核）；code-table `23/23/19/1/1/2/19/19/14`（`DECLRT=2`、`EMIT=19`、`GOLDEN=19`）；L2a manifest 48／7 零改；`r2:9` 零触。
+- 退出码取证：Linux `ubuntu-24.04` x86_64 实测 `exit(101)`（main run `39756401504`，`run_rc=101` 34 行；artifact `runtime-codes-logs-39756401504-1`）；ASAN UAF rc、LSAN rc 单列于 `asan-logs-39756401504-1`；GATE 报告 sha256 `5aa0597a14abaf4f6ece8b5bb1f83545c3b7141f0baea014acf539a0aac649ed`。macOS 不作 rc=101 终证。
 - 零 tag／零 Release；无 `[0.3.2]`；0.3.0 历史节零改。
 
 ### Known issues（跟踪中，非本版拦截）
