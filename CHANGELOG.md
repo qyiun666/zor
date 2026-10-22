@@ -4,6 +4,47 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.3] - 2026-10-22
+
+内部验证里程碑，非可用语言版本：本版为 L2d「复合类型输出与安装树 smoke」——在 0.3.2 的 stdout／CLI 契约之上，实现可打印复合值（tuple 0／≥2 元、array、struct、enum、嵌套）、`[u8;N]` 数组形态与只读投影 `p.x`／`t[0]`／`a[1]`，并提供 Linux x86_64 安装树 smoke。1 元组源形态 N/A；`-O*` 维持关闭并转 L2e。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装承诺或生产环境可用性承诺。
+
+本版口径：可打印性按类型级判定；含引用／`Box`／`Handle`／函数类型的复合值整体 rc=1 fail-closed（`zorcc: codegen:`、零产物），不宣称所有类型均可打印。G-D-1 实现面 **6／6** 仅在 stdout 契约 v1.2 口径下成立（含 v1.2.1 Q-2～Q-4 补丁）：多实参／终饰／12 原始类型／`[byte;N]`／运行期终止出口（L2c）＋复合 tuple（0／≥2 元）／array／struct／enum／嵌套（L2d）。计数 **90**＝stdout **86**（runtime 62＋负控 10＋CLI 14）＋packaging **4**；S5 11＋S7 3；N-04～06 退役归档、N-11～13 新增；旧五值 41／53／53／3／94、码表 `23/23/19/1/1/2/19/19/14`、manifest 48／7、runtime-codes 29＋6＋8、baseline 7/7、asan 8/8 零改。14 条新增 expected 与产品会签逐字节 SAME。
+
+### Added
+
+- **复合类型输出**：tuple（0 元 `()`；≥2 元 `(`＋元素以 `, ` 连接＋`)`）、array（`[`＋元素以 `, ` 连接＋`]`，0 长 `[]`）、struct（`类型名 { 字段: 值, ... }`，0 字段 `类型名 {}`，字段按声明顺序）、enum（无载荷／0 载荷 `变体名`；≥1 载荷 `变体名(...)`；不输出 enum 前缀）与嵌套递归；无尾逗号。1 元组源形态 N/A。可打印性按类型级判定；`&T`／`&mut T`／`Box<T>`／`Handle<T>`／fn 及含其成员的复合值整体 fail-closed；一次 `println` 原子输出。
+- **`[u8;N]` 数组形态**：`[u8;N]` 按十进制数组输出（`[1, 2]`、`[]`），与 `[byte;N]` 原始字节严格区分；`[byte;N]`／`[u8;N]` 字面量元素仅编译期常量，非常量元素 rc=1 fail-closed。
+- **只读投影**：`p.x`／`t[0]`／`a[1]` 可作为 `println` 实参，按成员类型递归格式化；下标须为整数字面量，非字面量下标 fail-closed；投影不移动／drop／改写值。
+- **R-1 安装树 smoke**：canonical `prefix/bin/zorcc`＋`prefix/share/zor/runtime/{zor_rt.c,h}`；resolver 新增 `exe/../share/zor/runtime` 候选；安装树外置 exe 不命中构建机绝对路径；解析失败列出已搜索候选，rc=2、零产物。Linux x86_64 安装树 smoke 通过。
+- **`packaging-smoke` 门禁**：新增独立 `packaging-smoke` job（`ubuntu-24.04` x86_64、timeout 20、artifact 90 天、fail-closed、advisory）；P-01～P-04 4/4 真执行；required 仍仅 `stdout-contract`，ruleset 未改。
+
+### Changed
+
+- **计数与负控**：stdout 由 72 扩至 **90**（runtime 62／负控 10／CLI 14）＋packaging 4；N-04～06（tuple／struct／enum 旧 fail-closed）退役归档，N-11～13 新增；S5 11／S7 3；旧五值、码表九值、manifest 48／7、runtime-codes 29＋6＋8、baseline 7/7、asan 8/8 零改。
+- **`stdout-contract`**：更新为 62／10／14 全真执行；两段 `ran=` 守门；两轮 SAME；Linux x86_64 终证。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.2` 落至 `0.3.3`；`compiler/Cargo.toml:5` description 版本串同步；`Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；`--version`／`-V` 输出 `zorcc 0.3.3`。
+
+### 门禁与回归读数
+
+- GATE-L2d-01：**PASS**——main `fbab0752f42e8b0a550152787516fa7aeacf92de`；run `39811902198`；`baseline`／`asan-linux`／`runtime-codes`／`stdout-contract`／`packaging-smoke` 五 job 全 **success**。
+- 三段判词：`PASS|stdout-contract|runtime=62 negative=10 fail=0 ran=62/10`；`PASS|cli-contract|cases=14 fail=0 ran=14`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`。
+- 读数：baseline strict 七段 **7/7**；asan-linux 八段 **8/8**（`R=7` ASAN／LSAN 零报告）；runtime-codes **29＋6＋8**（runtime 58/58、width 12/12、CLI 8/8、`fail=0`）；`cargo test` **261/0**；码表九值 `23/23/19/1/1/2/19/19/14`；旧五值 **41／53／53／3／94**；manifest **48＝41＋7**；legacy-snapshot **226**；`compiler/src` E30xx 字面 **0**；14 条 expected 与产品会签 `l2d-expected.sha256`（`c5ea65994b47d4448c937d044979636d90d6687ef2ae187a7c75deca38c50cef`）**14/14 逐字节 SAME**。
+- 证据：GATE 报告 `shared/ZOR-L2d-GATE-01-20261022/reports/GATE-L2d-01-报告-v1.md`（sha256 `d7686f223be1b9803ee97f0d9045e0afd4df61a601b6b546034cd0d0121111b6`）；证据包 `SHA256SUMS`（1126 文件）`2475689f56a396945298578b46a92c4e97c127210d5591d25de9990a8dc23560`。
+- 零 tag／零 Release；`[0.3.2]`／`[0.3.1]`／`[0.3.0]` 历史节零改。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **1 元组**：源形态 N/A（`(x,)` 折叠为 `x`，`(T,)` 折叠为 `T`），S5-04 未建；不新增语法。
+- **`-O*`／G-D-2**：0.3.2 所记 `-O*`／G-D-2 归 L2d 为当时计划，0.3.3 起以 L2e 为准；`-O*` 维持关闭（`-O0`／`-O2`／缺省；`-Og`／`-O1`／`-O3`／`-Os` rc=2）。
+- **`println(*b)`**：独立 `Box` 解引用实参在 main 0.3.2 已复现的既有缺陷（C 后端未声明变量，rc=2），不属 L2d 修复面，另票跟踪；复合内 `(*b, 2)` 已由新路径处理。
+- **R-1**：仅 Linux x86_64 安装树 smoke 通过；不构成安装或包管理器／跨平台／生产环境可用性承诺。
+- **`packaging-smoke`**：仍为 advisory job；终证仅 Linux x86_64，未提升为 required，ruleset 未改。
+- **ASAN 范围**：asan-linux 八段 8/8；`R=7` 条 build-run 结论不外推至 62 条 runtime，未逐条 ASAN。
+- **Q-3／Q-4 负控**：非常量元素、非字面量下标由类型／check 面与单测覆盖，无独立 CLI 负例；不改变 90 计数。
+- **NaN**：无端到端源形态（D-L2c-12）；格式化函数位模式单测覆盖，不列入 L2d 判据。
+- **跨平台**：stdout／CLI／packaging 终证仅 Linux x86_64；macOS 仅辅助，不作判据；Windows／其他发行版不在本版。
+- 零 tag／Release；不构成对外 API 稳定承诺。
+
 ## [0.3.2] - 2026-10-22
 
 内部验证里程碑，非可用语言版本：本版为 L2c「stdout 与结构化 CLI 契约」——在 0.3.1 的运行期诊断契约之上，定稿 stdout 契约 v1，落多实参分隔、终饰、12 原始类型、`[byte;N]` 与运行期终止前 stdout 原子输出，新增 `--diag=json`，冻结 `--version`／`-V`，并以独立 Linux x86_64 `stdout-contract` 门禁覆盖 stdout／CLI 字节级判据。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装承诺或生产环境可用性承诺。
