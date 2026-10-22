@@ -8,7 +8,7 @@
 
 内部验证里程碑，非可用语言版本：本版为 L2e「用户可见优化档、`--help` 与 `println(*b)` 修复」——在 0.3.3 的 stdout／CLI 与复合输出之上，开闸 `-O0`／`-O1`／`-O2`／`-O3`／`-Os`／`-Og` 六档并映射 C 编译器同名旗标，新增固定 `--help`，修复 `println(*b)` 的 `Box<i64>` 单 Box 解引用路径；安装树 `packaging-smoke` 仍为 advisory，待账本合并后连续两次 main 全绿再切 required。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装承诺或生产环境可用性承诺。
 
-本版口径：`-O*` 六档全接受，缺省 `-O2`，重复按最后一次生效；每档真实传给 C 编译器同名旗标，不静默降级。溢出语义：`-O0`／`-O1`／`-Og` 为 checked（E3001、rc=101），`-O2`／`-O3`／`-Os` 为 wrap；E3002 除零在所有档位 rc=101。非法值 `-O4`／`-O9`／`-Ofast`／`-O2x`／裸 `-O` rc=2、零产物。`--help` 仅长旗标，任意位置短路，stdout 706 B 固定文本、rc=0、stderr 0 B、零产物；`--version`／`-V` 优先于 help，help 优先于非法 flag／`-o` 缺值；不提供 `-h`。`println(*b)` 仅修 `Box<i64>`，单／多实参、重复读取不消费；其余 Box 载荷与 `println(b)` 维持 rc=1 fail-closed；typed Box 泛型化另票，不是本版能力。内部溢出覆盖位仍仅由 CI 注入，不作为用户开关、不出现在 `--help`。计数 **98**＝stdout **94**（runtime 65＋负控 12＋CLI 17）＋packaging **4**；runtime-codes **39＋6＋19**（64 行）；全量 **162**；`l2e-baseline` **162**（209 行）、`l2c-baseline` **68**（105 行）、`legacy-snapshot` **226**（恰 5 条变更、221 条零改）。
+本版口径：`-O*` 六档全接受，缺省 `-O2`，重复按最后一次生效；每档真实传给 C 编译器同名旗标，不静默降级。溢出语义：`-O0`／`-O1`／`-Og` 为 checked（E3001、rc=101），`-O2`／`-O3`／`-Os` 为 wrap；E3002 除零在所有档位 rc=101。非法值 `-O4`／`-O9`／`-Ofast`／`-O2x`／裸 `-O` rc=2、零产物。`--help` 仅长旗标，任意位置短路，stdout 706 B 固定文本、rc=0、stderr 0 B、零产物；`--version`／`-V` 优先于 help，help 优先于非法 flag／`-o` 缺值；不提供 `-h`。`println(*b)` 仅修 `Box<i64>`，单／多实参、重复读取不消费；其余 Box 载荷与 `println(b)` 维持 rc=1 fail-closed；typed Box 泛型化另票，不是本版能力。内部溢出覆盖位仍仅由 CI 注入，不作为用户开关、不出现在 `--help`。计数 **98**＝stdout **94**（runtime 65＋负控 12＋CLI 17）＋packaging **4**；runtime-codes **39＋6＋19**（64 行）；全量 **162**；`l2e-baseline` **162** 条（sha256 清单 209 行）、`l2c-baseline` **68** 条（sha256 清单 105 行）、`legacy-snapshot` **226**（恰 5 条变更、221 条零改）。
 
 ### Added
 
@@ -19,7 +19,7 @@
 ### Changed
 
 - **优化与溢出语义**：`-O0`／`-O1`／`-Og` checked（E3001、rc=101）；`-O2`／`-O3`／`-Os` wrap；E3002 全档 rc=101；0.3.3 的 `-O0` checked／`-O2` wrap 零回退。
-- **计数与资产**：stdout 由 **86**（62＋10＋14）扩至 **94**（65＋12＋17）＋packaging 4＝**98**（0.3.3 总 90 → 98）；runtime-codes 由 29＋6＋8 扩至 **39＋6＋19**（64 行）；全量 **162**；`l2e-baseline` 162 条（209 行）、`l2c-baseline` 68 条（105 行）、`legacy-snapshot` 226 条（恰 5 条变更、221 条零改）；`C4-02` 显式变更为无参 usage 断言（help 由 C5-01～03 覆盖），旧→新哈希在 QA 资产说明留痕。
+- **计数与资产**：stdout 由 **86**（62＋10＋14）扩至 **94**（65＋12＋17）＋packaging 4＝**98**（0.3.3 总 90 → 98）；runtime-codes 由 29＋6＋8 扩至 **39＋6＋19**（64 行）；全量 **162**；`l2e-baseline` 162 条（sha256 清单 209 行）、`l2c-baseline` 68 条（sha256 清单 105 行）、`legacy-snapshot` 226 条（恰 5 条变更、221 条零改）；`C4-02` 显式变更为无参 usage 断言（help 由 C5-01～03 覆盖），旧→新哈希在 QA 资产说明留痕。
 - **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.3` 落至 `0.3.4`；`compiler/Cargo.toml:5` description 版本串同步；`compiler/Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.4`。
 - **`packaging-smoke`**：本版合并时仍 advisory；账本合并后连续两次 main 全绿（GATE run `39860926956`＋账本 run）转 required，只改 ruleset `25633324`，切换后以 ruleset 为准；仅基础设施未执行可记录回退，代码红必须修复。
 
@@ -38,7 +38,7 @@
 - **`println(*b)` 范围**：仅 `Box<i64>`；其余 Box 载荷与 `println(b)` 维持 rc=1 fail-closed；typed Box 泛型化不在本版，另票跟踪。
 - **`l2e-baseline` 接入**：尚未接入 `ci/run_ci.sh`，由 GATE／QA 以 `shasum -c` 手工核验；本版通过。
 - **`packaging-smoke`**：仍为 advisory；账本＋两连绿后再切 ruleset，切换前不作为 required。
-- **PA-L2e**：PA-L2e-01～08 待 0.3.4 账本合并后执行；本版 CHANGELOG 不写 PA 通过。
+- **PA-L2e**：PA-L2e-01～08 待 0.3.4 账本合并后执行。
 - **性能**：`-O*` 只承诺接受与 cc 映射，不出性能数字、不作达标承诺。
 - 零 tag／Release；不构成安装、包管理器、跨平台或生产环境可用性承诺。
 
