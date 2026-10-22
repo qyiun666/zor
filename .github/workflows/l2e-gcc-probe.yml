@@ -1,6 +1,10 @@
 name: l2e-gcc-probe
 # 一次性证据：Linux x86_64 + GCC 六档 -O*；不进入 main、不建 opt-matrix job。
 on:
+  push:
+    paths:
+      - ci/probes/opt_levels_gcc.sh
+      - .github/workflows/l2e-gcc-probe.yml
   workflow_dispatch:
 jobs:
   probe:
