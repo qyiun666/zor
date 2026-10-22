@@ -86,6 +86,15 @@ pub fn build(
         col: e.col,
         what: e.what,
     })?;
+    // L2a A1 守卫：CORE-03 只产事件，不生成 malloc／free／drop；运行期归 CORE-04。
+    if ir.needs_l2a_runtime() {
+        let (line, col) = ir.first_l2a_pos().unwrap_or((1, 1));
+        return Err(BuildError::Unsupported {
+            line,
+            col,
+            what: "drop／Box 运行期（L2a CORE-04 前不生成）".to_string(),
+        });
+    }
     let source_str = source.to_str().ok_or_else(|| BuildError::Toolchain {
         msg: "源路径不是合法 UTF-8，无法写入 #line".to_string(),
     })?;
@@ -120,4 +129,40 @@ fn same_file(source: &Path, output: &Path) -> bool {
         }
     };
     src == out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build, BuildError, BuildOptions};
+    use crate::compile_typed;
+    use std::path::Path;
+
+    #[test]
+    fn l2a_runtime_guard_rejects_box_program_before_emit() {
+        let c = compile_typed("fn main() { let b = box 1; }");
+        assert!(c.diags.is_empty(), "{:?}", c.diags);
+        let e = build(
+            &c.prog,
+            &c.types,
+            Path::new("t.zor"),
+            Path::new("/tmp/zor-core03-guard-never"),
+            BuildOptions::default(),
+        )
+        .expect_err("guard must reject");
+        match e {
+            BuildError::Unsupported { what, line, col } => {
+                assert!(what.contains("CORE-04"), "{what}");
+                assert_eq!((line, col), (1, 13));
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn hello_ir_has_no_l2a_runtime() {
+        let c = compile_typed("fn main() { let s = \"hi\"; println(s); }");
+        assert!(c.diags.is_empty(), "{:?}", c.diags);
+        let ir = super::lower::lower(&c.prog, &c.types).expect("lower");
+        assert!(!ir.needs_l2a_runtime());
+    }
 }
