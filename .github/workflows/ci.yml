@@ -38,3 +38,34 @@ jobs:
           name: ci-logs-${{ github.run_id }}-${{ github.run_attempt }}
           path: ci/logs/
           retention-days: 30
+
+  # L2a CI-01：Linux ASAN/LSAN 零报告门禁（G-A-1）。
+  # 固定 ubuntu-24.04 + clang-18.1.3；manifest／7 条 build-run 由 QA-01 提供。
+  # CORE-04 落件前本 job 预期红（7 条 Box/drop 样本尚不能构建）；这是 fail-closed，
+  # 不是放行信号；不得用 continue-on-error 或重跑洗绿。
+  asan-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host pin preflight
+        run: bash ci/run_ci.sh --asan-host-check
+      - name: Manifest preflight
+        run: bash ci/asan/run_asan.sh --validate-only
+      - name: Build zorcc (release)
+        working-directory: compiler
+        run: cargo build --release
+      - name: ASAN/LSAN gate (strict, 8 stages)
+        env:
+          ZORC_BIN: ${{ github.workspace }}/compiler/target/release/zorcc
+        run: bash ci/run_ci.sh --strict --asan
+      - name: Upload ASAN evidence (ci/logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asan-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci/logs/
+          retention-days: 90
+          if-no-files-found: error

@@ -3,7 +3,7 @@
 # 归属：ZOR工具链与开发工程师｜版本：skeleton-v2（V-3+M-1 收尾）｜2026-10-11
 # 设计依据：shared/ZOR-0.1x-CI基线-设计草案-v1.md；QA 门禁 v2；排期验收单 V-3/M-1
 #
-# 阶段：cargo(可选,OQ-1方案B参考实现) → compile(debug/release 双模式,OQ-2) → unit-test → [bench]
+# 阶段：cargo(可选,OQ-1方案B参考实现) → compile(debug/release 双模式,OQ-2) → unit-test → golden → code-table → rust-compare → run-smoke → [asan(Linux,--asan)] → [bench]
 set -uo pipefail
 shopt -s nullglob  # S-1：未命中 glob 展开为空数组，杜绝字面 glob 进循环的旁路
 
@@ -11,14 +11,84 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 [ -n "$REPO_ROOT" ] || { echo "[ci] 必须在 git 仓库内运行"; exit 2; }
 cd "$REPO_ROOT"
 
-STRICT=0; WITH_BENCH=0
+# L2a CI-01：ASAN 宿主固定（ubuntu-24.04／x86_64／clang 18.1.3）
+# 判据由 QA v1.3 §6 提供；本函数只做 CI 宿主身份闸，不替代 run_asan.sh 的 manifest／用例判据。
+asan_host_pin_check() {
+  local pin="$REPO_ROOT/ci/asan/host-pin.env"
+  [ -f "$pin" ] || { echo "[ci][asan] ENV FAIL: 缺少 $pin"; return 1; }
+  # shellcheck disable=SC1090
+  . "$pin"
+  local os arch os_id os_version clang_bin clang_version rt t f
+  os="$(uname -s)"; arch="$(uname -m)"
+  [ "$os" = "Linux" ] || {
+    echo "[ci][asan] ENV FAIL: 宿主必须是 Linux（当前 $os）；macOS 无 LSAN，不得判 PASS"
+    return 1
+  }
+  [ "$arch" = "${ZOR_ASAN_ARCH:-x86_64}" ] || {
+    echo "[ci][asan] ENV FAIL: 架构必须是 ${ZOR_ASAN_ARCH:-x86_64}（当前 $arch）"
+    return 1
+  }
+  [ -r /etc/os-release ] || { echo "[ci][asan] ENV FAIL: 缺少 /etc/os-release"; return 1; }
+  os_id="$(. /etc/os-release 2>/dev/null; printf '%s' "${ID:-}")"
+  os_version="$(. /etc/os-release 2>/dev/null; printf '%s' "${VERSION_ID:-}")"
+  [ "$os_id" = "${ZOR_ASAN_OS_ID:-ubuntu}" ] || {
+    echo "[ci][asan] ENV FAIL: OS ID=$os_id，要求 ${ZOR_ASAN_OS_ID:-ubuntu}"
+    return 1
+  }
+  [ "$os_version" = "${ZOR_ASAN_OS_VERSION:-24.04}" ] || {
+    echo "[ci][asan] ENV FAIL: OS VERSION_ID=$os_version，要求 ${ZOR_ASAN_OS_VERSION:-24.04}"
+    return 1
+  }
+  clang_bin="${ZOR_ASAN_CLANG_BIN:-clang-18}"
+  command -v "$clang_bin" >/dev/null 2>&1 || {
+    echo "[ci][asan] ENV FAIL: 缺少 $clang_bin"
+    return 1
+  }
+  clang_version="$("$clang_bin" --version 2>&1 | head -1)"
+  printf '%s' "$clang_version" | grep -Fq -- "${ZOR_ASAN_CLANG:-18.1.3}" || {
+    echo "[ci][asan] ENV FAIL: clang 版本不符：$clang_version（要求含 ${ZOR_ASAN_CLANG:-18.1.3}）"
+    return 1
+  }
+  rt="$("$clang_bin" -print-file-name=libclang_rt.asan-x86_64.a 2>/dev/null || true)"
+  if [ -z "$rt" ] || [ ! -f "$rt" ]; then
+    rt="$("$clang_bin" -print-file-name=libclang_rt.asan-x86_64.so 2>/dev/null || true)"
+  fi
+  [ -n "$rt" ] && [ -f "$rt" ] || {
+    echo "[ci][asan] ENV FAIL: ASAN runtime 缺失（$clang_bin -print-file-name=...a/.so）"
+    return 1
+  }
+  for t in readelf timeout; do
+    command -v "$t" >/dev/null 2>&1 || {
+      echo "[ci][asan] ENV FAIL: 缺少工具 $t"
+      return 1
+    }
+  done
+  for f in ci/asan/cc-asan ci/asan/cc-nog; do
+    [ -x "$REPO_ROOT/$f" ] || {
+      echo "[ci][asan] ENV FAIL: 缺少或不可执行 $f"
+      return 1
+    }
+  done
+  echo "[ci][asan] host pin PASS os=${os_id} ${os_version} arch=${arch} clang=${clang_version}"
+  echo "[ci][asan] asan_runtime=${rt} cc_real=$(command -v "$clang_bin")"
+  return 0
+}
+
+STRICT=0; WITH_BENCH=0; WITH_ASAN=0; ASAN_HOST_CHECK=0
 for arg in "$@"; do
   case "$arg" in
     --strict) STRICT=1 ;;
     --bench) WITH_BENCH=1 ;;
-    *) echo "[ci] 未知参数 $arg (可用: --strict --bench)"; exit 2 ;;
+    --asan) WITH_ASAN=1 ;;
+    --asan-host-check) WITH_ASAN=1; ASAN_HOST_CHECK=1 ;;
+    *) echo "[ci] 未知参数 $arg (可用: --strict --bench --asan --asan-host-check)"; exit 2 ;;
   esac
 done
+
+if [ "$ASAN_HOST_CHECK" = 1 ]; then
+  if asan_host_pin_check; then exit 0; fi
+  exit 2
+fi
 
 # —— M-1 目录基准唯一定义处：核心工程师若定论为 specs/tests，仅改这两行（或注入同名环境变量）——
 TESTS_POS_DIR="${TESTS_POS_DIR:-tests/specs/positive}"
@@ -550,6 +620,31 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
   fi
 }
 
+stage_asan() { # L2a CI-01：宿主固定 + QA-01 ASAN/LSAN 脚本；fail-closed；不并入七段常驻面
+  local log; log="$(new_log asan)"
+  if [ -z "$ZORC" ]; then
+    echo "zorcc 未安装：asan strict 判 FAIL（不可 SKIP 洗绿）" > "$log"
+    [ "$STRICT" = 1 ] && record asan FAIL 1 "$log" || record asan SKIP 0 "$log"
+    return
+  fi
+  if ! asan_host_pin_check >>"$log" 2>&1; then
+    echo "[asan] host pin FAIL" >> "$log"
+    [ "$STRICT" = 1 ] && record asan FAIL 1 "$log" || record asan SKIP 0 "$log"
+    return
+  fi
+  local cc_real; cc_real="$(command -v "$ZOR_ASAN_CLANG_BIN")"
+  local rc=0
+  CC_REAL="$cc_real" ZORC_BIN="$ZORC" \
+    bash ci/asan/run_asan.sh --strict --zorc "$ZORC" --out "$LOG_DIR/asan" >>"$log" 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "[asan] 判定=PASS" >> "$log"
+    record asan PASS 0 "$log"
+  else
+    echo "[asan] 判定=FAIL rc=$rc" >> "$log"
+    [ "$STRICT" = 1 ] && record asan FAIL 1 "$log" || record asan SKIP 0 "$log"
+  fi
+}
+
 echo "[ci] run=$RUN_ID strict=$STRICT bench=$WITH_BENCH modes='$MODES' pos='$TESTS_POS_DIR' neg='$TESTS_NEG_DIR'"
 stage_cargo
 stage_compile
@@ -558,6 +653,7 @@ stage_golden
 stage_code_table
 stage_rust_compare
 stage_run_smoke
+[ "$WITH_ASAN" = 1 ] && stage_asan
 [ "$WITH_BENCH" = 1 ] && stage_bench
 
 {
