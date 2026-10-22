@@ -85,3 +85,11 @@ S7-03	S7	runtime	tests/stdout/cases/S7-03.zor	expected/S7-03.stdout	[u8;N] array
 N-11	N	compile-negative	tests/stdout/cases/N-11.zor	-	tuple containing Box fail-closed
 N-12	N	compile-negative	tests/stdout/cases/N-12.zor	-	struct nested tuple containing Box fail-closed
 N-13	N	compile-negative	tests/stdout/cases/N-13.zor	-	enum any-variant Box type-level fail-closed
+S8-01	S8	runtime	tests/stdout/cases/S8-01.zor	expected/S8-01.stdout	Box<i64> deref single arg
+S8-02	S8	runtime	tests/stdout/cases/S8-02.zor	expected/S8-02.stdout	Box<i64> deref multi-arg
+S8-03	S8	runtime	tests/stdout/cases/S8-03.zor	expected/S8-03.stdout	Box<i64> repeat read then unbox
+N-14	N	compile-negative	tests/stdout/cases/N-14.zor	-	Box direct arg fail-closed
+N-15	N	compile-negative	tests/stdout/cases/N-15.zor	-	Box<Box<i64>> deref fail-closed
+C5-01	C5	cli	-	-	--help fixed text
+C5-02	C5	cli	-	-	--help precedence
+C5-03	C5	cli	-	-	--version over --help

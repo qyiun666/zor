@@ -1,9 +1,20 @@
 case_id	args	expect_rc	expect_artifact	expect_stdout_not_contains	expect_stderr_contains	notes
+o0-accepted	tests/runtime/cases/l2b/e3001-add-o0.zor -O0	0	none	-	-	O0 accepted compile-only
+o1-accepted	tests/runtime/cases/l2b/e3001-add-o0.zor -O1	0	none	-	-	O1 accepted compile-only
+o2-accepted	tests/runtime/cases/l2b/e3001-add-o0.zor -O2	0	none	-	-	O2 accepted compile-only
+o3-accepted	tests/runtime/cases/l2b/e3001-add-o0.zor -O3	0	none	-	-	O3 accepted compile-only
+os-accepted	tests/runtime/cases/l2b/e3001-add-o0.zor -Os	0	none	-	-	Os accepted compile-only
+og-accepted	tests/runtime/cases/l2b/e3001-add-o0.zor -Og	0	none	-	-	Og accepted compile-only
+o4-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -O4	2	none	-	未知选项	O4 rejected
+o9-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -O9	2	none	-	未知选项	O9 rejected
+ofast-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -Ofast	2	none	-	未知选项	Ofast rejected
+o2x-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -O2x	2	none	-	未知选项	O2x rejected
+o-bare-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -O	2	none	-	未知选项	bare -O rejected
+o-last-wins-13	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -O1 -O3	0	exists	-	-	last -O3; cc argv -O3
+o-last-wins-31	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -O3 -O1	0	exists	-	-	last -O1; cc argv -O1
+o-last-wins-g2	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -Og -O2	0	exists	-	-	last -O2; cc argv -O2
+o-last-wins-0g	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -O0 -Og	0	exists	-	-	last -Og; cc argv -Og
 zoverflow-invalid	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -Zoverflow=bogus	2	none	-	-Zoverflow	invalid overflow value
 zoverflow-empty	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -Zoverflow=	2	none	-	-Zoverflow	empty overflow value
 zoverflow-check-mode	tests/runtime/cases/l2b/e3001-add-o0.zor -Zoverflow=check	0	none	-	-	compile-only accepted
-og-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -Og	2	none	-	未知选项	Og rejected
-o1-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -O1	2	none	-	未知选项	O1 rejected
-o3-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -O3	2	none	-	未知选项	O3 rejected
-os-rejected	tests/runtime/cases/l2b/e3001-add-o0.zor -o out -Os	2	none	-	未知选项	Os rejected
 usage-no-internal-flag		2	none	-Zoverflow	usage: zorcc	no-arg usage

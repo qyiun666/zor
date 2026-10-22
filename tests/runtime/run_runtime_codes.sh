@@ -80,9 +80,9 @@ safe_rel() { # safe_rel <path>
 is_sha() { printf '%s' "$1" | grep -Eq '^[0-9a-f]{64}$'; }
 
 # 精确 case_id 集合（防静默丢行／换行）
-EXPECTED_RUNTIME="e3001-add-o0 e3001-sub-o0 e3001-mul-o0 e3001-min-div-neg1-o0 e3001-const-add-o0 e3002-div-zero-o0 e3002-mod-zero-o0 e3001-flush-o0 e3001-wrap-o2 e3001-wrap-default e3001-wrap-o0-explicit e3001-check-o2-explicit no-overflow-ops-o0 no-overflow-ops-o2 min-mod-neg1-o0 e3001-g-o0 e3001-g-o2 e3001-u8-add-o0 e3001-u8-sub-o0 e3001-u8-mul-o0 e3001-u8-wrap-o2 e3001-u8-wrap-o0-explicit e3001-u32-add-o0 e3001-u32-wrap-o2 e3002-u8-div-zero-o0 e3002-u32-mod-zero-o2 no-overflow-unsigned-o0 e3001-const-add-o2 e3002-const-div-zero-o2"
+EXPECTED_RUNTIME="e3001-add-o0 e3001-sub-o0 e3001-mul-o0 e3001-min-div-neg1-o0 e3001-const-add-o0 e3002-div-zero-o0 e3002-mod-zero-o0 e3001-flush-o0 e3001-wrap-o2 e3001-wrap-default e3001-wrap-o0-explicit e3001-check-o2-explicit no-overflow-ops-o0 no-overflow-ops-o2 min-mod-neg1-o0 e3001-g-o0 e3001-g-o2 e3001-u8-add-o0 e3001-u8-sub-o0 e3001-u8-mul-o0 e3001-u8-wrap-o2 e3001-u8-wrap-o0-explicit e3001-u32-add-o0 e3001-u32-wrap-o2 e3002-u8-div-zero-o0 e3002-u32-mod-zero-o2 no-overflow-unsigned-o0 e3001-const-add-o2 e3002-const-div-zero-o2 e3001-check-o1 e3002-div-zero-o1 e3001-check-og e3002-div-zero-og e3001-wrap-o3 e3002-div-zero-o3 e3001-wrap-os e3002-div-zero-os e3001-o1-explicit-wrap e3001-o3-explicit-check"
 EXPECTED_WIDTH="width-i8-rejected width-i16-rejected width-i32-rejected width-u16-rejected width-u64-rejected width-byte-rejected"
-EXPECTED_CLI="zoverflow-invalid zoverflow-empty zoverflow-check-mode og-rejected o1-rejected o3-rejected os-rejected usage-no-internal-flag"
+EXPECTED_CLI="o0-accepted o1-accepted o2-accepted o3-accepted os-accepted og-accepted o4-rejected o9-rejected ofast-rejected o2x-rejected o-bare-rejected o-last-wins-13 o-last-wins-31 o-last-wins-g2 o-last-wins-0g zoverflow-invalid zoverflow-empty zoverflow-check-mode usage-no-internal-flag"
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/zor-runtime-codes.XXXXXX")" || exit 2
 trap 'rm -rf "$TMP"' EXIT
@@ -107,7 +107,7 @@ validate_runtime() {
     || frc_fail 4 "runtime-codes.tsv 表头不精确（须十列）"
   grep -q $'\r' "$RUNTIME_TSV" && frc_fail 4 "runtime-codes.tsv 含 CR"
   [ -z "$(tail -c 1 "$RUNTIME_TSV")" ] || frc_fail 4 "runtime-codes.tsv 末尾缺 LF"
-  [ "$(tail -n +2 "$RUNTIME_TSV" | wc -l | tr -d ' ')" -eq 29 ] || frc_fail 4 "runtime 数据行≠29"
+  [ "$(tail -n +2 "$RUNTIME_TSV" | wc -l | tr -d ' ')" -eq 39 ] || frc_fail 4 "runtime 数据行≠39"
   [ "$(tail -n +2 "$RUNTIME_TSV" | grep -c '^$' || true)" -eq 0 ] || frc_fail 4 "runtime 含空行"
   check_case_set "$RUNTIME_TSV" "$EXPECTED_RUNTIME" runtime
 
@@ -128,7 +128,7 @@ validate_runtime() {
     notes=$(printf '%s\n' "$line" | cut -f10)
     [ -n "$cid" ] || frc_fail 4 "runtime L$line_no case_id 为空"
     [ -n "$notes" ] || frc_fail 4 "$cid: notes 为空"
-    case "$opt" in O0|O2|default) ;; *) frc_fail 4 "$cid: opt=$opt" ;; esac
+    case "$opt" in O0|O1|O2|O3|Os|Og|default) ;; *) frc_fail 4 "$cid: opt=$opt" ;; esac
     case "$ov" in check|wrap|none) ;; *) frc_fail 4 "$cid: overflow=$ov" ;; esac
     case "$extra" in ""|-g) ;; *) frc_fail 4 "$cid: extra_flags=$extra" ;; esac
     case "$rc" in 101|0) ;; *) frc_fail 4 "$cid: expect_rc=$rc" ;; esac
@@ -205,7 +205,7 @@ validate_cli() {
     || frc_fail 4 "cli-cases.tsv 表头不精确"
   grep -q $'\r' "$CLI_TSV" && frc_fail 4 "cli-cases.tsv 含 CR"
   [ -z "$(tail -c 1 "$CLI_TSV")" ] || frc_fail 4 "cli-cases.tsv 末尾缺 LF"
-  [ "$(tail -n +2 "$CLI_TSV" | wc -l | tr -d ' ')" -eq 8 ] || frc_fail 4 "cli 数据行≠8"
+  [ "$(tail -n +2 "$CLI_TSV" | wc -l | tr -d ' ')" -eq 19 ] || frc_fail 4 "cli 数据行≠19"
   check_case_set "$CLI_TSV" "$EXPECTED_CLI" cli
   line_no=1
   while IFS= read -r line; do
@@ -220,11 +220,11 @@ validate_cli() {
     [ -n "$notc" ] || frc_fail 4 "$cid: stdout_not_contains 为空"
     [ -n "$inc" ] || frc_fail 4 "$cid: stderr_contains 为空"
     [ -n "$notes" ] || frc_fail 4 "$cid: notes 为空"
-    case "$cid" in
-      zoverflow-invalid|zoverflow-empty|zoverflow-check-mode|og-rejected|o1-rejected|o3-rejected|os-rejected) ;;
-      usage-no-internal-flag) [ -z "$args" ] || frc_fail 4 "$cid: args 须空" ;;
-    esac
-    [ "$cid" = usage-no-internal-flag ] || [ -n "$args" ] || frc_fail 4 "$cid: args 为空"
+    if [ "$cid" = usage-no-internal-flag ]; then
+      [ -z "$args" ] || frc_fail 4 "$cid: args 须空"
+    else
+      [ -n "$args" ] || frc_fail 4 "$cid: args 为空"
+    fi
   done < <(tail -n +2 "$CLI_TSV")
 }
 
@@ -237,7 +237,7 @@ if [ "$fail" -ne 0 ]; then
   exit 1
 fi
 if [ "$VALIDATE_ONLY" = 1 ]; then
-  echo "VALIDATE PASS|runtime-codes|runtime=29|width=6|cli=8"
+  echo "VALIDATE PASS|runtime-codes|runtime=39|width=6|cli=19"
   exit 0
 fi
 
@@ -286,7 +286,7 @@ mkdir -p "$OUT_DIR/round1" "$OUT_DIR/round2" "$OUT_DIR/generated-c"
 : > "$OUT_DIR/commands.txt"; : > "$OUT_DIR/summary.tsv"
 printf 'case_id\tround\tbuild_rc\trun_rc\tstdout_sha256\tstderr_sha256\tstderr_bytes\tlines\tcode\tverdict\n' > "$OUT_DIR/summary.tsv"
 : > "$OUT_DIR/stdout.sha256"; : > "$OUT_DIR/stderr.sha256"
-: > "$OUT_DIR/cli-controls.log"; : > "$OUT_DIR/width-controls.log"; : > "$OUT_DIR/generated-c.log"; : > "$OUT_DIR/runtime-codes.log"
+: > "$OUT_DIR/cli-controls.log"; : > "$OUT_DIR/width-controls.log"; : > "$OUT_DIR/generated-c.log"; : > "$OUT_DIR/cc-argv.log"; : > "$OUT_DIR/runtime-codes.log"
 cp "$RUNTIME_TSV" "$OUT_DIR/manifest.tsv"
 sha256_of "$RUNTIME_TSV" > "$OUT_DIR/manifest.sha256" || frc_fail 4 "manifest sha 计算失败"
 {
@@ -299,9 +299,17 @@ sha256_of "$RUNTIME_TSV" > "$OUT_DIR/manifest.sha256" || frc_fail 4 "manifest sh
 flags_for() { # flags_for <opt> <overflow>
   case "$1/$2" in
     O0/check) printf '%s' '-O0' ;;
+    O1/check) printf '%s' '-O1' ;;
+    Og/check) printf '%s' '-Og' ;;
     O2/check) printf '%s' '-O2 -Zoverflow=check' ;;
+    O3/check) printf '%s' '-O3 -Zoverflow=check' ;;
+    Os/check) printf '%s' '-Os -Zoverflow=check' ;;
     O0/wrap) printf '%s' '-O0 -Zoverflow=wrap' ;;
+    O1/wrap) printf '%s' '-O1 -Zoverflow=wrap' ;;
+    Og/wrap) printf '%s' '-Og -Zoverflow=wrap' ;;
     O2/wrap) printf '%s' '-O2' ;;
+    O3/wrap) printf '%s' '-O3' ;;
+    Os/wrap) printf '%s' '-Os' ;;
     default/wrap) printf '%s' '' ;;
     O0/none) printf '%s' '-O0' ;;
     O2/none) printf '%s' '-O2' ;;
@@ -330,6 +338,7 @@ run_runtime_round() { # run_runtime_round <round>
     flags="$(flags_for "$opt" "$ov" || true)"
     bin="$bdir/$cid"
     cap=""
+    argv_log="$OUT_DIR/$round/$cid.argv"; : > "$argv_log"
     case "$cid" in
       e3001-u8-*|e3002-u8-*|e3001-u32-*|e3002-u32-*|no-overflow-unsigned-*) cap="$OUT_DIR/generated-c/$cid" ;;
     esac
@@ -339,7 +348,7 @@ run_runtime_round() { # run_runtime_round <round>
       >> "$OUT_DIR/commands.txt"
     # 以仓库根为 cwd，传 manifest 的相对 source_path；保证 __FILE__ 与 expected 一致
     # shellcheck disable=SC2086
-    ( cd "$REPO_ROOT_REAL" && CC="$CC_CAPTURE" ZOR_REAL_CC="$CC_REAL_PATH" ZOR_CAPTURE_DIR="$cap" \
+    ( cd "$REPO_ROOT_REAL" && CC="$CC_CAPTURE" ZOR_REAL_CC="$CC_REAL_PATH" ZOR_CAPTURE_DIR="$cap" ZOR_ARGV_LOG="$argv_log" \
       timeout "$BUILD_TIMEOUT" "$ZORC_PATH" $flags $extra "$src" -o "$bin" ) \
       > "$OUT_DIR/$round/$cid.build.out" 2> "$OUT_DIR/$round/$cid.build.err"
     build_rc=$?
@@ -373,6 +382,10 @@ run_runtime_round() { # run_runtime_round <round>
       if grep -Eq 'zorcc:|AddressSanitizer|LeakSanitizer' "$OUT_DIR/$round/$cid.err"; then verdict=FAIL; fi
     fi
     [ "$run_rc" = "124" ] && verdict=FAIL
+    if [ "$opt" != "default" ] && ! grep -Eq -- "(^| )-${opt}( |$)" "$argv_log"; then
+      verdict=FAIL
+      printf '%s\t%s\n' "$cid" "missing cc flag -${opt}" >> "$OUT_DIR/cc-argv.log"
+    fi
     if [ -n "$cap" ]; then
       if [ ! -f "$cap/out.c" ]; then
         verdict=FAIL
@@ -415,7 +428,7 @@ line_no=1
 while IFS= read -r line; do
   line_no=$((line_no+1))
   cid=$(printf '%s\n' "$line" | cut -f1); src=$(printf '%s\n' "$line" | cut -f2)
-  for optflag in -O0 -O2; do
+  for optflag in -O0 -O1 -O2 -O3 -Os -Og; do
     bin="$TMP/width-$cid-$optflag"
     ( cd "$REPO_ROOT_REAL" && timeout "$BUILD_TIMEOUT" "$ZORC_PATH" "$optflag" "$src" -o "$bin" ) \
       > "$TMP/width-$cid-$optflag.out" 2> "$TMP/width-$cid-$optflag.err"
@@ -430,7 +443,7 @@ while IFS= read -r line; do
       # 范围扩展：只有行为符合 O-1 才记 WARN；静默 wrap／漏检＝FAIL
       timeout "$RUN_TIMEOUT" "$bin" > "$TMP/width-$cid-$optflag.run.out" 2> "$TMP/width-$cid-$optflag.run.err"
       wrc=$?
-      if [ "$optflag" = "-O0" ]; then
+      if [ "$optflag" = "-O0" ] || [ "$optflag" = "-O1" ] || [ "$optflag" = "-Og" ]; then
         if [ "$wrc" -eq 101 ] && grep -Eq '^zor: runtime error\[E300(1|2)\] .+:[0-9]+:[0-9]+: (integer overflow|division by zero)$' "$TMP/width-$cid-$optflag.run.err"; then
           v=WARN
         else
@@ -458,6 +471,7 @@ while IFS= read -r line; do
   erc=$(printf '%s\n' "$line" | cut -f3); art=$(printf '%s\n' "$line" | cut -f4)
   notc=$(printf '%s\n' "$line" | cut -f5); inc=$(printf '%s\n' "$line" | cut -f6)
   cli_tmp="$TMP/cli-$cid"; mkdir -p "$cli_tmp"
+  cli_argv_log="$cli_tmp/argv.txt"; : > "$cli_argv_log"
   # 词法替换 <src> 与 out；不做 shell eval
   argv=(); if [ -n "$args" ]; then read -r -a argv <<< "$args"; fi
   i=0
@@ -469,7 +483,7 @@ while IFS= read -r line; do
     i=$((i+1))
   done
   if [ "${#argv[@]}" -gt 0 ]; then
-    ( cd "$REPO_ROOT_REAL" && timeout "$RUN_TIMEOUT" "$ZORC_PATH" "${argv[@]}" ) \
+    ( cd "$REPO_ROOT_REAL" && CC="$CC_CAPTURE" ZOR_REAL_CC="$CC_REAL_PATH" ZOR_ARGV_LOG="$cli_argv_log" timeout "$RUN_TIMEOUT" "$ZORC_PATH" "${argv[@]}" ) \
       > "$cli_tmp/stdout" 2> "$cli_tmp/stderr"
     rc=$?
   else
@@ -483,6 +497,15 @@ while IFS= read -r line; do
   [ "$notc" != '-' ] && grep -Fq -- "$notc" "$cli_tmp/stdout" && v=FAIL
   [ "$inc" != '-' ] && ! grep -Fq -- "$inc" "$cli_tmp/stderr" && v=FAIL
   if find "$cli_tmp" -maxdepth 1 -name '.zorcc-tmp-*' | grep -q .; then v=FAIL; fi
+  case "$cid" in
+    o-last-wins-*)
+      lastopt=""
+      for tok in $args; do
+        case "$tok" in -O0|-O1|-O2|-O3|-Os|-Og) lastopt="$tok" ;; esac
+      done
+      if [ -z "$lastopt" ] || ! grep -Eq -- "(^| )${lastopt}( |$)" "$cli_argv_log"; then v=FAIL; fi
+      ;;
+  esac
   printf '%s\trc=%s\tartifact=%s\tverdict=%s\n' "$cid" "$rc" "$([ -e "$cli_tmp/out" ] && echo yes || echo no)" "$v" >> "$OUT_DIR/cli-controls.log"
   [ "$v" = FAIL ] && frc_fail 12 "$cid: rc=$rc expected=$erc"
 done < <(tail -n +2 "$CLI_TSV")
@@ -505,9 +528,10 @@ fi
 
 # ---- 汇总 ----
 {
-  echo "runtime_rows=29"
+  echo "runtime_rows=39"
   echo "width_rows=6"
-  echo "cli_rows=8"
+  echo "width_levels=6"
+  echo "cli_rows=19"
   echo "fail=$fail"
   echo "utc_end=$(utc_now)"
 } >> "$OUT_DIR/runtime-codes.log"

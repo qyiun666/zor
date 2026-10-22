@@ -61,3 +61,6 @@ S5-12	tests/stdout/cases/S5-12.zor	run	0	expected/S5-12.stdout	-	struct-in-tuple
 S7-01	tests/stdout/cases/S7-01.zor	run	0	expected/S7-01.stdout	-	[u8;N] array form
 S7-02	tests/stdout/cases/S7-02.zor	run	0	expected/S7-02.stdout	-	[u8;N] array form
 S7-03	tests/stdout/cases/S7-03.zor	run	0	expected/S7-03.stdout	-	[u8;N] array form
+S8-01	tests/stdout/cases/S8-01.zor	run	0	expected/S8-01.stdout	-	Box<i64> deref single arg
+S8-02	tests/stdout/cases/S8-02.zor	run	0	expected/S8-02.stdout	-	Box<i64> deref multi-arg
+S8-03	tests/stdout/cases/S8-03.zor	run	0	expected/S8-03.stdout	-	Box<i64> repeat read then unbox

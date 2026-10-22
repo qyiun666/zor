@@ -28,3 +28,13 @@ e3002-u32-mod-zero-o2	tests/runtime/cases/l2b/e3002-u32-mod-zero-o2.zor	O2	wrap	
 no-overflow-unsigned-o0	tests/runtime/cases/l2b/no-overflow-unsigned-o0.zor	O0	none		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	control	unsigned no overflow
 e3001-const-add-o2	tests/runtime/cases/l2b/e3001-const-add-o2.zor	O2	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	const max+1 wrap
 e3002-const-div-zero-o2	tests/runtime/cases/l2b/e3002-const-div-zero-o2.zor	O2	wrap		101	E3002	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	runtime-error	const div zero O2
+e3001-check-o1	tests/runtime/cases/l2b/e3001-add-o0.zor	O1	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	O1 checked add
+e3002-div-zero-o1	tests/runtime/cases/l2b/e3002-div-zero-o0.zor	O1	check		101	E3002	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	runtime-error	O1 div zero
+e3001-check-og	tests/runtime/cases/l2b/e3001-add-o0.zor	Og	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	Og checked add
+e3002-div-zero-og	tests/runtime/cases/l2b/e3002-div-zero-o0.zor	Og	check		101	E3002	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	runtime-error	Og div zero
+e3001-wrap-o3	tests/runtime/cases/l2b/e3001-add-o0.zor	O3	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	O3 wrap
+e3002-div-zero-o3	tests/runtime/cases/l2b/e3002-div-zero-o0.zor	O3	wrap		101	E3002	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	runtime-error	O3 div zero
+e3001-wrap-os	tests/runtime/cases/l2b/e3001-add-o0.zor	Os	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	Os wrap
+e3002-div-zero-os	tests/runtime/cases/l2b/e3002-div-zero-o0.zor	Os	wrap		101	E3002	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	runtime-error	Os div zero
+e3001-o1-explicit-wrap	tests/runtime/cases/l2b/e3001-add-o0.zor	O1	wrap		0	none	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	wrap	O1 explicit wrap override
+e3001-o3-explicit-check	tests/runtime/cases/l2b/e3001-add-o0.zor	O3	check		101	E3001	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	checked	O3 explicit check override

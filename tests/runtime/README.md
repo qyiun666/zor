@@ -79,14 +79,14 @@ ASAN 段的 N-5／N-LS／N-6 编号见 QA v1.3 §6.4，由 `ci/asan/run_asan.sh`
 
 | 文件 | 内容 |
 |---|---|
-| `runtime-codes.tsv` | **29 行** runtime（仅 i64／u8／u32）；十列 `case_id source_path opt overflow extra_flags expect_rc expect_code expect_stdout_sha256 kind notes` |
-| `width-failclosed.tsv` | **6 行**（i8／i16／i32／u16／u64／byte）；rc=1、零产物、`zorcc: codegen:`；不作为「缺 codegen」FAIL |
-| `cli-cases.tsv` | **8 行** CLI 负控（非法 `-Zoverflow`、`-Og/-O1/-O3/-Os`、无参 usage） |
+| `runtime-codes.tsv` | **39 行** runtime（L2e 增 O1／Og checked 与 O3／Os wrap 行；既有 29 行零改）；十列 `case_id source_path opt overflow extra_flags expect_rc expect_code expect_stdout_sha256 kind notes` |
+| `width-failclosed.tsv` | **6 行**（i8／i16／i32／u16／u64／byte），runner 六档循环＝36 执行；rc=1、零产物、`zorcc: codegen:`；不作为「缺 codegen」FAIL |
+| `cli-cases.tsv` | **19 行**（6 六档正例＋5 非法 `-O*`＋4 last-wins＋3 `-Zoverflow` 内部位＋无参 usage） |
 | `cases/l2b/*.zor` | runtime 源；以仓库根为 cwd、按 `source_path` 相对路径传给 zorcc，`<file>` 与 expected 一致 |
 | `controls/l2b/width-*.zor` | 宽度 fail-closed 源 |
 | `expected/<case>.stderr` | terminate 期望串；逐字节比对，恰 1 行＋1 LF |
 | `run_runtime_codes.sh` | 判据脚本；`--validate-only` 可在 macOS 预检，完整运行只认 Linux |
-| `cc-capture` | QA 证据 wrapper：捕获生成 C 后调用真实 `CC`，用于 u8／u32 宽度抽检 |
+| `cc-capture` | QA 证据 wrapper：捕获生成 C 与 CC argv（`ZOR_ARGV_LOG`）后调用真实 `CC` |
 
 ### 运行
 
@@ -99,10 +99,10 @@ ZORC_BIN=<zorcc> CC=clang-18 bash tests/runtime/run_runtime_codes.sh --strict --
 ```
 
 - 完整运行：两轮独立构建／运行；rc、stdout sha、stderr sha 逐条一致；终止样本 rc=101、stderr 恰 1 行＋1 LF；无 sanitizer 报告；错误路径零产物、无 `.zorcc-tmp-*`。
-- 宽度负控：`-O0`／`-O2` 双档 rc=1、零产物、`zorcc: codegen:`；若实现意外支持且行为符合 O-1，记 WARN（范围扩展）交 PMO，不判既有无 codegen FAIL。
+- 宽度负控：六档 `-O0/-O1/-O2/-O3/-Os/-Og` 均为 rc=1、零产物、`zorcc: codegen:`；若实现意外支持且行为符合 O-1，记 WARN（范围扩展）交 PMO，不判既有无 codegen FAIL。
 - `runtime-codes` 必须在**无 sanitizer 普通构建**判 rc=101；ASAN UAF rc=1／LSAN rc=1 归 `asan` 面，LSAN `detect_leaks=1` 会覆盖 101。
 - fail-closed F-RC-1～14；宿主非 Linux、manifest 缺失、空集、expected 缺失、helper 缺失、超时、artifact 空均 FAIL，不 SKIP。
 - 期望 line／col 为操作符 token 的 1-based 列，当前按核心 v1.1 设计预置；CORE-02／03 实现 head 后 QA 重新捕获 golden 并会签，若列口径变化先改设计再改 expected。
-- 声明边界：只写「L2b 29 条 runtime 在 Linux 普通构建通过 + 6 条宽度 fail-closed + 8 条 CLI 负控」；不得写「全部整型已覆盖」（仅 i64／u8／u32 codegen）或「终止样本零泄漏」。
+- 声明边界：只写「L2e 39 条 runtime 在 Linux 普通构建通过 + 6 条宽度×6 档 fail-closed + 19 条 CLI 控制」；不得写「全部整型已覆盖」（仅 i64／u8／u32 codegen）或「终止样本零泄漏」。
 
 

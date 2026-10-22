@@ -1,20 +1,20 @@
-# tests/stdout — L2d stdout／CLI 契约门禁（QA）
+# tests/stdout — L2e stdout／CLI 契约门禁（QA）
 
-归属：ZOR质量保障。入口由 `ci/run_ci.sh --stdout-contract` 直调；CI 不维护第二套矩阵。S5 11＋S7 3 expected 已在 PR #114 head `2a92902` 两轮捕获并 byte-SAME；本地 `--strict --allow-nonlinux` 得 62/10/14 PASS，**Linux x86_64 CI 与产品会签为门禁前提**。
+归属：ZOR质量保障。入口由 `ci/run_ci.sh --stdout-contract` 直调；CI 不维护第二套矩阵。S5 11＋S7 3 expected 已在 PR #114 head `2a92902` 两轮捕获并 byte-SAME；L2e 目标计数 65/12/17（expected 待核心实现 head 捕获），**Linux x86_64 CI 与产品会签为门禁前提**。
 
-## 计数（冻结 90＝86 stdout＋4 packaging）
+## 计数（L2e 冻结 98＝94 stdout＋4 packaging）
 
 | 段 | 条数 | 矩阵 |
 |---|---:|---|
-| stdout runtime | **62** | `stdout-cases.tsv`（S1 6／S2 4／S3 29／S4 5／S5 11／S6 4／S7 3） |
-| stdout 编译负控 | **10** | `negative.tsv`（N-01～03、N-07～13；N-04～06 退役归档） |
-| CLI | **14** | `cli-cases.tsv`（C1 6／C2 3／C3 3／C4 2，零改） |
-| stdout 合计 | **86** | `new-cases.tsv` |
+| stdout runtime | **65** | `stdout-cases.tsv`（S1 6／S2 4／S3 29／S4 5／S5 11／S6 4／S7 3／S8 3） |
+| stdout 编译负控 | **12** | `negative.tsv`（N-01～03、N-07～15；N-04～06 退役归档） |
+| CLI | **17** | `cli-cases.tsv`（C1 6／C2 3／C3 3／C4 2（C4-02 显式变更）／C5 3 help） |
+| stdout 合计 | **94** | `new-cases.tsv` |
 | packaging | **4** | `tests/packaging/packaging-cases.tsv`（独立 job） |
 
 - **S5-04 N/A**：1 元组无源形态，不建 case、不计数；不得写“1 元组已支持”。
 - N-04／05／06 退役转正例，归档 `retired/l2c/`；不得继续 fail-closed。
-- `l2c-baseline.tsv` 锁 69 条未变用例（48＋7＋14）；`l2c-baseline.sha256` 为标准清单（105 行），`shasum -a 256 -c tests/stdout/l2c-baseline.sha256` 可复算。
+- `l2c-baseline.tsv` 锁 68 条未变用例（48＋7＋13；C4-02 显式移出）；`l2c-baseline.sha256` 为标准清单（105 行），`shasum -a 256 -c tests/stdout/l2c-baseline.sha256` 可复算。
 - D-L2c-12：NaN 无端到端源形态；浮点契约由 `backend::float_fmt` 单测覆盖，S3-27 以 `1e-5` 替代。
 - N-09／N-10 为 `&T`／`&mut T` 条件负控；`Handle<T>`／fn 无语法，记 N/A。
 
@@ -33,8 +33,8 @@ bash tests/stdout/run_stdout_contract.sh --strict
 
 - runtime：两轮构建＋运行；stdout 逐字节 `cmp`；`run` 模式 stderr 0 B；`stdout-terminate` 模式只判 stdout 与 rc=101（E30xx 文案归 runtime-codes）。
 - negative：两轮 rc=1、零产物、stderr 含判词；不新增 E 码。
-- CLI：NDJSON 六键固定序 `code/severity/message/file/line/col`、行序与文本模式一致、无诊断 stderr 0 B；`--version`／`-V` 短路；`-o` 零残留；usage 不泄露 `-Zoverflow` 与未开放 `-O*`。
-- 旧资产：`legacy-snapshot.sha256`（226 文件）逐文件 sha256；旧五值 41／53／53／3／94、manifest 48、runtime-codes 29＋6＋8 计数复核。
+- CLI：NDJSON 六键固定序 `code/severity/message/file/line/col`、行序与文本模式一致、无诊断 stderr 0 B；`--version`／`-V` 短路；`-o` 零残留；usage 不泄露 `-Zoverflow`；`--help` 输出固定文本（C5）。
+- 旧资产：`legacy-snapshot.sha256`（226 文件）逐文件 sha256；旧五值 41／53／53／3／94、manifest 48、runtime-codes 39＋6＋19 计数复核。
 
 ## 资产说明
 
