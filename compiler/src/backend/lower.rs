@@ -463,11 +463,20 @@ fn print_arg(
                 Ex::Path(n, _, _) => lookup(scope, n, *dl, *dc)?,
                 _ => return Err(SubsetError::new(*dl, *dc, "lower：解引用源形态")),
             };
+            if b.slots.get(src.0 as usize).map(|s| &s.ty)
+                != Some(&Ty::Box(Box::new(Ty::I64)))
+            {
+                return Err(SubsetError::new(*dl, *dc, "lower：解引用源非 Box<i64>"));
+            }
             let irt = ir_ty_of(b.types, e, "println 实参")?;
             if irt != Ty::I64 {
                 return Err(SubsetError::new(*dl, *dc, "lower：解引用结果类型非 i64"));
             }
-            Ok(PrintArg::Int { ty: IntTy::I64, expr: IntExpr::Local(src) })
+            // 读入 i64 临时量：Box owner 槽位只声明 zor_box_<id>，不能把其 id
+            // 当作 i64 局部 id 使用。与 lower_value 的复合解引用路径保持一致。
+            let id = new_temp(b, Ty::I64);
+            b.body.push(Stmt::BindI64Deref { local: id, src, line: *dl, col: *dc });
+            Ok(PrintArg::Int { ty: IntTy::I64, expr: IntExpr::Local(id) })
         }
         Ex::Un(..) | Ex::Bin(..) => {
             let irt = ir_ty_of(b.types, e, "println 实参")?;
@@ -1284,6 +1293,33 @@ mod tests {
         assert!(matches!(b[0], Stmt::BindBox { value: 1, .. }));
         assert!(matches!(b[1], Stmt::BindI64Deref { .. }));
         assert!(matches!(b[2], Stmt::Unbox { .. }));
+    }
+
+    /// L2e：`println(*b)` 必须先把 Box 载荷读入 i64 临时量；不得把 Box 槽位 id
+    /// 当作 i64 局部 id（后者会让 emit 生成未声明的 `zor_i64_<box_id>`）。
+    #[test]
+    fn deref_print_uses_i64_temp_not_box_slot() {
+        let b = body("fn main() {\n    let b = box 42;\n    println(*b);\n}\n");
+        assert_eq!(b.len(), 4, "{b:?}");
+        assert!(matches!(b[0], Stmt::BindBox { local: LocalId(0), value: 42, .. }));
+        let temp = match &b[1] {
+            Stmt::BindI64Deref { local, src, .. } => {
+                assert_eq!(src.0, 0, "解引用源必须是 Box 槽位");
+                *local
+            }
+            other => panic!("expected BindI64Deref, got {other:?}"),
+        };
+        assert_ne!(temp.0, 0, "临时量不得复用 Box 槽位 id");
+        match &b[2] {
+            Stmt::Print { args, .. } => match &args[0] {
+                PrintArg::Int { ty: IntTy::I64, expr: IntExpr::Local(id) } => {
+                    assert_eq!(*id, temp);
+                }
+                other => panic!("expected Int(Local(temp)), got {other:?}"),
+            },
+            other => panic!("expected Print, got {other:?}"),
+        }
+        assert!(matches!(b[3], Stmt::ScopeExit { .. }));
     }
 
     #[test]

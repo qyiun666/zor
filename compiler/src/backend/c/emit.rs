@@ -770,6 +770,17 @@ mod tests {
         assert_eq!(c.matches("free(").count(), 1, "{c}");
     }
 
+    /// L2e：`println(*b)` 先读 Box 载荷到 i64 临时量，再打印；Box 只释放一次。
+    #[test]
+    fn deref_print_emits_temp_read_and_one_free() {
+        let p = ir("fn main() {\n    let b = box 42;\n    println(*b);\n}\n");
+        let c = emit(&p, "t.zor");
+        assert!(c.contains("int64_t zor_i64_1 = *zor_box_0;"), "{c}");
+        assert!(c.contains("printf(\"%lld\", (long long)(zor_i64_1));"), "{c}");
+        assert!(!c.contains("(zor_i64_0)"), "{c}");
+        assert_eq!(c.matches("free(zor_box_0);").count(), 1, "{c}");
+    }
+
     #[test]
     fn scope_exit_frees_in_reverse_declaration_order() {
         let p = ir("fn main() {\n    let a = box 1;\n    let b = box 2;\n}\n");

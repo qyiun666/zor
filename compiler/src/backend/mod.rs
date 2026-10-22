@@ -16,10 +16,37 @@ use std::path::Path;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OptLevel {
     O0,
+    O1,
     O2,
+    O3,
+    Os,
+    Og,
 }
 
-/// 算术模式：`-O0` 缺省 checked；`-O2`／缺省 wrap；`-Zoverflow` 显式覆盖。
+impl OptLevel {
+    /// 与 C 编译器同名旗标一一对应；`c::cc` 直接传给 cc，不做降级。
+    pub fn cc_flag(self) -> &'static str {
+        match self {
+            OptLevel::O0 => "-O0",
+            OptLevel::O1 => "-O1",
+            OptLevel::O2 => "-O2",
+            OptLevel::O3 => "-O3",
+            OptLevel::Os => "-Os",
+            OptLevel::Og => "-Og",
+        }
+    }
+
+    /// 档位缺省 overflow：`O0`／`O1`／`Og` checked；`O2`／`O3`／`Os` wrap。
+    pub fn default_overflow(self) -> OverflowMode {
+        match self {
+            OptLevel::O0 | OptLevel::O1 | OptLevel::Og => OverflowMode::Check,
+            OptLevel::O2 | OptLevel::O3 | OptLevel::Os => OverflowMode::Wrap,
+        }
+    }
+}
+
+/// 算术模式：`O0`／`O1`／`Og` 缺省 checked；`O2`／`O3`／`Os` 及缺省 wrap；
+/// `-Zoverflow` 显式覆盖。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OverflowMode {
     Check,
@@ -28,10 +55,7 @@ pub enum OverflowMode {
 
 impl OverflowMode {
     pub fn from_opt(opt: OptLevel) -> Self {
-        match opt {
-            OptLevel::O0 => OverflowMode::Check,
-            OptLevel::O2 => OverflowMode::Wrap,
-        }
+        opt.default_overflow()
     }
 }
 
