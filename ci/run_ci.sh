@@ -7,6 +7,7 @@
 # L2b：--runtime-codes 为独立模式（单段 summary），只执行宿主检查＋runtime-codes 判据；不改既有七段／八段语义。
 # L2c：--stdout-contract 为独立模式（stdout／cli 两段 summary），直调 QA 判据脚本；不改既有七段／八段／runtime-codes 语义。
 # L2d：--packaging-smoke 为独立模式（单段 summary），直调 QA 安装树判据脚本；不改既有七段／八段／runtime-codes／stdout 语义。
+# L2e：stdout 判词 65／12／17、runtime-codes 39／6／19；仅同步计数门禁，不建 opt-matrix，不改 job 结构。
 set -uo pipefail
 shopt -s nullglob  # S-1：未命中 glob 展开为空数组，杜绝字面 glob 进循环的旁路
 
@@ -695,8 +696,18 @@ stage_runtime_codes() { # L2b CI-01：独立 Linux job；直调 QA 判据脚本�
   CC="${CC:-cc}" ZORC_BIN="$ZORC" OUT_DIR="$out" \
     bash tests/runtime/run_runtime_codes.sh --strict --out "$out" --zorc "$ZORC" >>"$log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
-    echo "[runtime-codes] 判定=PASS" >> "$log"
-    record runtime-codes PASS 0 "$log"
+    # L2e CI-01：冻结 runtime_rows=39／width_rows=6／cli_rows=19／fail=0；缺行或计数不符同样 FAIL。
+    local counts_ok=1 kv
+    for kv in runtime_rows=39 width_rows=6 cli_rows=19 fail=0; do
+      grep -Fxq "$kv" "$out/runtime-codes.log" 2>/dev/null || counts_ok=0
+    done
+    if [ "$counts_ok" -eq 1 ]; then
+      echo "[runtime-codes] 判定=PASS（39／6／19）" >> "$log"
+      record runtime-codes PASS 0 "$log"
+    else
+      echo "[runtime-codes] 计数不符：期望 runtime_rows=39 width_rows=6 cli_rows=19 fail=0（L2e 冻结）" >> "$log"
+      record runtime-codes FAIL 1 "$log"
+    fi
   else
     echo "[runtime-codes] 判定=FAIL rc=$rc" >> "$log"
     record runtime-codes FAIL 1 "$log"
@@ -735,13 +746,13 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   local so_v cli_v so_rc=0 cli_rc=0
   so_v="$(stdout_section_verdict stdout-contract "$log" "$rc")"
   cli_v="$(stdout_section_verdict cli-contract "$log" "$rc")"
-  # L2d CI-01：冻结计数 62／10／14；判定 PASS 但判词计数不符（如 QA 旧资产 48）同样 FAIL，防静默洗绿。
-  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=62 negative=10 fail=0 ran=62/10' "$log"; then
-    echo "[stdout-contract] 计数不符：期望 runtime=62 negative=10 ran=62/10（L2d 冻结）" >> "$log"
+  # L2e CI-01：冻结计数 65／12／17；判定 PASS 但判词计数不符（如旧资产 62／10／14）同样 FAIL，防静默洗绿。
+  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=65 negative=12 fail=0 ran=65/12' "$log"; then
+    echo "[stdout-contract] 计数不符：期望 runtime=65 negative=12 ran=65/12（L2e 冻结）" >> "$log"
     so_v=FAIL
   fi
-  if [ "$cli_v" = PASS ] && ! grep -Fq 'PASS|cli-contract|cases=14 fail=0 ran=14' "$log"; then
-    echo "[cli-contract] 计数不符：期望 cases=14 ran=14（L2d 冻结）" >> "$log"
+  if [ "$cli_v" = PASS ] && ! grep -Fq 'PASS|cli-contract|cases=17 fail=0 ran=17' "$log"; then
+    echo "[cli-contract] 计数不符：期望 cases=17 ran=17（L2e 冻结）" >> "$log"
     cli_v=FAIL
   fi
   [ "$so_v" = FAIL ] && so_rc=1
