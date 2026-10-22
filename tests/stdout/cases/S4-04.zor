@@ -1,0 +1,4 @@
+fn main() {
+    let s = "你好";
+    println(s);
+}

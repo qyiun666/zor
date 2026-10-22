@@ -1,0 +1,73 @@
+case_id	face	kind	source	expected	notes
+S1-01	S1	runtime	tests/stdout/cases/S1-01.zor	expected/S1-01.stdout	2 strings, single space
+S1-02	S1	runtime	tests/stdout/cases/S1-02.zor	expected/S1-02.stdout	mixed string/int/bool
+S1-03	S1	runtime	tests/stdout/cases/S1-03.zor	expected/S1-03.stdout	2 integers
+S1-04	S1	runtime	tests/stdout/cases/S1-04.zor	expected/S1-04.stdout	empty strings keep one separator
+S1-05	S1	runtime	tests/stdout/cases/S1-05.zor	expected/S1-05.stdout	single string
+S1-06	S1	runtime	tests/stdout/cases/S1-06.zor	expected/S1-06.stdout	4 args
+S2-01	S2	runtime	tests/stdout/cases/S2-01.zor	expected/S2-01.stdout	int + exactly one LF
+S2-02	S2	runtime	tests/stdout/cases/S2-02.zor	expected/S2-02.stdout	empty string -> just LF
+S2-03	S2	runtime	tests/stdout/cases/S2-03.zor	expected/S2-03.stdout	two calls, no extra LF
+S2-04	S2	runtime	tests/stdout/cases/S2-04.zor	expected/S2-04.stdout	EOF after println
+S3-01	S3	runtime	tests/stdout/cases/S3-01.zor	expected/S3-01.stdout	i8 boundary -128
+S3-02	S3	runtime	tests/stdout/cases/S3-02.zor	expected/S3-02.stdout	i8 boundary 127
+S3-03	S3	runtime	tests/stdout/cases/S3-03.zor	expected/S3-03.stdout	i16 boundary -32768
+S3-04	S3	runtime	tests/stdout/cases/S3-04.zor	expected/S3-04.stdout	i16 boundary 32767
+S3-05	S3	runtime	tests/stdout/cases/S3-05.zor	expected/S3-05.stdout	i32 boundary -2147483648
+S3-06	S3	runtime	tests/stdout/cases/S3-06.zor	expected/S3-06.stdout	i32 boundary 2147483647
+S3-07	S3	runtime	tests/stdout/cases/S3-07.zor	expected/S3-07.stdout	i64 boundary -9223372036854775808
+S3-08	S3	runtime	tests/stdout/cases/S3-08.zor	expected/S3-08.stdout	i64 boundary 9223372036854775807
+S3-09	S3	runtime	tests/stdout/cases/S3-09.zor	expected/S3-09.stdout	u8 boundary 0
+S3-10	S3	runtime	tests/stdout/cases/S3-10.zor	expected/S3-10.stdout	u8 boundary 255
+S3-11	S3	runtime	tests/stdout/cases/S3-11.zor	expected/S3-11.stdout	u16 boundary 0
+S3-12	S3	runtime	tests/stdout/cases/S3-12.zor	expected/S3-12.stdout	u16 boundary 65535
+S3-13	S3	runtime	tests/stdout/cases/S3-13.zor	expected/S3-13.stdout	u32 boundary 0
+S3-14	S3	runtime	tests/stdout/cases/S3-14.zor	expected/S3-14.stdout	u32 boundary 4294967295
+S3-15	S3	runtime	tests/stdout/cases/S3-15.zor	expected/S3-15.stdout	u64 boundary 0
+S3-16	S3	runtime	tests/stdout/cases/S3-16.zor	expected/S3-16.stdout	u64 boundary 18446744073709551615
+S3-17	S3	runtime	tests/stdout/cases/S3-17.zor	expected/S3-17.stdout	bool true lowercase
+S3-18	S3	runtime	tests/stdout/cases/S3-18.zor	expected/S3-18.stdout	bool false lowercase
+S3-19	S3	runtime	tests/stdout/cases/S3-19.zor	expected/S3-19.stdout	byte 0 decimal
+S3-20	S3	runtime	tests/stdout/cases/S3-20.zor	expected/S3-20.stdout	byte 255 decimal
+S3-21	S3	runtime	tests/stdout/cases/S3-21.zor	expected/S3-21.stdout	unit literal
+S3-22	S3	runtime	tests/stdout/cases/S3-22.zor	expected/S3-22.stdout	f32 shortest
+S3-23	S3	runtime	tests/stdout/cases/S3-23.zor	expected/S3-23.stdout	f32 threshold e=7 -> scientific
+S3-24	S3	runtime	tests/stdout/cases/S3-24.zor	expected/S3-24.stdout	f32 negative zero
+S3-25	S3	runtime	tests/stdout/cases/S3-25.zor	expected/S3-25.stdout	f64 shortest
+S3-26	S3	runtime	tests/stdout/cases/S3-26.zor	expected/S3-26.stdout	f64 threshold e=16 -> scientific
+S3-27	S3	runtime	tests/stdout/cases/S3-27.zor	expected/S3-27.stdout	D-L2c-12: nan replaced by 1e-5; floats stay 8 / total 72
+S3-28	S3	runtime	tests/stdout/cases/S3-28.zor	expected/S3-28.stdout	f64 +inf via overflow literal
+S3-29	S3	runtime	tests/stdout/cases/S3-29.zor	expected/S3-29.stdout	f64 -inf via overflow literal
+S4-01	S4	runtime	tests/stdout/cases/S4-01.zor	expected/S4-01.stdout	N=0 -> zero bytes + LF
+S4-02	S4	runtime	tests/stdout/cases/S4-02.zor	expected/S4-02.stdout	single byte
+S4-03	S4	runtime	tests/stdout/cases/S4-03.zor	expected/S4-03.stdout	ASCII
+S4-04	S4	runtime	tests/stdout/cases/S4-04.zor	expected/S4-04.stdout	UTF-8 bytes
+S4-05	S4	runtime	tests/stdout/cases/S4-05.zor	expected/S4-05.stdout	raw NUL + escaped LF (binary source)
+S6-01	S6	runtime	tests/stdout/cases/S6-01.zor	expected/S6-01.stdout	prior println retained; E3002 rc101 (stderr not judged)
+S6-02	S6	runtime	tests/stdout/cases/S6-02.zor	expected/S6-02.stdout	multi-arg call emits zero bytes on arg termination
+S6-03	S6	runtime	tests/stdout/cases/S6-03.zor	expected/S6-03.stdout	prior println retained; E3001 under -O0
+S6-04	S6	runtime	tests/stdout/cases/S6-04.zor	expected/S6-04.stdout	multi-arg call zero bytes on arg overflow
+N-01	NEGATIVE	compile-negative	tests/stdout/cases/N-01.zor	-	zero-arg println stays E1601
+N-02	NEGATIVE	compile-negative	tests/stdout/cases/N-02.zor	-	print with arg fail-closed
+N-03	NEGATIVE	compile-negative	tests/stdout/cases/N-03.zor	-	print zero-arg fail-closed
+N-04	NEGATIVE	compile-negative	tests/stdout/cases/N-04.zor	-	tuple fail-closed
+N-05	NEGATIVE	compile-negative	tests/stdout/cases/N-05.zor	-	struct fail-closed
+N-06	NEGATIVE	compile-negative	tests/stdout/cases/N-06.zor	-	enum fail-closed
+N-07	NEGATIVE	compile-negative	tests/stdout/cases/N-07.zor	-	Box fail-closed
+N-08	NEGATIVE	compile-negative	tests/stdout/cases/N-08.zor	-	struct with Box field fail-closed
+C1-01	CLI	cli	-	-	single diagnostic: six keys fixed order, stderr NDJSON, rc1
+C1-02	CLI	cli	-	-	two diagnostics in source order
+C1-03	CLI	cli	-	-	path with quote/backslash JSON-escaped
+C1-04	CLI	cli	-	-	non-ASCII path UTF-8
+C1-05	CLI	cli	-	-	with -o failure: rc1, zero artifact
+C1-06	CLI	cli	-	-	check mode success: rc0, stderr 0 B
+C2-01	CLI	cli	-	-	stdout exactly zorcc <version>\n, stderr 0
+C2-02	CLI	cli	-	-	version wins over invalid flag and nonexistent source
+C2-03	CLI	cli	-	-	version wins over JSON, no JSON output
+C3-01	CLI	cli	-	-	successful atomic publish; binary runs
+C3-02	CLI	cli	-	-	failure: zero artifact; text stderr identical to no -o
+C3-03	CLI	cli	-	-	missing -o value rc2, no artifact
+C4-01	CLI	cli	-	-	no args: usage rc2
+C4-02	CLI	cli	-	-	usage does not expose -Zoverflow or unopened -O*
+N-09	NEGATIVE	compile-negative	tests/stdout/cases/N-09.zor	-	&T argument fail-closed at println (conditional F-2)
+N-10	NEGATIVE	compile-negative	tests/stdout/cases/N-10.zor	-	&mut T argument fail-closed at println (conditional F-2)

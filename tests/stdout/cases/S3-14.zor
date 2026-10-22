@@ -1,0 +1,4 @@
+fn main() {
+    let x: u32 = 4294967295;
+    println(x);
+}

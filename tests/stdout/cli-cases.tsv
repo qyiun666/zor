@@ -1,0 +1,15 @@
+case_id	mode	args	expect_rc	notes
+C1-01	ndjson-one	--diag=json|$BAD1	1	single diagnostic: six keys fixed order, stderr NDJSON, rc1
+C1-02	ndjson-two	--diag=json|$BAD2	1	two diagnostics in source order
+C1-03	ndjson-escape	--diag=json|$ESCAPE	1	path with quote/backslash JSON-escaped
+C1-04	ndjson-utf8	--diag=json|$UTF8	1	non-ASCII path UTF-8
+C1-05	ndjson-o	--diag=json|$BAD1|-o|$OUT	1	with -o failure: rc1, zero artifact
+C1-06	ndjson-check	--diag=json|$GOOD	0	check mode success: rc0, stderr 0 B
+C2-01	version	--version	0	stdout exactly zorcc <version>\n, stderr 0
+C2-02	version-short	-V|--bogus|$NOFILE	0	version wins over invalid flag and nonexistent source
+C2-03	version-json	--version|--diag=json	0	version wins over JSON, no JSON output
+C3-01	o-ok	$GOOD|-o|$OUT	0	successful atomic publish; binary runs
+C3-02	o-fail	$BAD1|-o|$OUT	1	failure: zero artifact; text stderr identical to no -o
+C3-03	o-missing	$GOOD|-o	2	missing -o value rc2, no artifact
+C4-01	usage	-	2	no args: usage rc2
+C4-02	usage-flags	-	2	usage does not expose -Zoverflow or unopened -O*
