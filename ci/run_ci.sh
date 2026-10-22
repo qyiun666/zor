@@ -722,6 +722,8 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   local rc=0
   CC="${CC:-cc}" ZORC_BIN="$ZORC" OUT_DIR="$out" \
     bash tests/stdout/run_stdout_contract.sh --strict >>"$log" 2>&1 || rc=$?
+  # D-L2c-16：把 QA 两段判词（含 ran 计数）回显到 job 日志，便于直接核对执行数。
+  grep -E '^(PASS|FAIL)\|(stdout|cli)-contract' "$log" || true
   local so_v cli_v so_rc=0 cli_rc=0
   so_v="$(stdout_section_verdict stdout-contract "$log" "$rc")"
   cli_v="$(stdout_section_verdict cli-contract "$log" "$rc")"
