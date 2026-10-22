@@ -5,6 +5,7 @@
 #
 # 阶段：cargo(可选,OQ-1方案B参考实现) → compile(debug/release 双模式,OQ-2) → unit-test → golden → code-table → rust-compare → run-smoke → [asan(Linux,--asan)] → [bench]
 # L2b：--runtime-codes 为独立模式（单段 summary），只执行宿主检查＋runtime-codes 判据；不改既有七段／八段语义。
+# L2c：--stdout-contract 为独立模式（stdout／cli 两段 summary），直调 QA 判据脚本；不改既有七段／八段／runtime-codes 语义。
 set -uo pipefail
 shopt -s nullglob  # S-1：未命中 glob 展开为空数组，杜绝字面 glob 进循环的旁路
 
@@ -75,7 +76,7 @@ asan_host_pin_check() {
   return 0
 }
 
-STRICT=0; WITH_BENCH=0; WITH_ASAN=0; ASAN_HOST_CHECK=0; WITH_RUNTIME_CODES=0
+STRICT=0; WITH_BENCH=0; WITH_ASAN=0; ASAN_HOST_CHECK=0; WITH_RUNTIME_CODES=0; WITH_STDOUT_CONTRACT=0
 for arg in "$@"; do
   case "$arg" in
     --strict) STRICT=1 ;;
@@ -83,12 +84,18 @@ for arg in "$@"; do
     --asan) WITH_ASAN=1 ;;
     --asan-host-check) WITH_ASAN=1; ASAN_HOST_CHECK=1 ;;
     --runtime-codes) WITH_RUNTIME_CODES=1 ;;
-    *) echo "[ci] 未知参数 $arg (可用: --strict --bench --asan --asan-host-check --runtime-codes)"; exit 2 ;;
+    --stdout-contract) WITH_STDOUT_CONTRACT=1 ;;
+    *) echo "[ci] 未知参数 $arg (可用: --strict --bench --asan --asan-host-check --runtime-codes --stdout-contract)"; exit 2 ;;
   esac
 done
 
 if [ "$WITH_RUNTIME_CODES" = 1 ] && { [ "$STRICT" = 1 ] || [ "$WITH_ASAN" = 1 ] || [ "$WITH_BENCH" = 1 ]; }; then
   echo "[ci] --runtime-codes 为独立模式，不可与 --strict／--asan／--bench 组合" >&2
+  exit 2
+fi
+
+if [ "$WITH_STDOUT_CONTRACT" = 1 ] && { [ "$STRICT" = 1 ] || [ "$WITH_ASAN" = 1 ] || [ "$WITH_BENCH" = 1 ] || [ "$WITH_RUNTIME_CODES" = 1 ]; }; then
+  echo "[ci] --stdout-contract 为独立模式，不可与 --strict／--asan／--bench／--runtime-codes 组合" >&2
   exit 2
 fi
 
@@ -687,6 +694,54 @@ stage_runtime_codes() { # L2b CI-01：独立 Linux job；直调 QA 判据脚本�
     record runtime-codes FAIL 1 "$log"
   fi
 }
+
+stdout_section_verdict() { # 显式 FAIL 判词优先（即使脚本 rc=0）；否则 rc=0 即两段 PASS；缺判词按 FAIL（fail-closed）
+  local section="$1" log="$2" rc="$3"
+  if grep -q "^FAIL|${section}|" "$log" 2>/dev/null; then printf 'FAIL'; return; fi
+  if [ "$rc" -eq 0 ]; then printf 'PASS'; return; fi
+  if grep -q "^PASS|${section}|" "$log" 2>/dev/null; then printf 'PASS'; return; fi
+  printf 'FAIL'
+}
+
+stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚本；stdout／cli 两段 summary；fail-closed
+  local log; log="$(new_log stdout-contract)"
+  local out="$LOG_DIR/stdout-contract"
+  mkdir -p "$out"
+  if [ -z "$ZORC" ]; then
+    echo "zorcc 未安装：stdout-contract 判 FAIL（不可 SKIP 洗绿）" > "$log"
+    record stdout-contract FAIL 1 "$log"
+    record cli-contract FAIL 1 "$log"
+    return
+  fi
+  if [ ! -f tests/stdout/run_stdout_contract.sh ]; then
+    echo "stdout-contract 判据脚本缺失：tests/stdout/run_stdout_contract.sh（QA-01 未合入）" > "$log"
+    record stdout-contract FAIL 1 "$log"
+    record cli-contract FAIL 1 "$log"
+    return
+  fi
+  local rc=0
+  CC="${CC:-cc}" ZORC_BIN="$ZORC" OUT_DIR="$out" \
+    bash tests/stdout/run_stdout_contract.sh --strict >>"$log" 2>&1 || rc=$?
+  local so_v cli_v so_rc=0 cli_rc=0
+  so_v="$(stdout_section_verdict stdout-contract "$log" "$rc")"
+  cli_v="$(stdout_section_verdict cli-contract "$log" "$rc")"
+  [ "$so_v" = FAIL ] && so_rc=1
+  [ "$cli_v" = FAIL ] && cli_rc=1
+  echo "[stdout-contract] 判定=$so_v rc=$rc" >> "$log"
+  echo "[cli-contract] 判定=$cli_v rc=$rc" >> "$log"
+  record stdout-contract "$so_v" "$so_rc" "$log"
+  record cli-contract "$cli_v" "$cli_rc" "$log"
+}
+
+if [ "$WITH_STDOUT_CONTRACT" = 1 ]; then
+  stage_stdout_contract
+  {
+    echo "--- stage summary ($RUN_ID) ---"
+    for s in "${summary[@]}"; do echo "$s"; done
+  } | tee "$LOG_DIR/summary.txt"
+  echo "[ci] 证据目录: $LOG_DIR"
+  exit "$overall"
+fi
 
 if [ "$WITH_RUNTIME_CODES" = 1 ]; then
   stage_runtime_codes
