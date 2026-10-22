@@ -1,0 +1,5 @@
+struct Holder { b: Box<i64> }
+fn main() {
+    let h = Holder { b: box 1 };
+    println(h);
+}

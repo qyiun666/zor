@@ -1,0 +1,4 @@
+fn main() {
+    let x: u16 = 0;
+    println(x);
+}

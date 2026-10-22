@@ -1,0 +1,4 @@
+fn main() {
+    let x: f32 = 1e7;
+    println(x);
+}

@@ -1,0 +1,4 @@
+fn main() {
+    let x: i32 = 2147483647;
+    println(x);
+}

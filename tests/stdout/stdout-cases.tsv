@@ -1,0 +1,49 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S1-01	tests/stdout/cases/S1-01.zor	run	0	expected/S1-01.stdout	-	2 strings, single space
+S1-02	tests/stdout/cases/S1-02.zor	run	0	expected/S1-02.stdout	-	mixed string/int/bool
+S1-03	tests/stdout/cases/S1-03.zor	run	0	expected/S1-03.stdout	-	2 integers
+S1-04	tests/stdout/cases/S1-04.zor	run	0	expected/S1-04.stdout	-	empty strings keep one separator
+S1-05	tests/stdout/cases/S1-05.zor	run	0	expected/S1-05.stdout	-	single string
+S1-06	tests/stdout/cases/S1-06.zor	run	0	expected/S1-06.stdout	-	4 args
+S2-01	tests/stdout/cases/S2-01.zor	run	0	expected/S2-01.stdout	-	int + exactly one LF
+S2-02	tests/stdout/cases/S2-02.zor	run	0	expected/S2-02.stdout	-	empty string -> just LF
+S2-03	tests/stdout/cases/S2-03.zor	run	0	expected/S2-03.stdout	-	two calls, no extra LF
+S2-04	tests/stdout/cases/S2-04.zor	run	0	expected/S2-04.stdout	-	EOF after println
+S3-01	tests/stdout/cases/S3-01.zor	run	0	expected/S3-01.stdout	-	i8 boundary -128
+S3-02	tests/stdout/cases/S3-02.zor	run	0	expected/S3-02.stdout	-	i8 boundary 127
+S3-03	tests/stdout/cases/S3-03.zor	run	0	expected/S3-03.stdout	-	i16 boundary -32768
+S3-04	tests/stdout/cases/S3-04.zor	run	0	expected/S3-04.stdout	-	i16 boundary 32767
+S3-05	tests/stdout/cases/S3-05.zor	run	0	expected/S3-05.stdout	-	i32 boundary -2147483648
+S3-06	tests/stdout/cases/S3-06.zor	run	0	expected/S3-06.stdout	-	i32 boundary 2147483647
+S3-07	tests/stdout/cases/S3-07.zor	run	0	expected/S3-07.stdout	-	i64 boundary -9223372036854775808
+S3-08	tests/stdout/cases/S3-08.zor	run	0	expected/S3-08.stdout	-	i64 boundary 9223372036854775807
+S3-09	tests/stdout/cases/S3-09.zor	run	0	expected/S3-09.stdout	-	u8 boundary 0
+S3-10	tests/stdout/cases/S3-10.zor	run	0	expected/S3-10.stdout	-	u8 boundary 255
+S3-11	tests/stdout/cases/S3-11.zor	run	0	expected/S3-11.stdout	-	u16 boundary 0
+S3-12	tests/stdout/cases/S3-12.zor	run	0	expected/S3-12.stdout	-	u16 boundary 65535
+S3-13	tests/stdout/cases/S3-13.zor	run	0	expected/S3-13.stdout	-	u32 boundary 0
+S3-14	tests/stdout/cases/S3-14.zor	run	0	expected/S3-14.stdout	-	u32 boundary 4294967295
+S3-15	tests/stdout/cases/S3-15.zor	run	0	expected/S3-15.stdout	-	u64 boundary 0
+S3-16	tests/stdout/cases/S3-16.zor	run	0	expected/S3-16.stdout	-	u64 boundary 18446744073709551615
+S3-17	tests/stdout/cases/S3-17.zor	run	0	expected/S3-17.stdout	-	bool true lowercase
+S3-18	tests/stdout/cases/S3-18.zor	run	0	expected/S3-18.stdout	-	bool false lowercase
+S3-19	tests/stdout/cases/S3-19.zor	run	0	expected/S3-19.stdout	-	byte 0 decimal
+S3-20	tests/stdout/cases/S3-20.zor	run	0	expected/S3-20.stdout	-	byte 255 decimal
+S3-21	tests/stdout/cases/S3-21.zor	run	0	expected/S3-21.stdout	-	unit literal
+S3-22	tests/stdout/cases/S3-22.zor	run	0	expected/S3-22.stdout	-	f32 shortest
+S3-23	tests/stdout/cases/S3-23.zor	run	0	expected/S3-23.stdout	-	f32 threshold e=7 -> scientific
+S3-24	tests/stdout/cases/S3-24.zor	run	0	expected/S3-24.stdout	-	f32 negative zero
+S3-25	tests/stdout/cases/S3-25.zor	run	0	expected/S3-25.stdout	-	f64 shortest
+S3-26	tests/stdout/cases/S3-26.zor	run	0	expected/S3-26.stdout	-	f64 threshold e=16 -> scientific
+S3-27	tests/stdout/cases/S3-27.zor	run	0	expected/S3-27.stdout	-	D-L2c-12: nan replaced by 1e-5; floats stay 8 / total 72
+S3-28	tests/stdout/cases/S3-28.zor	run	0	expected/S3-28.stdout	-	f64 +inf via overflow literal
+S3-29	tests/stdout/cases/S3-29.zor	run	0	expected/S3-29.stdout	-	f64 -inf via overflow literal
+S4-01	tests/stdout/cases/S4-01.zor	run	0	expected/S4-01.stdout	-	N=0 -> zero bytes + LF
+S4-02	tests/stdout/cases/S4-02.zor	run	0	expected/S4-02.stdout	-	single byte
+S4-03	tests/stdout/cases/S4-03.zor	run	0	expected/S4-03.stdout	-	ASCII
+S4-04	tests/stdout/cases/S4-04.zor	run	0	expected/S4-04.stdout	-	UTF-8 bytes
+S4-05	tests/stdout/cases/S4-05.zor	run	0	expected/S4-05.stdout	-	raw NUL + escaped LF (binary source)
+S6-01	tests/stdout/cases/S6-01.zor	stdout-terminate	101	expected/S6-01.stdout	-	prior println retained; E3002 rc101 (stderr not judged)
+S6-02	tests/stdout/cases/S6-02.zor	stdout-terminate	101	expected/S6-02.stdout	-	multi-arg call emits zero bytes on arg termination
+S6-03	tests/stdout/cases/S6-03.zor	stdout-terminate	101	expected/S6-03.stdout	-O0	prior println retained; E3001 under -O0
+S6-04	tests/stdout/cases/S6-04.zor	stdout-terminate	101	expected/S6-04.stdout	-O0	multi-arg call zero bytes on arg overflow

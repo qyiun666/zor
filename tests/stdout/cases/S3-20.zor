@@ -1,0 +1,4 @@
+fn main() {
+    let x: byte = 255;
+    println(x);
+}
