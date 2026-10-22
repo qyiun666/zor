@@ -42,3 +42,10 @@
 - 资产与判据脚本由 QA 提供：`tests/stdout/`（`manifest.tsv`、`negative.tsv`、`cli-cases.tsv`、`cases/`、`controls/`、`expected/`、`run_stdout_contract.sh`、`new-cases.tsv`）；`--stdout-contract` 直调 QA 脚本（env：`ZORC_BIN`／`CC`／`OUT_DIR`），CI 不自维护第二套矩阵／expected；缺件或空集即 FAIL，不得 SKIP／`continue-on-error`／重跑洗绿
 - 判据边界：rc=101／E30xx／stderr 仍归 `runtime-codes`；本 job 只判 stdout 字节与顺序（S6 不复制 E30xx 判据）；stdout 失败按脚本显式 `PASS|FAIL|` 判词分段落账，缺判词按 FAIL
 - required 时机：实施 PR 内 advisory；QA GATE PASS 与 0.3.2 账本合入后再设为 required
+
+## L2d 复合输出扩展与 packaging-smoke（0.3.3 起）
+- `--stdout-contract` 计数冻结为 **86**：runtime **62**（L2c 48＋S5 11＋S7 3）＋负控 **10**＋CLI **14**；CI 除分段落账外，还校验两段判词原文 `PASS|stdout-contract|runtime=62 negative=10 fail=0 ran=62/10` 与 `PASS|cli-contract|cases=14 fail=0 ran=14`；判定 PASS 但计数不符（如 QA 旧资产 48）一律 FAIL，防静默洗绿；QA 脚本仍是唯一判据来源，CI 不自维护矩阵
+- `bash ci/run_ci.sh --packaging-smoke`：独立模式（不可与 `--strict／--asan／--bench／--runtime-codes／--stdout-contract` 组合），只执行 `stage_packaging_smoke`，输出单段 `summary.txt`；直调 QA `tests/packaging/run_packaging_smoke.sh --strict`（env：`ZORC_BIN`／`CC`／`OUT_DIR`／`ZOR_INSTALLER`）；缺 zorcc／脚本／判词、或 `PASS|packaging-smoke|cases=4 fail=0 ran=4` 计数不符即 FAIL，不得 SKIP／`continue-on-error`／重跑洗绿
+- `bash ci/install.sh --prefix <绝对前缀> [--destdir <根>] [--zorcc <路径>] [--runtime <目录>]`：安装树构造（CI smoke 用，非用户安装承诺）；canonical 布局 `<DESTDIR><prefix>/bin/zorcc`＋`<DESTDIR><prefix>/share/zor/runtime/{zor_rt.c,h}`；缺 zorcc／helper 或前缀非绝对路径 rc=2
+- job：`packaging-smoke`（`ubuntu-24.04`、timeout 20、无 sanitizer、`env -u ZOR_RUNTIME_DIR`），artifact `packaging-logs-<run_id>-<attempt>` 90 天、仅文本；实施期 advisory，required 仍仅 `stdout-contract`；baseline 七段、asan-linux 八段、runtime-codes、stdout-contract 结构零改
+- `-O*`／G-D-2 不属本版（L2e）；不建 `opt-matrix` job

@@ -133,3 +133,38 @@ jobs:
             ci/logs/**/*.sha256
           retention-days: 90
           if-no-files-found: error
+
+  # L2d CI-01：Linux 安装树 smoke（R-1：prefix/bin/zorcc + prefix/share/zor/runtime）。
+  # 独立失败面：只验安装布局／helper 定位／DESTDIR，不并入 baseline／asan／runtime-codes／stdout-contract。
+  # 实施期 advisory（不设为 required）；QA 资产合流前预期红，不得 continue-on-error 或重跑洗绿。
+  packaging-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build zorcc (release)
+        working-directory: compiler
+        run: cargo build --release
+      - name: packaging smoke (install tree, Linux x86_64)
+        env:
+          ZORC_BIN: ${{ github.workspace }}/compiler/target/release/zorcc
+          CC: clang-18
+          LC_ALL: C
+          TZ: UTC
+          TERM: dumb
+          NO_COLOR: "1"
+        run: env -u ZOR_RUNTIME_DIR bash ci/run_ci.sh --packaging-smoke
+      - name: Upload packaging evidence (ci/logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaging-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ci/logs/**/*.log
+            ci/logs/**/summary.txt
+            ci/logs/**/*.tsv
+            ci/logs/**/*.sha256
+          retention-days: 90
+          if-no-files-found: error
