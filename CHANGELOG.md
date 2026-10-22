@@ -4,6 +4,44 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.0] - 2026-10-22
+
+内部验证里程碑，非可用语言版本：本版为 L2a「运行期安全地基」——在 0.2.1 的 hello 闭环之上，落 typed IR／type table、E2203／E2204 借用硬闸、G-E-2 的 move／overwrite／Box 载荷状态机、drop flags 与 Box 运行期释放，以及 Linux ASAN／LSAN 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。
+
+本版口径：ASAN／LSAN 零报告**仅限** `tests/runtime/manifest.tsv` 的 7 条 `build-run`（hello＋6 条 Box／drop）；41 枚既有正例只承担**编译期零回归**，不进入 ASAN 运行集。不把 41 枚正例写成 ASAN 零报告范围；不将 manifest 7 条的结论外推为语言级结论。本版不新增 AC 编号；新增 E2203／E2204 两枚 E 码（R2 §8）；`r2:9` 零触；既有 45 枚 golden／45 枚 negative 零改（新增 8／8 另计）。G-E-2 只做 move／overwrite／Box 载荷部分闭合；容器／close 归 L3，FFI／回调归 R4。
+
+### Added
+
+- **typed IR／type table**：新增 `compiler/src/type_table.rs`，记录表达式／let／赋值目标类型与函数签名（键＝位置＋节点类别）；check 写入、lower 只读，`compile_typed` 返回 `Compilation{prog,types,diags}`；`compile`／`compile_to_diags` 兼容保留；lower 缺表、非 byte 数组或与字面量不符即 fail-closed。既有 41 正例编译期零回归；不新增用户可见 flag／输出。
+- **E2203／E2204 借用硬闸**：E2203＝借用活跃期间写／移／unbox owner 槽位；E2204＝`&mut` 活跃期间直接读取 owner 槽位；R2 §2 增 owner 槽位直接访问句，R2 §8 增两行。新增 8 枚负例 `r2-n22…r2-n29`＋8 枚 golden：E2203 6 枚（p4／p5／p7／p9／p9b／p11）、E2204 2 枚（p10／p10b-c）；p12／p3／p10d 放行；绑定级保守口径，字段不相交的精确放行不在本版承诺。E2203 落件（含负例＋golden 同批）先于 drop／Box 代码生成。
+- **G-E-2 状态机（部分）**：move／overwrite／Box 载荷的槽位状态机（`Live／Moved／Unboxed`）与 IR 事件；覆盖＝先移源、再 drop 旧活值；自赋值不 drop；移动／unbox 后重初始化不 drop；作用域按声明逆序只 drop `Live`。容器／close／FFI／回调不在本版。
+- **drop flags／Box 运行期**：`BindBox`／`BindBoxAssign`＝`malloc`＋存值（覆盖先按 `drop_dst` 释放旧值）；`Unbox`／`ScopeExit`＝按运行时 `live` flag `free`，作用域逆序；`MoveAssign`／`SelfAssign` 不释放并转移 flag；OOM 显式报错；A1 守卫删净，7 条 `build-run` 转绿。
+- **Linux ASAN／LSAN 门禁**：CI 新增 `asan-linux` job（`ubuntu-24.04`＋clang `18.1.3`、strict 八段、artifact 90 天、fail-closed F-1～F-15）；`tests/runtime/manifest.tsv` 48 行＝41 `compile-only`＋7 `build-run`（`cases=48`、`run_cases=7`）；7 条 `build-run` 带 `-g` 零 ASAN／LSAN 报告，UAF／泄漏／去 `-g` 三探针必红／必 FAIL，零 allowlist。macOS 仅作辅助，不作零报告证据。
+
+### Changed
+
+- 构建路径由 `compile()` 切到 `compile_typed()`，lower 消费 type table；0.2.0／0.2.1 的 `-o`、无 `-o` 检查态、rc 0／1／2、零残留、零隐式产物零回退。
+- 计数与码表：positive 41 不变；negative 45→53、golden 45→53、`tests/specs` `.zor` 86→94；code-table 九值 `21/21/17/1/1/2/17/17/12`→`23/23/19/1/1/2/19/19/14`（A6=0）；`compare` 3 不变；`cargo test` 119→166（不删测）。M1：CI 资产计数含 M1 两枚，AC 用例面不含；报告不得把 41／45 写成 AC 覆盖数。
+- CI：Linux `--strict --asan` 为八段；macOS baseline 保持七段；`asan-linux` 在 CORE-04 前预期红，转绿后由 GATE-01 复核；不在 macOS 上判 LSAN。
+
+### 门禁与回归读数
+
+- QA GATE-01 PASS @ main `60025b8`；main push run `39734639811`：baseline＋asan-linux 双 success；`cargo test` 166/0；双 locale 七段 strict 7/7；Linux `--strict --asan` 八段 8/8；计数 **41／53／53／3／94**；compile 82/0；unit 正例 41/0、负例 53/漏检 0；golden 53/53/差异 0；code-table `23/23/19/1/1/2/19/19/14`（A1–A8b1／HDR 违规 0）；compare 3/3；run-smoke PASS。
+- manifest 48＝41 `compile-only`＋7 `build-run`；7 条 `build-run` 全 PASS（build/run rc=0、stderr 0 B、`debug_info=present`、`san=none`、stdout sha 匹配）；UAF／LEAK／NOG 三探针有牙；两轮一致；零 allowlist；artifact `asan-logs-39734639811-1` 90 天。
+- 既有 45 枚 golden／45 枚 negative 零改（新增 8／8 另计）；`r2:9` 零触；零 tag／零 Release；无 `[0.3.1]`。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **E30xx／`-Zoverflow`**：L2b；本版不实发 E3001／E3002，`-Zoverflow` 仅内部／CI 位，不构成用户可见契约；溢出模式按有效优化档（`-O0`／`-Og` checked，其余 wrap，缺省 `-O2` wrap，`-g` 正交）留待 L2b。
+- **stdout 六数／CO-8／G-D-3／结构化 CLI**：L2c；本版未实现多实参分隔符、12 原始类型、`[byte;N]`、复合类型、运行期终止出口、`-O*` 契约、`--diag=json` 或版本短路；`-o` 仍为唯一对外构建入口。
+- **G-B-3 基准劣化门禁**：L4；`bench/` 仅骨架，本版不判绿。
+- **G-E-2 容器／close**：L3；**FFI／回调**：R4；不宣称 G-E-2 全闭。
+- **跨平台**：只新增 Linux ASAN 验收宿主；macOS 仅辅助，Windows／其他发行版不在本版；不构成功能矩阵承诺。
+- **字段不相交借用精度**：L2d／L3；绑定级保守拒绝不作为 L2a FAIL。
+- **运行期残余**：OOM 路径不清理已分配 owner；emit 信任静态 liveness；ScopeExit 诊断锚点取最后语句位置；列入后续硬化。
+- 内存／性能：未出数，只写「目标」，不作达标承诺。
+- 零 tag／Release；不构成可安装／生产可用／对外 API 稳定承诺。
+
 ## [0.2.1] - 2026-10-21
 
 内部验证里程碑，非可用语言版本：本版为 0.2.0 之后的**维护性补丁，零行为变更**——仅修复 `ci/run_ci.sh` 五处 shell 变量后接全角标点（`，`／`（`／`：`）在 UTF-8 locale 下被并入变量名的解析问题；不改门禁判定、rc 语义、七段结构、`compiler/src/**`、`tests/specs` 或运行期行为。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。零新增 AC 编号、零新增 E 码、零修改 `r2:9`、零新增 golden／negative；0.2.0 的首个可执行闭环与 0.1.x 编译期语义均不变。
