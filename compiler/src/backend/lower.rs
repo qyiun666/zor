@@ -6,18 +6,36 @@
 //!
 //! L2a：本模块实现 G-E-2（move／overwrite／Box 载荷）的状态机，产出显式 IR 事件；
 //! malloc／free／drop 的运行期生成归 `c::emit`，不在此处发生。
+//!
+//! L2c：`println` 多实参按 stdout 契约降级——i64／u8／u32 保留运行期值（printf），
+//! 其余原始类型由 check 类型表 + 字面量/常量绑定在编译期格式化（不依赖 libc 浮点）。
 
-use super::ir::{ArithOp, Func, IntExpr, IntTy, Local, LocalId, Program, Stmt, StrArg, Ty};
+use super::float_fmt;
+use super::ir::{
+    ArithOp, Func, IntExpr, IntTy, Local, LocalId, PrintArg, Program, Stmt, StrArg, Ty,
+};
 use super::subset::{self, SubsetError};
 use crate::parser::{Ex, Lit, Prog, St, Ty as AstTy};
 use crate::type_table::{self, TypeTable};
 use std::collections::HashMap;
+
+/// 编译期可确定的标量值（非运行期整型）。
+#[derive(Clone, Debug, PartialEq)]
+enum ConstVal {
+    Int(i128),
+    Bool(bool),
+    Unit,
+    F32(f32),
+    F64(f64),
+}
 
 /// L2a 局部槽位状态：`live` 是静态可判的 owner 活跃位。
 #[derive(Clone, Debug)]
 struct Slot {
     ty: Ty,
     live: bool,
+    /// 仅编译期标量（bool／byte／窄整型／浮点等）有值；运行期整型为 `None`。
+    konst: Option<ConstVal>,
 }
 
 pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
@@ -53,7 +71,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 ));
                             }
                             body.push(Stmt::BindStr { local: id, bytes, line: *l, col: *c });
-                            slots.push(Slot { ty: Ty::Bytes(n), live: true });
+                            slots.push(Slot { ty: Ty::Bytes(n), live: true, konst: None });
                         }
                         Ex::Box(inner, _, _) => {
                             if local_ty != Ty::Box(Box::new(Ty::I64)) {
@@ -61,23 +79,30 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             }
                             let value = int_lit(inner)?;
                             body.push(Stmt::BindBox { local: id, value, line: *l, col: *c });
-                            slots.push(Slot { ty: local_ty, live: true });
+                            slots.push(Slot { ty: local_ty, live: true, konst: None });
                         }
                         Ex::Lit(Lit::Int(v), il, ic) => match &local_ty {
                             Ty::I64 => {
                                 let value = i64::try_from(*v)
                                     .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i64"))?;
                                 body.push(Stmt::BindI64 { local: id, value, line: *l, col: *c });
-                                slots.push(Slot { ty: Ty::I64, live: true });
+                                slots.push(Slot { ty: Ty::I64, live: true, konst: None });
                             }
                             Ty::U8 | Ty::U32 => {
                                 let ty = ir_int_ty(&local_ty).expect("u8/u32");
                                 let expr = IntExpr::Const(int_const(v, ty, init)?);
                                 body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
-                                slots.push(Slot { ty: local_ty, live: true });
+                                slots.push(Slot { ty: local_ty, live: true, konst: None });
                             }
-                            _ => return Err(SubsetError::new(*l, *c, "lower：整型绑定类型不在 L2b codegen 子集")),
+                            _ => {
+                                let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
+                                slots.push(Slot { ty: local_ty, live: true, konst: Some(val) });
+                            }
                         },
+                        Ex::Lit(Lit::Bool(_) | Lit::Float(_), _, _) | Ex::UnitLit(..) => {
+                            let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
+                            slots.push(Slot { ty: local_ty, live: true, konst: Some(val) });
+                        }
                         Ex::Deref(base, dl, dc) => {
                             if local_ty != Ty::I64 {
                                 return Err(SubsetError::new(*l, *c, "lower：解引用结果类型非 i64"));
@@ -93,7 +118,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 return Err(SubsetError::new(*dl, *dc, "lower：解引用源非 Box<i64>"));
                             }
                             body.push(Stmt::BindI64Deref { local: id, src, line: *dl, col: *dc });
-                            slots.push(Slot { ty: Ty::I64, live: true });
+                            slots.push(Slot { ty: Ty::I64, live: true, konst: None });
                         }
                         Ex::Path(n, nl, nc) => {
                             let src = lookup(&scope, n, *nl, *nc)?;
@@ -103,7 +128,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 }
                                 body.push(Stmt::MoveAssign { dst: id, src, line: *nl, col: *nc });
                                 set_live(&mut slots, src, false);
-                                slots.push(Slot { ty: local_ty, live: true });
+                                slots.push(Slot { ty: local_ty, live: true, konst: None });
                             } else if let Some(ty) = ir_int_ty(&local_ty) {
                                 if slots.get(src.0 as usize).map(|s| &s.ty) != Some(&local_ty) {
                                     return Err(SubsetError::new(*nl, *nc, "lower：整型拷贝源类型与目标不符"));
@@ -115,12 +140,15 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     line: *nl,
                                     col: *nc,
                                 });
-                                slots.push(Slot { ty: local_ty, live: true });
+                                slots.push(Slot { ty: local_ty, live: true, konst: None });
+                            } else if is_const_scalar_ty(&local_ty) {
+                                let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
+                                slots.push(Slot { ty: local_ty, live: true, konst: Some(val) });
                             } else {
                                 return Err(SubsetError::new(*nl, *nc, "lower：移动目标类型非 Box"));
                             }
                         }
-                        Ex::Bin(..) | Ex::Un(..) => {
+                        Ex::Bin(..) => {
                             let ty = ir_int_ty(&local_ty).ok_or_else(|| {
                                 SubsetError::new(
                                     *l,
@@ -130,7 +158,17 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             })?;
                             let expr = lower_int_expr(init, ty, types, &slots, &scope)?;
                             body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
-                            slots.push(Slot { ty: local_ty, live: true });
+                            slots.push(Slot { ty: local_ty, live: true, konst: None });
+                        }
+                        Ex::Un(..) => {
+                            if let Some(ty) = ir_int_ty(&local_ty) {
+                                let expr = lower_int_expr(init, ty, types, &slots, &scope)?;
+                                body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
+                                slots.push(Slot { ty: local_ty, live: true, konst: None });
+                            } else {
+                                let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
+                                slots.push(Slot { ty: local_ty, live: true, konst: Some(val) });
+                            }
                         }
                         other => {
                             let (il, ic) = subset::expr_span(other);
@@ -145,40 +183,14 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                     last_pos = (*l, *c);
                     let is_println =
                         matches!(callee.as_ref(), Ex::Path(n, _, _) if n == "println");
-                    if !is_println || args.len() != 1 {
+                    if !is_println || args.is_empty() {
                         return Err(SubsetError::new(*l, *c, "lower：println 形态"));
                     }
-                    let arg = match &args[0] {
-                        Ex::Path(n, nl, nc) => {
-                            let id = lookup(&scope, n, *nl, *nc)?;
-                            let n_bytes = match slots.get(id.0 as usize).map(|s| &s.ty) {
-                                Some(Ty::Bytes(n)) => *n,
-                                _ => return Err(SubsetError::new(*nl, *nc, "lower：println 实参非字符串绑定")),
-                            };
-                            // 与 check 的类型表交叉核对（唯一类型来源）
-                            let table = expr_byte_len(types, &args[0], *nl, *nc, "println 实参")?;
-                            if table != n_bytes {
-                                return Err(SubsetError::new(*nl, *nc, "lower：println 实参类型与局部绑定不符"));
-                            }
-                            StrArg::Local(id)
-                        }
-                        Ex::Lit(Lit::Str(s), sl, sc) => {
-                            let n = expr_byte_len(types, &args[0], *sl, *sc, "println 实参")?;
-                            if n != s.len() as u64 {
-                                return Err(SubsetError::new(
-                                    *sl,
-                                    *sc,
-                                    format!("lower：println 实参类型 [byte; {}] 与字面量 {} 字节不符", n, s.len()),
-                                ));
-                            }
-                            StrArg::Bytes(s.as_bytes().to_vec())
-                        }
-                        other => {
-                            let (al, ac) = subset::expr_span(other);
-                            return Err(SubsetError::new(al, ac, "lower：println 实参"));
-                        }
-                    };
-                    body.push(Stmt::Println { arg, line: *l, col: *c });
+                    let mut pargs = Vec::with_capacity(args.len());
+                    for arg in args {
+                        pargs.push(print_arg(arg, types, &slots, &scope)?);
+                    }
+                    body.push(Stmt::Print { args: pargs, newline: true, line: *l, col: *c });
                 }
                 St::Expr(Some(Ex::Unbox(n, ul, uc)), _, _) => {
                     last_pos = (*ul, *uc);
@@ -285,6 +297,263 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
     Ok(Program { funcs })
 }
 
+/// println 实参降级：字符串／字节串／运行期整型／编译期格式化标量。
+fn print_arg(
+    e: &Ex,
+    types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
+) -> Result<PrintArg, SubsetError> {
+    match e {
+        Ex::Lit(Lit::Str(s), sl, sc) => {
+            let n = expr_byte_len(types, e, *sl, *sc, "println 实参")?;
+            if n != s.len() as u64 {
+                return Err(SubsetError::new(
+                    *sl,
+                    *sc,
+                    format!("lower：println 实参类型 [byte; {}] 与字面量 {} 字节不符", n, s.len()),
+                ));
+            }
+            Ok(PrintArg::Str(StrArg::Bytes(s.as_bytes().to_vec())))
+        }
+        Ex::Lit(Lit::Int(_), _, _) => {
+            let ty = int_ty_of(types, e, "println 实参")?;
+            let expr = lower_int_expr(e, ty, types, slots, scope)?;
+            Ok(PrintArg::Int { ty, expr })
+        }
+        Ex::Lit(Lit::Float(_) | Lit::Bool(_), _, _) | Ex::UnitLit(..) => {
+            let irt = ir_ty_of(types, e, "println 实参")?;
+            let val = const_scalar(e, &irt, types, slots, scope)?;
+            Ok(PrintArg::Bytes(format_const(&val, &irt)?))
+        }
+        Ex::Path(n, nl, nc) => {
+            let id = lookup(scope, n, *nl, *nc)?;
+            let slot = slots
+                .get(id.0 as usize)
+                .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：println 实参槽位缺失"))?;
+            match &slot.ty {
+                Ty::Bytes(n_bytes) => {
+                    // 与 check 的类型表交叉核对（唯一类型来源）
+                    let table = expr_byte_len(types, e, *nl, *nc, "println 实参")?;
+                    if table != *n_bytes {
+                        return Err(SubsetError::new(*nl, *nc, "lower：println 实参类型与局部绑定不符"));
+                    }
+                    Ok(PrintArg::Str(StrArg::Local(id)))
+                }
+                ty => {
+                    let irt = ir_ty_of(types, e, "println 实参")?;
+                    if &irt != ty {
+                        return Err(SubsetError::new(*nl, *nc, "lower：println 实参类型与局部绑定不符"));
+                    }
+                    if let Some(ity) = ir_int_ty(ty) {
+                        Ok(PrintArg::Int { ty: ity, expr: IntExpr::Local(id) })
+                    } else {
+                        let val = slot
+                            .konst
+                            .clone()
+                            .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：println 常量绑定缺少值"))?;
+                        Ok(PrintArg::Bytes(format_const(&val, ty)?))
+                    }
+                }
+            }
+        }
+        Ex::Deref(base, dl, dc) => {
+            let src = match base.as_ref() {
+                Ex::Path(n, _, _) => lookup(scope, n, *dl, *dc)?,
+                _ => return Err(SubsetError::new(*dl, *dc, "lower：解引用源形态")),
+            };
+            let irt = ir_ty_of(types, e, "println 实参")?;
+            if irt != Ty::I64 {
+                return Err(SubsetError::new(*dl, *dc, "lower：解引用结果类型非 i64"));
+            }
+            Ok(PrintArg::Int { ty: IntTy::I64, expr: IntExpr::Local(src) })
+        }
+        Ex::Un(..) | Ex::Bin(..) => {
+            let irt = ir_ty_of(types, e, "println 实参")?;
+            if let Some(ty) = ir_int_ty(&irt) {
+                let expr = lower_int_expr(e, ty, types, slots, scope)?;
+                Ok(PrintArg::Int { ty, expr })
+            } else {
+                let val = const_scalar(e, &irt, types, slots, scope)?;
+                Ok(PrintArg::Bytes(format_const(&val, &irt)?))
+            }
+        }
+        other => {
+            let (l, c) = subset::expr_span(other);
+            Err(SubsetError::new(l, c, "lower：println 实参不可打印"))
+        }
+    }
+}
+
+fn int_ty_of(types: &TypeTable, e: &Ex, what: &str) -> Result<IntTy, SubsetError> {
+    let irt = ir_ty_of(types, e, what)?;
+    ir_int_ty(&irt).ok_or_else(|| {
+        let (l, c) = subset::expr_span(e);
+        SubsetError::new(l, c, format!("lower：{} 不是运行期整型", what))
+    })
+}
+
+fn ir_ty_of(types: &TypeTable, e: &Ex, what: &str) -> Result<Ty, SubsetError> {
+    let (l, c) = subset::expr_span(e);
+    let t = types
+        .expr_ty(e)
+        .ok_or_else(|| SubsetError::new(l, c, format!("lower：{} 缺少 type table 记录", what)))?;
+    ast_to_ir(t).ok_or_else(|| {
+        SubsetError::new(l, c, format!("lower：{} 类型 '{}' 不在 L2c codegen 子集", what, t.display()))
+    })
+}
+
+fn is_const_scalar_ty(t: &Ty) -> bool {
+    matches!(
+        t,
+        Ty::I8
+            | Ty::I16
+            | Ty::I32
+            | Ty::U16
+            | Ty::U64
+            | Ty::Byte
+            | Ty::Bool
+            | Ty::Unit
+            | Ty::F32
+            | Ty::F64
+    )
+}
+
+/// 编译期标量求值；类型唯一来源仍为 TypeTable，节点类型与期望宽度逐点核对。
+fn const_scalar(
+    e: &Ex,
+    want: &Ty,
+    types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
+) -> Result<ConstVal, SubsetError> {
+    let (l, c) = subset::expr_span(e);
+    let recorded = types
+        .expr_ty(e)
+        .ok_or_else(|| SubsetError::new(l, c, "lower：常量初值缺少 type table 记录"))?;
+    if ast_to_ir(recorded).as_ref() != Some(want) {
+        return Err(SubsetError::new(
+            l,
+            c,
+            format!("lower：常量初值类型 '{}' 与绑定不符", recorded.display()),
+        ));
+    }
+    match e {
+        Ex::Lit(Lit::Int(v), il, ic) => {
+            let n = i128::try_from(*v)
+                .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i128"))?;
+            if !int_in_range(want, n) {
+                return Err(SubsetError::new(*il, *ic, "lower：整型字面量超出声明宽度"));
+            }
+            Ok(ConstVal::Int(n))
+        }
+        Ex::Lit(Lit::Float(v), _, _) => match want {
+            Ty::F32 => Ok(ConstVal::F32(*v as f32)),
+            Ty::F64 => Ok(ConstVal::F64(*v)),
+            _ => Err(SubsetError::new(l, c, "lower：浮点初值类型与绑定不符")),
+        },
+        Ex::Lit(Lit::Bool(v), _, _) => match want {
+            Ty::Bool => Ok(ConstVal::Bool(*v)),
+            _ => Err(SubsetError::new(l, c, "lower：bool 初值类型与绑定不符")),
+        },
+        Ex::UnitLit(_, _) => match want {
+            Ty::Unit => Ok(ConstVal::Unit),
+            _ => Err(SubsetError::new(l, c, "lower：unit 初值类型与绑定不符")),
+        },
+        Ex::Path(n, nl, nc) => {
+            let id = lookup(scope, n, *nl, *nc)?;
+            let slot = slots
+                .get(id.0 as usize)
+                .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：常量拷贝源槽位缺失"))?;
+            if &slot.ty != want {
+                return Err(SubsetError::new(*nl, *nc, "lower：常量拷贝源类型与目标不符"));
+            }
+            slot.konst
+                .clone()
+                .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：常量拷贝源不是编译期常量"))
+        }
+        Ex::Un(op, inner, ul, uc) if op == "-" => {
+            // 负整数字面量按幅值求值：正幅值本身可超出正数范围（如 i8 的 128）。
+            if let Ex::Lit(Lit::Int(v), il, ic) = inner.as_ref() {
+                if !matches!(
+                    want,
+                    Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::U8 | Ty::U16 | Ty::U32 | Ty::U64 | Ty::Byte
+                ) {
+                    return Err(SubsetError::new(*ul, *uc, "lower：一元 '-' 要求数值类型"));
+                }
+                let n = i128::try_from(*v)
+                    .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i128"))?;
+                let n = n
+                    .checked_neg()
+                    .ok_or_else(|| SubsetError::new(*ul, *uc, "lower：整型常量取负溢出"))?;
+                if !int_in_range(want, n) {
+                    return Err(SubsetError::new(*ul, *uc, "lower：整型字面量超出声明宽度"));
+                }
+                return Ok(ConstVal::Int(n));
+            }
+            let v = const_scalar(inner, want, types, slots, scope)?;
+            match v {
+                ConstVal::Int(n) => {
+                    let n = n
+                        .checked_neg()
+                        .ok_or_else(|| SubsetError::new(*ul, *uc, "lower：整型常量取负溢出"))?;
+                    if !int_in_range(want, n) {
+                        return Err(SubsetError::new(*ul, *uc, "lower：整型字面量超出声明宽度"));
+                    }
+                    Ok(ConstVal::Int(n))
+                }
+                ConstVal::F32(v) => Ok(ConstVal::F32(-v)),
+                ConstVal::F64(v) => Ok(ConstVal::F64(-v)),
+                _ => Err(SubsetError::new(*ul, *uc, "lower：一元 '-' 非常量数值")),
+            }
+        }
+        Ex::Un(op, inner, ul, uc) if op == "!" => match const_scalar(inner, want, types, slots, scope)? {
+            ConstVal::Bool(v) => Ok(ConstVal::Bool(!v)),
+            _ => Err(SubsetError::new(*ul, *uc, "lower：'!' 非常量 bool")),
+        },
+        other => {
+            let (el, ec) = subset::expr_span(other);
+            Err(SubsetError::new(el, ec, "lower：常量形态不在 L2c codegen 子集"))
+        }
+    }
+}
+
+fn int_in_range(ty: &Ty, n: i128) -> bool {
+    match ty {
+        Ty::I8 => (-128..=127).contains(&n),
+        Ty::I16 => (-32768..=32767).contains(&n),
+        Ty::I32 => (i32::MIN as i128..=i32::MAX as i128).contains(&n),
+        Ty::I64 => (i64::MIN as i128..=i64::MAX as i128).contains(&n),
+        Ty::U8 | Ty::Byte => (0..=u8::MAX as i128).contains(&n),
+        Ty::U16 => (0..=u16::MAX as i128).contains(&n),
+        Ty::U32 => (0..=u32::MAX as i128).contains(&n),
+        Ty::U64 => (0..=u64::MAX as i128).contains(&n),
+        _ => false,
+    }
+}
+
+fn format_const(v: &ConstVal, ty: &Ty) -> Result<Vec<u8>, SubsetError> {
+    match (v, ty) {
+        (
+            ConstVal::Int(n),
+            Ty::I8
+            | Ty::I16
+            | Ty::I32
+            | Ty::I64
+            | Ty::U8
+            | Ty::U16
+            | Ty::U32
+            | Ty::U64
+            | Ty::Byte,
+        ) => Ok(n.to_string().into_bytes()),
+        (ConstVal::Bool(b), Ty::Bool) => Ok(if *b { b"true".to_vec() } else { b"false".to_vec() }),
+        (ConstVal::Unit, Ty::Unit) => Ok(b"()".to_vec()),
+        (ConstVal::F32(v), Ty::F32) => Ok(float_fmt::format_f32(*v).into_bytes()),
+        (ConstVal::F64(v), Ty::F64) => Ok(float_fmt::format_f64(*v).into_bytes()),
+        _ => Err(SubsetError::new(0, 0, "lower：常量格式化类型不符")),
+    }
+}
+
 fn lookup(
     scope: &HashMap<String, LocalId>,
     name: &str,
@@ -321,7 +590,7 @@ fn let_type(types: &TypeTable, init: &Ex, l: usize, c: usize) -> Result<Ty, Subs
         .let_ty(l, c)
         .ok_or_else(|| SubsetError::new(l, c, "lower：let 缺少 type table 记录"))?;
     let ir = ast_to_ir(t)
-        .ok_or_else(|| SubsetError::new(l, c, format!("lower：let 类型 '{}' 不在 L2b codegen 子集", t.display())))?;
+        .ok_or_else(|| SubsetError::new(l, c, format!("lower：let 类型 '{}' 不在 L2c codegen 子集", t.display())))?;
     let init_t = types
         .expr_ty(init)
         .ok_or_else(|| SubsetError::new(l, c, "lower：let 初值缺少 type table 记录"))?;
@@ -349,9 +618,19 @@ fn expr_byte_len(
 fn ast_to_ir(t: &AstTy) -> Option<Ty> {
     match t {
         AstTy::Arr(elem, n) if matches!(elem.as_ref(), AstTy::Prim("byte")) => Some(Ty::Bytes(*n)),
+        AstTy::Prim("i8") => Some(Ty::I8),
+        AstTy::Prim("i16") => Some(Ty::I16),
+        AstTy::Prim("i32") => Some(Ty::I32),
         AstTy::Prim("i64") => Some(Ty::I64),
         AstTy::Prim("u8") => Some(Ty::U8),
+        AstTy::Prim("u16") => Some(Ty::U16),
         AstTy::Prim("u32") => Some(Ty::U32),
+        AstTy::Prim("u64") => Some(Ty::U64),
+        AstTy::Prim("byte") => Some(Ty::Byte),
+        AstTy::Prim("bool") => Some(Ty::Bool),
+        AstTy::Prim("unit") => Some(Ty::Unit),
+        AstTy::Prim("f32") => Some(Ty::F32),
+        AstTy::Prim("f64") => Some(Ty::F64),
         AstTy::BoxTy(inner) if matches!(inner.as_ref(), AstTy::Prim("i64")) => {
             Some(Ty::Box(Box::new(Ty::I64)))
         }
@@ -359,6 +638,7 @@ fn ast_to_ir(t: &AstTy) -> Option<Ty> {
     }
 }
 
+/// 运行期整型宽度：L2b 起仅 i64／u8／u32 走 C 变量与 printf。
 fn ir_int_ty(t: &Ty) -> Option<IntTy> {
     match t {
         Ty::I64 => Some(IntTy::I64),
@@ -427,6 +707,18 @@ fn lower_int_expr(
             if ty != IntTy::I64 {
                 return Err(SubsetError::new(*l, *c, "lower：无符号一元 '-' 不在 L2b codegen 子集"));
             }
+            // 负字面量折叠为常量，覆盖 i64::MIN（正字面量本身不可表示）。
+            if let Ex::Lit(Lit::Int(v), il, ic) = inner.as_ref() {
+                let n = i128::try_from(*v)
+                    .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i128"))?;
+                let n = n
+                    .checked_neg()
+                    .ok_or_else(|| SubsetError::new(*il, *ic, "lower：整型常量取负溢出"))?;
+                if !int_in_range(&Ty::I64, n) {
+                    return Err(SubsetError::new(*il, *ic, "lower：整型字面量超出声明宽度"));
+                }
+                return Ok(IntExpr::Const(n));
+            }
             let inner = lower_int_expr(inner, ty, types, slots, scope)?;
             Ok(IntExpr::Neg { expr: Box::new(inner), line: *l, col: *c })
         }
@@ -462,7 +754,7 @@ fn int_lit(e: &Ex) -> Result<i64, SubsetError> {
 #[cfg(test)]
 mod tests {
     use super::lower;
-    use crate::backend::ir::{ArithOp, IntExpr, IntTy, LocalId, Stmt, StrArg, Ty};
+    use crate::backend::ir::{ArithOp, IntExpr, IntTy, LocalId, PrintArg, Stmt, StrArg, Ty};
     use crate::type_table::TypeTable;
     use crate::compile_typed;
 
@@ -474,6 +766,16 @@ mod tests {
 
     fn body(src: &str) -> Vec<Stmt> {
         ir(src).funcs[0].body.clone()
+    }
+
+    fn printed(src: &str) -> Vec<PrintArg> {
+        body(src)
+            .into_iter()
+            .find_map(|s| match s {
+                Stmt::Print { args, .. } => Some(args),
+                _ => None,
+            })
+            .expect("print stmt")
     }
 
     #[test]
@@ -495,11 +797,15 @@ mod tests {
             other => panic!("expected BindStr, got {other:?}"),
         }
         match &f.body[1] {
-            Stmt::Println { arg: StrArg::Local(id), line, .. } => {
-                assert_eq!(id.0, 0);
+            Stmt::Print { args, newline, line, .. } => {
+                assert!(*newline);
                 assert_eq!(*line, 3);
+                match &args[0] {
+                    PrintArg::Str(StrArg::Local(id)) => assert_eq!(id.0, 0),
+                    other => panic!("expected Str(Local), got {other:?}"),
+                }
             }
-            other => panic!("expected Println(Local), got {other:?}"),
+            other => panic!("expected Print, got {other:?}"),
         }
     }
 
@@ -507,8 +813,66 @@ mod tests {
     fn literal_println_lowers_to_bytes() {
         let p = ir("fn main() { println(\"hi\"); }");
         match &p.funcs[0].body[0] {
-            Stmt::Println { arg: StrArg::Bytes(b), .. } => assert_eq!(b.as_slice(), b"hi"),
-            other => panic!("expected Println(Bytes), got {other:?}"),
+            Stmt::Print { args, .. } => match &args[0] {
+                PrintArg::Str(StrArg::Bytes(b)) => assert_eq!(b.as_slice(), b"hi"),
+                other => panic!("expected Str(Bytes), got {other:?}"),
+            },
+            other => panic!("expected Print, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn multi_arg_print_preserves_source_order() {
+        let args = printed("fn main() { println(\"a\", 1, true, \"b\"); }");
+        assert_eq!(args.len(), 4, "{args:?}");
+        assert!(matches!(&args[0], PrintArg::Str(StrArg::Bytes(b)) if b == b"a"));
+        assert!(matches!(&args[1], PrintArg::Int { ty: IntTy::I64, .. }));
+        assert!(matches!(&args[2], PrintArg::Bytes(b) if b == b"true"));
+        assert!(matches!(&args[3], PrintArg::Str(StrArg::Bytes(b)) if b == b"b"));
+    }
+
+    #[test]
+    fn all_narrow_primitives_are_formatted_at_compile_time() {
+        for (src, want) in [
+            ("fn main() { let x: i8 = -128; println(x); }", "-128"),
+            ("fn main() { let x: i16 = -32768; println(x); }", "-32768"),
+            ("fn main() { let x: i32 = -2147483648; println(x); }", "-2147483648"),
+            ("fn main() { let x: u16 = 65535; println(x); }", "65535"),
+            ("fn main() { let x: u64 = 18446744073709551615; println(x); }", "18446744073709551615"),
+            ("fn main() { let x: byte = 255; println(x); }", "255"),
+            ("fn main() { let x = true; println(x); }", "true"),
+            ("fn main() { let x = (); println(x); }", "()"),
+        ] {
+            match &printed(src)[0] {
+                PrintArg::Bytes(b) => assert_eq!(b, want.as_bytes(), "{src}"),
+                other => panic!("{src}: expected Bytes, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn float_literals_follow_contract_at_compile_time() {
+        for (src, want) in [
+            ("fn main() { println(1.0); }", "1"),
+            ("fn main() { println(1e16); }", "1e+16"),
+            ("fn main() { println(1e-5); }", "1e-05"),
+            ("fn main() { println(-0.0); }", "-0"),
+            ("fn main() { let x: f32 = 1e7; println(x); }", "1e+07"),
+            ("fn main() { let x: f32 = 1e6; println(x); }", "1000000"),
+        ] {
+            match &printed(src)[0] {
+                PrintArg::Bytes(b) => assert_eq!(b, want.as_bytes(), "{src}"),
+                other => panic!("{src}: expected Bytes, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn runtime_int_print_keeps_runtime_value() {
+        let args = printed("fn main() { let a: u8 = 250; println(a); }");
+        match &args[0] {
+            PrintArg::Int { ty: IntTy::U8, expr: IntExpr::Local(id) } => assert_eq!(id.0, 0),
+            other => panic!("expected Int(U8), got {other:?}"),
         }
     }
 
@@ -518,8 +882,11 @@ mod tests {
         let f = &p.funcs[0];
         assert_eq!(f.locals.len(), 2);
         match &f.body[2] {
-            Stmt::Println { arg: StrArg::Local(id), .. } => assert_eq!(id.0, 1),
-            other => panic!("expected Println(Local), got {other:?}"),
+            Stmt::Print { args, .. } => match &args[0] {
+                PrintArg::Str(StrArg::Local(id)) => assert_eq!(id.0, 1),
+                other => panic!("expected Str(Local), got {other:?}"),
+            },
+            other => panic!("expected Print, got {other:?}"),
         }
     }
 
@@ -640,18 +1007,13 @@ mod tests {
         assert!(matches!(b[1], Stmt::ScopeExit { .. }));
     }
 
-    // —— L2b 整型算术 ——
-
     #[test]
     fn u8_annotation_and_arithmetic_lower_to_bind_int() {
         let p = ir("fn main() {\n    let a: u8 = 250;\n    let c = a + 10;\n}\n");
         assert_eq!(p.funcs[0].locals[0].ty, Ty::U8);
-        assert_eq!(p.funcs[0].locals[1].ty, Ty::U8);
         match &p.funcs[0].body[1] {
-            Stmt::BindInt { ty, expr: IntExpr::Bin { op: ArithOp::Add, .. }, .. } => {
-                assert_eq!(*ty, IntTy::U8);
-            }
-            other => panic!("expected BindInt(u8 add), got {other:?}"),
+            Stmt::BindInt { ty: IntTy::U8, .. } => {}
+            other => panic!("expected BindInt(U8), got {other:?}"),
         }
     }
 
@@ -659,8 +1021,8 @@ mod tests {
     fn unsupported_width_fails_closed_before_codegen() {
         let c = compile_typed("fn main() {\n    let a: i8 = 127;\n    let c = a + 1;\n}\n");
         assert!(c.diags.is_empty(), "{:?}", c.diags);
-        let e = lower(&c.prog, &c.types).expect_err("i8 must fail closed");
-        assert!(e.what.contains("i8") && e.what.contains("L2b"), "{}", e.what);
+        let e = lower(&c.prog, &c.types).expect_err("i8 arithmetic must fail closed");
+        assert!(e.what.contains("L2b"), "{}", e.what);
     }
 
     #[test]
@@ -673,10 +1035,19 @@ mod tests {
     fn unary_minus_lowers_to_neg_node() {
         let b = body("fn main() {\n    let max = 9223372036854775807;\n    let c = -max - 2;\n}\n");
         match &b[1] {
-            Stmt::BindInt { ty: IntTy::I64, expr: IntExpr::Bin { op: ArithOp::Sub, lhs, .. }, .. } => {
+            Stmt::BindInt { expr: IntExpr::Bin { op: ArithOp::Sub, lhs, .. }, .. } => {
                 assert!(matches!(lhs.as_ref(), IntExpr::Neg { .. }), "{lhs:?}");
             }
-            other => panic!("expected BindInt(Sub(Neg)), got {other:?}"),
+            other => panic!("expected BindInt(Bin), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn negative_literal_min_folds_to_constant() {
+        let b = body("fn main() {\n    let m = -9223372036854775808;\n}\n");
+        match &b[0] {
+            Stmt::BindInt { expr: IntExpr::Const(v), .. } => assert_eq!(*v, i64::MIN as i128),
+            other => panic!("expected BindInt(Const), got {other:?}"),
         }
     }
 }

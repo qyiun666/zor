@@ -1,21 +1,32 @@
-//! 0.2.0 首片支持面判定（子集闸）。
+//! L2c 支持面判定（子集闸）。
 //!
 //! 闸先于 lower：不支持即返回 `SubsetError`，由调用方映射为 rc=1 且不落产物。
 //! 本模块只判形态，不复制 check 的类型规则；类型与所有权判定唯一来源仍是 check。
+//!
+//! L2c 面：stdout 契约的五实现面（多实参／终饰／12 原始类型／`[byte;N]`／终止前
+//! 原子输出）。`print` 与复合类型（元组／struct／enum／数组）按冻结口径 fail-closed。
 
 use crate::parser::{Blk, Ex, FnDecl, Lit, Prog, St, Ty};
 use std::collections::HashMap;
 
-/// 首片绑定种类：字符串／Box<i64>／整型（i64／u8／u32 及其他在册整型）。
+/// 首片绑定种类：字节串／Box<i64>／全部在册原始类型。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BindingKind {
     Str,
     BoxI64,
+    I8,
+    I16,
+    I32,
     I64,
     U8,
+    U16,
     U32,
-    /// 其他在册整型：subset 放行，lower 以 rc=1 fail-closed。
-    OtherInt,
+    U64,
+    Byte,
+    Bool,
+    Unit,
+    F32,
+    F64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -31,7 +42,8 @@ impl SubsetError {
     }
 }
 
-/// 支持面：单个 `main`（无参、unit 返回）、字符串字面量 `let`、`println` 单实参。
+/// 支持面：单个 `main`（无参、unit 返回）、原始类型／字节串 `let`、`println` 多实参。
+/// `print` 与复合类型按 L2c 契约 fail-closed（rc=1、零产物）。
 pub fn check(prog: &Prog) -> Result<(), SubsetError> {
     if let Some(s) = prog.structs.first() {
         return Err(SubsetError::new(
@@ -81,6 +93,35 @@ fn check_main(f: &FnDecl) -> Result<(), SubsetError> {
     Ok(())
 }
 
+/// 标注与初值种类合一；常量负字面量可按标注收窄（`-128: i8`）。
+fn unify_ann(
+    ann: Option<BindingKind>,
+    kind: BindingKind,
+    init: &Ex,
+    l: usize,
+    c: usize,
+) -> Result<BindingKind, SubsetError> {
+    match ann {
+        None => Ok(kind),
+        Some(a) if a == kind => Ok(a),
+        Some(a) if narrowable_const(init) && width_compatible(a, kind) => Ok(a),
+        Some(_) => Err(SubsetError::new(l, c, "let 类型标注与初值类型不符")),
+    }
+}
+
+fn narrowable_const(e: &Ex) -> bool {
+    matches!(
+        e,
+        Ex::Un(op, inner, _, _)
+            if op == "-" && matches!(inner.as_ref(), Ex::Lit(Lit::Int(_) | Lit::Float(_), _, _))
+    )
+}
+
+fn width_compatible(ann: BindingKind, expr: BindingKind) -> bool {
+    (is_int_kind(ann) && is_int_kind(expr))
+        || (matches!(ann, BindingKind::F32 | BindingKind::F64) && expr == BindingKind::F64)
+}
+
 fn check_block(blk: &Blk, bindings: &mut HashMap<String, BindingKind>) -> Result<(), SubsetError> {
     if let Some(tail) = &blk.tail {
         if !matches!(tail.as_ref(), Ex::UnitLit(_, _)) {
@@ -91,34 +132,33 @@ fn check_block(blk: &Blk, bindings: &mut HashMap<String, BindingKind>) -> Result
     for st in &blk.stmts {
         match st {
             St::Let(name, ann, init, l, c) => {
-                // L2b：只放行整型标注（i64/u8/u32 可 codegen；其余在册整型由 lower
-                // rc=1 fail-closed）。数组／引用等标注仍按原判据拒判。
+                // L2c：全部在册原始类型与 [byte; N] 标注进入 codegen；ref／Box 等仍拒判。
                 let ann_kind = match ann {
                     None => None,
-                    Some(Ty::Prim(p)) => match *p {
-                        "i64" => Some(BindingKind::I64),
-                        "u8" => Some(BindingKind::U8),
-                        "u32" => Some(BindingKind::U32),
-                        _ if is_registered_int(p) => Some(BindingKind::OtherInt),
-                        _ => {
+                    Some(Ty::Prim(p)) => match prim_kind(p) {
+                        Some(k) => Some(k),
+                        None => {
                             return Err(SubsetError::new(
                                 *l,
                                 *c,
-                                "let 类型标注（仅整型 i64／u8／u32 可 codegen）",
+                                "let 类型标注（仅原始类型与 [byte; N] 可 codegen）",
                             ))
                         }
                     },
+                    Some(Ty::Arr(elem, _)) if matches!(elem.as_ref(), Ty::Prim("byte")) => {
+                        Some(BindingKind::Str)
+                    }
                     Some(_) => {
                         return Err(SubsetError::new(
                             *l,
                             *c,
-                            "let 类型标注（仅整型 i64／u8／u32 可 codegen）",
+                            "let 类型标注（仅原始类型与 [byte; N] 可 codegen）",
                         ))
                     }
                 };
                 let kind = match init {
                     Ex::Lit(Lit::Str(_), _, _) => {
-                        if ann_kind.is_some() {
+                        if ann_kind.is_some() && ann_kind != Some(BindingKind::Str) {
                             return Err(SubsetError::new(*l, *c, "let 类型标注与字符串初值不符"));
                         }
                         BindingKind::Str
@@ -132,62 +172,120 @@ fn check_block(blk: &Blk, bindings: &mut HashMap<String, BindingKind>) -> Result
                         }
                         BindingKind::BoxI64
                     }
-                    Ex::Lit(Lit::Int(_), _, _) => ann_kind.unwrap_or(BindingKind::I64),
+                    Ex::Lit(Lit::Int(_), _, _) => match ann_kind {
+                        None => BindingKind::I64,
+                        Some(k) if is_int_kind(k) || k == BindingKind::Byte => k,
+                        Some(_) => {
+                            return Err(SubsetError::new(*l, *c, "let 类型标注与整型初值不符"))
+                        }
+                    },
+                    Ex::Lit(Lit::Bool(_), _, _) => match ann_kind {
+                        None | Some(BindingKind::Bool) => BindingKind::Bool,
+                        _ => return Err(SubsetError::new(*l, *c, "let 类型标注与 bool 初值不符")),
+                    },
+                    Ex::UnitLit(_, _) => match ann_kind {
+                        None | Some(BindingKind::Unit) => BindingKind::Unit,
+                        _ => return Err(SubsetError::new(*l, *c, "let 类型标注与 unit 初值不符")),
+                    },
+                    Ex::Lit(Lit::Float(_), _, _) => match ann_kind {
+                        None => BindingKind::F64,
+                        Some(BindingKind::F32) => BindingKind::F32,
+                        Some(BindingKind::F64) => BindingKind::F64,
+                        _ => {
+                            return Err(SubsetError::new(*l, *c, "let 类型标注与浮点初值不符"))
+                        }
+                    },
                     Ex::Deref(base, il, ic) => match base.as_ref() {
                         Ex::Path(n, _, _) if bindings.get(n) == Some(&BindingKind::BoxI64) => {
-                            BindingKind::I64
+                            match ann_kind {
+                                None | Some(BindingKind::I64) => BindingKind::I64,
+                                Some(_) => {
+                                    return Err(SubsetError::new(
+                                        *l,
+                                        *c,
+                                        "let 类型标注与解引用初值不符",
+                                    ))
+                                }
+                            }
                         }
                         _ => {
                             return Err(SubsetError::new(*il, *ic, "解引用源不是 Box 绑定"))
                         }
                     },
                     Ex::Path(n, il, ic) => match bindings.get(n) {
-                        Some(BindingKind::BoxI64) => BindingKind::BoxI64,
-                        Some(k) if is_int_kind(*k) => ann_kind.unwrap_or(*k),
-                        _ => return Err(SubsetError::new(*il, *ic, "let 初始化非字符串字面量")),
+                        Some(BindingKind::BoxI64) => {
+                            if ann_kind.is_some() {
+                                return Err(SubsetError::new(*l, *c, "let 类型标注与 Box 初值不符"));
+                            }
+                            BindingKind::BoxI64
+                        }
+                        Some(k) if is_copy_kind(*k) => match ann_kind {
+                            None => *k,
+                            Some(a) if a == *k => a,
+                            Some(_) => {
+                                return Err(SubsetError::new(
+                                    *il,
+                                    *ic,
+                                    "let 类型标注与复制源类型不符",
+                                ))
+                            }
+                        },
+                        _ => return Err(SubsetError::new(*il, *ic, "let 初始化非可复制绑定")),
                     },
-                    Ex::Bin(..) | Ex::Un(..) => match int_expr_kind(init, bindings) {
-                        Some(k) => ann_kind.unwrap_or(k),
+                    Ex::Bin(..) => match int_expr_kind(init, bindings) {
+                        Some(k) => unify_ann(ann_kind, k, init, *l, *c)?,
                         None => {
                             let (il, ic) = expr_span(init);
                             return Err(SubsetError::new(il, ic, "let 初始化非整型算术表达式"));
                         }
                     },
+                    Ex::Un(..) => {
+                        if let Some(k) = int_expr_kind(init, bindings) {
+                            unify_ann(ann_kind, k, init, *l, *c)?
+                        } else if let Some(k) = const_unary_kind(init, bindings) {
+                            unify_ann(ann_kind, k, init, *l, *c)?
+                        } else {
+                            let (il, ic) = expr_span(init);
+                            return Err(SubsetError::new(il, ic, "let 初始化非可 codegen 形态"));
+                        }
+                    }
                     _ => {
                         let (il, ic) = expr_span(init);
-                        return Err(SubsetError::new(il, ic, "let 初始化非字符串字面量"));
+                        return Err(SubsetError::new(il, ic, "let 初始化非可 codegen 形态"));
                     }
                 };
                 bindings.insert(name.clone(), kind);
             }
             St::Expr(Some(Ex::Call(callee, args, l, c)), _, _) => {
-                let is_println =
-                    matches!(callee.as_ref(), Ex::Path(n, _, _) if n == "println");
-                if !is_println {
-                    let (cl, cc) = expr_span(callee);
-                    return Err(SubsetError::new(cl, cc, "非 println 调用"));
-                }
-                if args.len() != 1 {
+                let name = match callee.as_ref() {
+                    Ex::Path(n, _, _) => n.as_str(),
+                    _ => {
+                        let (cl, cc) = expr_span(callee);
+                        return Err(SubsetError::new(cl, cc, "调用形态"));
+                    }
+                };
+                if name == "print" {
                     return Err(SubsetError::new(
                         *l,
                         *c,
-                        format!("println 实参数量 {}（首片只支持单实参）", args.len()),
+                        "print 内建（L2c 不实现，fail-closed；stdout 契约只覆盖 println）",
                     ));
                 }
-                match &args[0] {
-                    Ex::Lit(Lit::Str(_), _, _) => {}
-                    Ex::Path(n, l2, c2) => {
-                        if bindings.get(n) != Some(&BindingKind::Str) {
-                            return Err(SubsetError::new(
-                                *l2,
-                                *c2,
-                                format!("println 实参 '{}' 不是首片字符串绑定", n),
-                            ));
-                        }
-                    }
-                    other => {
-                        let (al, ac) = expr_span(other);
-                        return Err(SubsetError::new(al, ac, "println 实参形态"));
+                if name != "println" {
+                    let (cl, cc) = expr_span(callee);
+                    return Err(SubsetError::new(cl, cc, "非 println 调用"));
+                }
+                if args.is_empty() {
+                    return Err(SubsetError::new(*l, *c, "println 实参数量 0（至少一参）"));
+                }
+                for a in args {
+                    if !is_printable_arg(a, bindings) {
+                        let (al, ac) = expr_span(a);
+                        return Err(SubsetError::new(
+                            al,
+                            ac,
+                            "println 实参不可打印（引用／Box／复合类型或未实现形态）",
+                        ));
                     }
                 }
             }
@@ -207,7 +305,11 @@ fn check_block(blk: &Blk, bindings: &mut HashMap<String, BindingKind>) -> Result
                 }
             }
             St::Expr(Some(_), l, c) => {
-                return Err(SubsetError::new(*l, *c, "表达式语句（首片只支持 println 调用／unbox）"))
+                return Err(SubsetError::new(
+                    *l,
+                    *c,
+                    "表达式语句（首片只支持 println 调用／unbox）",
+                ))
             }
             St::Expr(None, l, c) => return Err(SubsetError::new(*l, *c, "空语句")),
             St::LetDecl(_, _, l, c) => return Err(SubsetError::new(*l, *c, "let 无初始化")),
@@ -242,18 +344,53 @@ pub(crate) fn expr_span(e: &Ex) -> (usize, usize) {
     e.span()
 }
 
-fn is_registered_int(p: &str) -> bool {
-    matches!(
-        p,
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "byte"
-    )
+fn prim_kind(p: &str) -> Option<BindingKind> {
+    Some(match p {
+        "i8" => BindingKind::I8,
+        "i16" => BindingKind::I16,
+        "i32" => BindingKind::I32,
+        "i64" => BindingKind::I64,
+        "u8" => BindingKind::U8,
+        "u16" => BindingKind::U16,
+        "u32" => BindingKind::U32,
+        "u64" => BindingKind::U64,
+        "byte" => BindingKind::Byte,
+        "bool" => BindingKind::Bool,
+        "unit" => BindingKind::Unit,
+        "f32" => BindingKind::F32,
+        "f64" => BindingKind::F64,
+        _ => return None,
+    })
 }
 
 fn is_int_kind(k: BindingKind) -> bool {
     matches!(
         k,
-        BindingKind::I64 | BindingKind::U8 | BindingKind::U32 | BindingKind::OtherInt
+        BindingKind::I8
+            | BindingKind::I16
+            | BindingKind::I32
+            | BindingKind::I64
+            | BindingKind::U8
+            | BindingKind::U16
+            | BindingKind::U32
+            | BindingKind::U64
     )
+}
+
+fn is_copy_kind(k: BindingKind) -> bool {
+    is_int_kind(k)
+        || matches!(
+            k,
+            BindingKind::Byte
+                | BindingKind::Bool
+                | BindingKind::Unit
+                | BindingKind::F32
+                | BindingKind::F64
+        )
+}
+
+fn is_printable_kind(k: BindingKind) -> bool {
+    k == BindingKind::Str || is_copy_kind(k)
 }
 
 fn is_int_lit(e: &Ex) -> bool {
@@ -273,9 +410,8 @@ fn int_expr_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> Option<Bind
         },
         Ex::Un(op, inner, _, _) if op == "-" => {
             match int_expr_kind(inner, bindings)? {
-                // L2b 不支持无符号一元 `-`；subset 放行到 lower 会失去诊断，
-                // 故在此显式拒判（仍走 rc=1 fail-closed）。
-                BindingKind::U8 | BindingKind::U32 => None,
+                // 无符号一元 `-` 不在 codegen 子集。
+                BindingKind::U8 | BindingKind::U16 | BindingKind::U32 | BindingKind::U64 => None,
                 k => Some(k),
             }
         }
@@ -296,6 +432,77 @@ fn int_expr_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> Option<Bind
         }
         _ => None,
     }
+}
+
+/// 常量一元形态（浮点／bool）：`-<float>`、`!<bool>`；供 let 与 println 共用。
+fn const_unary_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> Option<BindingKind> {
+    match e {
+        Ex::Un(op, inner, _, _) if op == "-" => match scalar_expr_kind(inner, bindings)? {
+            BindingKind::F32 | BindingKind::F64 => scalar_expr_kind(inner, bindings),
+            _ => None,
+        },
+        Ex::Un(op, inner, _, _) if op == "!" => {
+            match scalar_expr_kind(inner, bindings)? {
+                BindingKind::Bool => Some(BindingKind::Bool),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+fn scalar_expr_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> Option<BindingKind> {
+    match e {
+        Ex::Lit(Lit::Int(_), _, _) => Some(BindingKind::I64),
+        Ex::Lit(Lit::Float(_), _, _) => Some(BindingKind::F64),
+        Ex::Lit(Lit::Bool(_), _, _) => Some(BindingKind::Bool),
+        Ex::UnitLit(_, _) => Some(BindingKind::Unit),
+        Ex::Path(n, _, _) => bindings.get(n).copied().filter(|k| is_copy_kind(*k)),
+        _ => None,
+    }
+}
+
+/// println 实参形态：字面量／可复制绑定／Box 解引用／整型算术／常量一元。
+fn is_printable_arg(e: &Ex, bindings: &HashMap<String, BindingKind>) -> bool {
+    match e {
+        Ex::Lit(Lit::Str(_) | Lit::Int(_) | Lit::Float(_) | Lit::Bool(_), _, _) => true,
+        Ex::UnitLit(_, _) => true,
+        Ex::Path(n, _, _) => bindings.get(n).copied().is_some_and(is_printable_kind),
+        Ex::Deref(base, _, _) => matches!(
+            base.as_ref(),
+            Ex::Path(n, _, _) if bindings.get(n) == Some(&BindingKind::BoxI64)
+        ),
+        Ex::Un(op, inner, _, _) if op == "-" => {
+            if let Some(k) = int_expr_kind(e, bindings) {
+                return is_runtime_int_kind(k) || is_const_neg_kind(e, bindings);
+            }
+            matches!(
+                scalar_expr_kind(inner, bindings),
+                Some(BindingKind::F32 | BindingKind::F64)
+            )
+        }
+        Ex::Un(op, inner, _, _) if op == "!" => {
+            matches!(scalar_expr_kind(inner, bindings), Some(BindingKind::Bool))
+        }
+        Ex::Bin(..) => int_expr_kind(e, bindings).is_some_and(is_runtime_int_kind),
+        _ => false,
+    }
+}
+
+fn is_const_neg_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> bool {
+    matches!(
+        e,
+        Ex::Un(op, inner, _, _)
+            if op == "-"
+                && matches!(
+                    int_expr_kind(inner, bindings),
+                    Some(BindingKind::I8 | BindingKind::I16 | BindingKind::I32)
+                )
+    )
+}
+
+fn is_runtime_int_kind(k: BindingKind) -> bool {
+    matches!(k, BindingKind::I64 | BindingKind::U8 | BindingKind::U32)
 }
 
 #[cfg(test)]
@@ -323,6 +530,32 @@ mod tests {
     #[test]
     fn literal_println_is_supported() {
         ok("fn main() { println(\"hi\"); }");
+    }
+
+    #[test]
+    fn multi_arg_println_is_supported() {
+        ok("fn main() { let s = \"x\"; println(s, 1, true); }");
+    }
+
+    #[test]
+    fn all_primitives_are_printable() {
+        for (decl, arg) in [
+            ("let x: i8 = -128;", "x"),
+            ("let x: i16 = -32768;", "x"),
+            ("let x: i32 = -2147483648;", "x"),
+            ("let x: i64 = -9223372036854775808;", "x"),
+            ("let x: u8 = 255;", "x"),
+            ("let x: u16 = 65535;", "x"),
+            ("let x: u32 = 4294967295;", "x"),
+            ("let x: u64 = 18446744073709551615;", "x"),
+            ("let x: byte = 255;", "x"),
+            ("let x = true;", "x"),
+            ("let x = ();", "x"),
+            ("let x: f32 = 1.1;", "x"),
+            ("let x: f64 = -0.0;", "x"),
+        ] {
+            ok(&format!("fn main() {{ {decl} println({arg}); }}"));
+        }
     }
 
     #[test]
@@ -365,24 +598,20 @@ mod tests {
     }
 
     #[test]
-    fn let_annotation_is_rejected() {
-        assert!(err_of("fn main() { let s: [byte; 2] = \"hi\"; println(s); }").contains("标注"));
+    fn byte_array_annotation_is_supported() {
+        ok("fn main() { let s: [byte; 2] = \"hi\"; println(s); }");
     }
 
     #[test]
     fn non_string_let_is_rejected() {
-        // L2b 起整型算术是受支持形态；本测试保留“非字符串、非 L2b 整型”的拒判面。
+        // 浮点算术不在 L2c stdout 契约内；本测试保留“非 L2c 整型算术”的拒判面。
         assert!(err_of("fn main() { let x = 1.0 + 2.0; }").contains("整型"));
     }
 
     #[test]
-    fn non_string_println_is_rejected() {
-        assert!(err_of("fn main() { println(42); }").contains("println"));
-    }
-
-    #[test]
-    fn multi_arg_println_is_rejected() {
-        assert!(err_of("fn main() { let s = \"x\"; println(s, s); }").contains("单实参"));
+    fn int_println_is_supported() {
+        ok("fn main() { println(42); }");
+        ok("fn main() { let a = 1; let b = 2; println(a + b); }");
     }
 
     #[test]
@@ -390,6 +619,27 @@ mod tests {
         // 零参 println 由 check 的 E1601 拦截，子集闸看不到该形态。
         let (_, diags) = compile("fn main() { println(); }");
         assert!(!diags.is_empty(), "front-end must reject println()");
+    }
+
+    #[test]
+    fn print_is_fail_closed() {
+        assert!(err_of("fn main() { print(\"x\"); }").contains("print"));
+        assert!(err_of("fn main() { print(); }").contains("print"));
+    }
+
+    #[test]
+    fn composite_tuple_print_is_fail_closed() {
+        assert!(err_of("fn main() { println((1, 2)); }").contains("不可打印"));
+    }
+
+    #[test]
+    fn box_print_is_fail_closed() {
+        assert!(err_of("fn main() { let b = box 1; println(b); }").contains("不可打印"));
+    }
+
+    #[test]
+    fn ref_print_is_fail_closed() {
+        assert!(err_of("fn main() { let x = 1; let r = &x; println(r); }").contains("let"));
     }
 
     #[test]

@@ -19,6 +19,6 @@ cargo test           # tests/r1_diag.rs：正例零诊断 + 逐码负例
 
 ## CI 接线
 
-`ci/run_ci.sh` 的 stage_cargo 检测到本目录 `Cargo.toml` 即自动激活（cargo build+test 入门禁）。compile 阶段经 `ZORC_BIN` 指向本二进制（如 `compiler/target/debug/zorcc` 或安装路径）；flags `-Zoverflow=check` / `-O2 -Zoverflow=wrap` 被接受（0.1.1 为 no-op，溢出运行期行为随代码生成后端落地）。
+`ci/run_ci.sh` 的 stage_cargo 检测到本目录 `Cargo.toml` 即自动激活（cargo build+test 入门禁）。compile 阶段经 `ZORC_BIN` 指向本二进制（如 `compiler/target/debug/zorcc` 或安装路径）；内部溢出模式覆盖位由 CI 注入，用户文档不展开。
 
 用例目录基准= M-1 定论 `tests/specs/{positive,negative,compare}`。

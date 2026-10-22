@@ -11,9 +11,18 @@ pub struct LocalId(pub u32);
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ty {
     Bytes(u64),
+    I8,
+    I16,
+    I32,
     I64,
     U8,
+    U16,
     U32,
+    U64,
+    Byte,
+    Bool,
+    F32,
+    F64,
     Box(Box<Ty>),
     Unit,
 }
@@ -104,10 +113,19 @@ pub struct Local {
     pub ty: Ty,
 }
 
-/// `println` 的单实参来源：已绑定局部，或直接字面量。
+/// `println` 的字符串实参来源：已绑定局部，或直接字面量。
 #[derive(Clone, Debug)]
 pub enum StrArg {
     Local(LocalId),
+    Bytes(Vec<u8>),
+}
+
+/// L2c 打印实参：字符串／字节串、三宽度运行期整型、编译期格式化字节。
+#[derive(Clone, Debug)]
+pub enum PrintArg {
+    Str(StrArg),
+    Int { ty: IntTy, expr: IntExpr },
+    /// 布尔／byte／unit／窄整型／浮点的契约格式化结果（编译期确定）。
     Bytes(Vec<u8>),
 }
 
@@ -120,9 +138,10 @@ pub enum Stmt {
         line: usize,
         col: usize,
     },
-    /// `println` 单实参：输出原字节 + 一枚 LF。
-    Println {
-        arg: StrArg,
+    /// `println(a1, ..., aN)`：实参间单空格，整次调用恰一枚 LF。
+    Print {
+        args: Vec<PrintArg>,
+        newline: bool,
         line: usize,
         col: usize,
     },
