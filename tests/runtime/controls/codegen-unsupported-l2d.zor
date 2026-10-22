@@ -1,0 +1,7 @@
+// L2d run-smoke 后端 fail-closed 负控（替代 codegen-unsupported.zor 的 N-3 用途）。
+// 原控制源 struct Mark {} 在 L2d 已成为合法可打印形态；旧文件按 legacy-snapshot 零改保留，
+// N-3 改指本文件。期望不变：rc=1、stderr 含 "zorcc: codegen:"、无产物、不新增 E 码位。
+fn main() {
+    let b = box 1;
+    println((b, 1));
+}
