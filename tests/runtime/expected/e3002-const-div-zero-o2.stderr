@@ -1,0 +1,1 @@
+zor: runtime error[E3002] tests/runtime/cases/l2b/e3002-const-div-zero-o2.zor:2:20: division by zero

@@ -1,0 +1,7 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+width-i8-rejected	tests/runtime/controls/l2b/width-i8-rejected.zor	1	none	zorcc: codegen:	zor: runtime error	i8 fail-closed
+width-i16-rejected	tests/runtime/controls/l2b/width-i16-rejected.zor	1	none	zorcc: codegen:	zor: runtime error	i16 fail-closed
+width-i32-rejected	tests/runtime/controls/l2b/width-i32-rejected.zor	1	none	zorcc: codegen:	zor: runtime error	i32 fail-closed
+width-u16-rejected	tests/runtime/controls/l2b/width-u16-rejected.zor	1	none	zorcc: codegen:	zor: runtime error	u16 fail-closed
+width-u64-rejected	tests/runtime/controls/l2b/width-u64-rejected.zor	1	none	zorcc: codegen:	zor: runtime error	u64 fail-closed
+width-byte-rejected	tests/runtime/controls/l2b/width-byte-rejected.zor	1	none	zorcc: codegen:	zor: runtime error	byte fail-closed
