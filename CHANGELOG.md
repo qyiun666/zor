@@ -8,7 +8,7 @@
 
 内部验证里程碑，非可用语言版本：本版为 L2b「运行期错误与溢出契约」——在 0.3.0 的运行期安全地基之上，实发 E3001／E3002 运行期诊断（rc=101、`zor:` 前缀、源行号），落整数算术 checked／wrap 双档与除零一致语义，并新增独立 Linux `runtime-codes` 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。
 
-本版口径：运行期诊断**仅**在算术真正执行且越界／除零时发出，编译期 rc 0／1／2 不变；E3001／E3002 不进入编译期 EMIT／golden，运行期期望串落 `tests/runtime/`。溢出为 checked 时（`-O0` 或内部模式覆盖位）发 E3001，wrap 时（`-O2`／缺省）按模 2^N 回绕；除零两档均 E3002。内部溢出模式覆盖位仅用于 CI 取证，不对用户暴露，未进入 `--help`、README 或用户文档。本版 `codegen` 面**仅** i64／u8／u32；其余在册整型宽度（i8／i16／i32／u16／u64／byte）参与算术时按 rc=1 fail-closed，不实发检查，**不构成全宽度覆盖承诺**。本版不新增 AC 编号；E3001／E3002 已在 R1 §8b 登记（`DECLRT=2`）并由本版起实发；计数 41／53／53／3／94 与码表 `23/23/19/1/1/2/19/19/14` 不变；`r2:9` 零触；L2a manifest 48＝41 `compile-only`＋7 `build-run` 零改。
+本版口径：运行期诊断**仅**在算术真正执行且越界／除零时发出，编译期 rc 0／1／2 不变；E3001／E3002 不进入编译期 EMIT／golden，运行期期望串落 `tests/runtime/`。溢出为 checked 时（`-O0` 或内部模式覆盖位）发 E3001，wrap 时（`-O2`／缺省）按模 2^N 回绕；除零两档均 E3002。内部溢出模式覆盖位仅用于 CI 取证，不对用户暴露，未进入 `--help`、README 或用户文档。本版 `codegen` 面**仅** i64／u8／u32；其余在册整型宽度（i8／i16／i32／u16／u64／byte）参与算术时按 rc=1 fail-closed，不实发检查，**不构成覆盖全部整型宽度的承诺**。本版不新增 AC 编号；E3001／E3002 已在 R1 §8b 登记（`DECLRT=2`）并由本版起实发；计数 41／53／53／3／94 与码表 `23/23/19/1/1/2/19/19/14` 不变；`r2:9` 零触；L2a manifest 48＝41 `compile-only`＋7 `build-run` 零改。
 
 ### Added
 
@@ -26,14 +26,14 @@
 
 ### 门禁与回归读数
 
-- QA GATE-01（L2b）结论：⟨待回填：PASS／FAIL＋报告路径＋sha256⟩。main push run：⟨待回填：run id 与 job 结论⟩；`runtime-codes` job：⟨待回填：29＋6＋8 实测 PASS 数、两轮一致性、artifact 名⟩；baseline strict 七段：⟨待回填 7/7⟩；asan-linux 八段：⟨待回填 8/8⟩；`cargo test`：⟨待回填 n/0⟩。
-- 计数与码表：positive 41／negative 53／golden 53／compare 3／`tests/specs` `.zor` 94（期望不变，待复核）；code-table `23/23/19/1/1/2/19/19/14`（`DECLRT=2`、`EMIT=19`、`GOLDEN=19`）；L2a manifest 48／7 零改；`r2:9` 零触。
-- 退出码取证：Linux `ubuntu-24.04` x86_64 实测 `exit(101)`；ASAN UAF rc、LSAN rc 单列；⟨待回填：run id／artifact／sha256⟩。macOS 不作 rc=101 终证。
+- QA GATE-01（L2b）结论：**PASS**——`shared/ZOR-L2b-GATE-01-20261022/ZOR-L2b-GATE-01终报告-QA-v1.md`（sha256 `5aa0597a14abaf4f6ece8b5bb1f83545c3b7141f0baea014acf539a0aac649ed`；证据包 49 文件 `900a1ae981ad7c6371ac1400c55ccefa099df57ead94cd96a661003585582c5e`）。main push run：`39756401504`（head `0b00eb2`），baseline／asan-linux／runtime-codes 三 job success；`runtime-codes` job：runtime 58/58（29×2）、width 12/12（6×2）、CLI 8/8、`fail=0`、两轮 summary SAME、artifact `runtime-codes-logs-39756401504-1`；baseline strict 七段：7/7（artifact `ci-logs-39756401504-1`）；asan-linux 八段：8/8（artifact `asan-logs-39756401504-1`）；`cargo test`：191/0。
+- 计数与码表：positive 41／negative 53／golden 53／compare 3／`tests/specs` `.zor` 94（已复核）；code-table `23/23/19/1/1/2/19/19/14`（`DECLRT=2`、`EMIT=19`、`GOLDEN=19`）；L2a manifest 48／7 零改；`r2:9` 零触。
+- 退出码取证：Linux `ubuntu-24.04` x86_64 实测 `exit(101)`（main run `39756401504`，`run_rc=101` 34 行；artifact `runtime-codes-logs-39756401504-1`）；ASAN UAF rc、LSAN rc 单列于 `asan-logs-39756401504-1`；GATE 报告 sha256 `5aa0597a14abaf4f6ece8b5bb1f83545c3b7141f0baea014acf539a0aac649ed`。macOS 不作 rc=101 终证。
 - 零 tag／零 Release；无 `[0.3.2]`；0.3.0 历史节零改。
 
 ### Known issues（跟踪中，非本版拦截）
 
-- **整型宽度覆盖**：本版 `codegen` 仅 i64／u8／u32；i8／i16／i32／u16／u64／byte 参与算术时 rc=1 fail-closed（含 `zorcc: codegen:`、零产物）。其余宽度的 codegen 与门禁样本归后续切片；本版**不宣称**全宽度覆盖。
+- **整型宽度覆盖**：本版 `codegen` 仅 i64／u8／u32；i8／i16／i32／u16／u64／byte 参与算术时 rc=1 fail-closed（含 `zorcc: codegen:`、零产物）。其余宽度的 codegen 与门禁样本归后续切片；本版**不宣称**覆盖全部整型宽度。
 - **用户可见优化档**：`-O*` 档位契约、`-Og`／`-O1`／`-O3`／`-Os` 白名单扩展归 L2c G-D-2；本版不承诺用户可选择 checked／wrap。用户可见缺省（`-O2`）语义为 wrap，而非 checked。
 - **内部溢出模式覆盖位**：仅内部／CI；不对外暴露，未进入 `--help`、README 或用户文档；非法值 rc=2、零产物。不作为用户契约。
 - **运行期终止清理**：E30xx 终止**不保证** drop／Box 释放；终止样本不纳入 ASAN／LSAN 泄漏零报告；L2a 的 7 条 `build-run` 零报告结论不外推到运行期终止样本。
