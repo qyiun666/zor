@@ -1,4 +1,4 @@
-//! 0.2.0 codegen 后端边界（ADR-0001 §1）。
+//! codegen 后端边界（ADR-0001 §1）。
 //!
 //! 数据流：check 后的 `Prog` → subset 闸 → lower → typed IR → C emitter → cc。
 //! 首片只有 C 后端；未来后端在同一 IR 接口后追加，不重写前端。
@@ -35,7 +35,7 @@ impl Default for BuildOptions {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BuildError {
-    /// 前端通过、但不在 0.2.0 首片子集：rc=1，零产物，不占 E 码。
+    /// 前端通过、但不在当前 codegen 子集：rc=1，零产物，不占 E 码。
     Unsupported {
         line: usize,
         col: usize,
@@ -56,7 +56,7 @@ impl BuildError {
     pub fn render(&self, source: &Path) -> String {
         match self {
             BuildError::Unsupported { line, col, what } => format!(
-                "zorcc: codegen: {}:{}:{}: 0.2.0 首片不支持 {}",
+                "zorcc: codegen: {}:{}:{}: 当前 codegen 首片不支持 {}",
                 source.display(),
                 line,
                 col,
@@ -86,15 +86,6 @@ pub fn build(
         col: e.col,
         what: e.what,
     })?;
-    // L2a A1 守卫：CORE-03 只产事件，不生成 malloc／free／drop；运行期归 CORE-04。
-    if ir.needs_l2a_runtime() {
-        let (line, col) = ir.first_l2a_pos().unwrap_or((1, 1));
-        return Err(BuildError::Unsupported {
-            line,
-            col,
-            what: "drop／Box 运行期（L2a CORE-04 前不生成）".to_string(),
-        });
-    }
     let source_str = source.to_str().ok_or_else(|| BuildError::Toolchain {
         msg: "源路径不是合法 UTF-8，无法写入 #line".to_string(),
     })?;
@@ -133,36 +124,88 @@ fn same_file(source: &Path, output: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{build, BuildError, BuildOptions};
+    use super::{build, BuildOptions};
     use crate::compile_typed;
     use std::path::Path;
 
     #[test]
-    fn l2a_runtime_guard_rejects_box_program_before_emit() {
+    fn box_program_builds_runs_and_exits_zero() {
         let c = compile_typed("fn main() { let b = box 1; }");
         assert!(c.diags.is_empty(), "{:?}", c.diags);
-        let e = build(
+        let out = std::env::temp_dir().join(format!(
+            "zor-core04-build-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let built = build(
             &c.prog,
             &c.types,
             Path::new("t.zor"),
-            Path::new("/tmp/zor-core03-guard-never"),
+            &out,
             BuildOptions::default(),
-        )
-        .expect_err("guard must reject");
-        match e {
-            BuildError::Unsupported { what, line, col } => {
-                assert!(what.contains("CORE-04"), "{what}");
-                assert_eq!((line, col), (1, 13));
-            }
-            other => panic!("unexpected {other:?}"),
-        }
+        );
+        assert!(built.is_ok(), "{built:?}");
+        assert!(out.is_file(), "产物缺失");
+        let run = std::process::Command::new(&out).output().expect("run artifact");
+        assert_eq!(run.status.code(), Some(0));
+        assert!(run.stdout.is_empty());
+        assert!(run.stderr.is_empty(), "{:?}", run.stderr);
+        let _ = std::fs::remove_file(&out);
     }
 
     #[test]
-    fn hello_ir_has_no_l2a_runtime() {
+    fn hello_emit_has_no_alloc_or_free() {
         let c = compile_typed("fn main() { let s = \"hi\"; println(s); }");
         assert!(c.diags.is_empty(), "{:?}", c.diags);
         let ir = super::lower::lower(&c.prog, &c.types).expect("lower");
-        assert!(!ir.needs_l2a_runtime());
+        let src = super::c::emit::emit(&ir, "t.zor");
+        assert!(!src.contains("malloc"), "{src}");
+        assert!(!src.contains("free("), "{src}");
+    }
+
+    #[test]
+    fn six_runtime_samples_build_and_run_clean() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        for name in [
+            "box_create_read_unbox",
+            "box_scope_drop",
+            "box_overwrite_drop",
+            "box_move_between_bindings",
+            "box_self_assign_no_drop",
+            "box_unbox_then_reinit",
+        ] {
+            let src_path = root
+                .join("tests/runtime/cases")
+                .join(format!("{name}.zor"));
+            let text = std::fs::read_to_string(&src_path).expect("read runtime sample");
+            let c = compile_typed(&text);
+            assert!(c.diags.is_empty(), "{name}: {:?}", c.diags);
+            let out = std::env::temp_dir().join(format!(
+                "zor-core04-{}-{}-{}",
+                name,
+                std::process::id(),
+                nanos
+            ));
+            let built = build(
+                &c.prog,
+                &c.types,
+                &src_path,
+                &out,
+                BuildOptions::default(),
+            );
+            assert!(built.is_ok(), "{name}: {built:?}");
+            let run = std::process::Command::new(&out).output().expect("run artifact");
+            assert_eq!(run.status.code(), Some(0), "{name}");
+            assert!(run.stdout.is_empty(), "{name}: {:?}", run.stdout);
+            assert!(run.stderr.is_empty(), "{name}: {:?}", run.stderr);
+            let _ = std::fs::remove_file(&out);
+        }
     }
 }
