@@ -124,6 +124,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: stdout-contract-logs-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ci/logs/
+          # D-L2c-16：只上传证据类文本文件；CLI 转义夹具文件名含双引号（a"b\c.zor），
+          # 整目录上传会被 upload-artifact 拒绝。判据产物仍完整留在 runner 日志与本地。
+          path: |
+            ci/logs/**/*.log
+            ci/logs/**/summary.txt
+            ci/logs/**/*.tsv
+            ci/logs/**/*.sha256
           retention-days: 90
           if-no-files-found: error
