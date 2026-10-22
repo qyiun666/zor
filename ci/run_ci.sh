@@ -520,8 +520,9 @@ stage_run_smoke() { # 020-CI-01：0.2.0 首个可执行闭环＋五类负控（Q
     fi
   fi
 
-  # N-3 后端 fail-closed：最小 struct → rc=1、zorcc: codegen:、无产物
-  local ctl_codegen="$REPO_ROOT/tests/runtime/controls/codegen-unsupported.zor"
+  # N-3 后端 fail-closed：复合内 Box（L2d 不可打印）→ rc=1、zorcc: codegen:、无产物
+  # 旧 codegen-unsupported.zor 的 struct Mark {} 在 L2d 已合法，按 legacy-snapshot 零改保留。
+  local ctl_codegen="$REPO_ROOT/tests/runtime/controls/codegen-unsupported-l2d.zor"
   if [ ! -f "$ctl_codegen" ]; then
     echo "N-3 FAIL: 缺少 $ctl_codegen" >> "$log"; fail=1
   else
