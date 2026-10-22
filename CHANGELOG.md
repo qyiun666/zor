@@ -4,6 +4,44 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.4] - 2026-10-23
+
+内部验证里程碑，非可用语言版本：本版为 L2e「用户可见优化档、`--help` 与 `println(*b)` 修复」——在 0.3.3 的 stdout／CLI 与复合输出之上，开闸 `-O0`／`-O1`／`-O2`／`-O3`／`-Os`／`-Og` 六档并映射 C 编译器同名旗标，新增固定 `--help`，修复 `println(*b)` 的 `Box<i64>` 单 Box 解引用路径；安装树 `packaging-smoke` 仍为 advisory，待账本合并后连续两次 main 全绿再切 required。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装承诺或生产环境可用性承诺。
+
+本版口径：`-O*` 六档全接受，缺省 `-O2`，重复按最后一次生效；每档真实传给 C 编译器同名旗标，不静默降级。溢出语义：`-O0`／`-O1`／`-Og` 为 checked（E3001、rc=101），`-O2`／`-O3`／`-Os` 为 wrap；E3002 除零在所有档位 rc=101。非法值 `-O4`／`-O9`／`-Ofast`／`-O2x`／裸 `-O` rc=2、零产物。`--help` 仅长旗标，任意位置短路，stdout 706 B 固定文本、rc=0、stderr 0 B、零产物；`--version`／`-V` 优先于 help，help 优先于非法 flag／`-o` 缺值；不提供 `-h`。`println(*b)` 仅修 `Box<i64>`，单／多实参、重复读取不消费；其余 Box 载荷与 `println(b)` 维持 rc=1 fail-closed；typed Box 泛型化另票，不是本版能力。内部溢出覆盖位仍仅由 CI 注入，不作为用户开关、不出现在 `--help`。计数 **98**＝stdout **94**（runtime 65＋负控 12＋CLI 17）＋packaging **4**；runtime-codes **39＋6＋19**（64 行）；全量 **162**；`l2e-baseline` **162** 条（sha256 清单 209 行）、`l2c-baseline` **68** 条（sha256 清单 105 行）、`legacy-snapshot` **226**（恰 5 条变更、221 条零改）。
+
+### Added
+
+- **用户可见 `-O*` 六档**：接受 `-O0`／`-O1`／`-O2`／`-O3`／`-Os`／`-Og`；缺省 `-O2`；同一 argv 重复按最后一次生效；各档真实映射 C 编译器同名旗标，`-g` 正交；无 `-o` 检查态接受档位但不产生产物。非法 `-O4`／`-O9`／`-Ofast`／`-O2x`／裸 `-O` rc=2、零产物。
+- **`--help`**：argv 任意位置命中即短路；stdout 输出 706 B 固定帮助文本（15 行、LF、无 BOM／尾随空格）；rc=0、stderr 0 B、不读源、不依赖 runtime helper、零产物；`--version`／`-V` 优先于 help；help 优先于非法 flag／`-o` 缺值；`-h` 不提供，仍 rc=2。
+- **`println(*b)` 修复**：`Box<i64>` 单 Box 解引用实参按载荷输出（`println(*b)`、`println(*b, 1)`）；不消费 Box，重复读取正确，作用域结束只 drop 一次；`unbox` 语义不变。
+
+### Changed
+
+- **优化与溢出语义**：`-O0`／`-O1`／`-Og` checked（E3001、rc=101）；`-O2`／`-O3`／`-Os` wrap；E3002 全档 rc=101；0.3.3 的 `-O0` checked／`-O2` wrap 零回退。
+- **计数与资产**：stdout 由 **86**（62＋10＋14）扩至 **94**（65＋12＋17）＋packaging 4＝**98**（0.3.3 总 90 → 98）；runtime-codes 由 29＋6＋8 扩至 **39＋6＋19**（64 行）；全量 **162**；`l2e-baseline` 162 条（sha256 清单 209 行）、`l2c-baseline` 68 条（sha256 清单 105 行）、`legacy-snapshot` 226 条（恰 5 条变更、221 条零改）；`C4-02` 显式变更为无参 usage 断言（help 由 C5-01～03 覆盖），旧→新哈希在 QA 资产说明留痕。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.3` 落至 `0.3.4`；`compiler/Cargo.toml:5` description 版本串同步；`compiler/Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.4`。
+- **`packaging-smoke`**：本版合并时仍 advisory；账本合并后连续两次 main 全绿（GATE run `39860926956`＋账本 run）转 required，只改 ruleset `25633324`，切换后以 ruleset 为准；仅基础设施未执行可记录回退，代码红必须修复。
+
+### 门禁与回归读数
+
+- GATE-L2e-01：**PASS**——main `bdf45c626073ec79bc13d0cc1b902817bb7bca92`；run `39860926956`；`baseline`／`asan-linux`／`runtime-codes`／`stdout-contract`／`packaging-smoke` 五 job 全 **success**。
+- 三段判词：`PASS|stdout-contract|runtime=65 negative=12 fail=0 ran=65/12`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：baseline 七段 **7/7**；asan-linux 八段 **8/8**（`R=7` ASAN／LSAN 零报告）；runtime-codes **39＋6＋19**（64 行）；`l2e-baseline` **209/209**、`l2c-baseline` **105/105**、`legacy-snapshot` **226/226**；`compiler/src` E30xx 字面 **0**；help 706 B 与产品会签逐字节 SAME；GCC 六档探针 build／run rc=0、输出 SAME、argv 同名旗标，overflow 矩阵符合本版口径。
+- 证据：GATE 报告 `shared/ZOR-L2e-GATE-01-20261023/reports/GATE-L2e-01-报告-v1.md`（sha256 `1453be4b433c183ca61161808d2c154707afc57429d43da1fc5a2b849a22536d`）；证据包 `SHA256SUMS`（32 文件）`a838b3de240a436255f82c6cdf362102f09fa99295a3d00ff28e8072aaf41586`；产品 expected 会签 `shared/ZOR-L2e-Expected会签-产品-v1.md`（`efdb7f2eb981df039235e0fd41c77c3d05473018181fcb40b896f5b77b279af2`）。
+- 零 tag／零 Release；`[0.3.3]` 及更早历史节零改。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **NaN**：无端到端源形态；格式化函数位模式单测覆盖，不列入本版判据。
+- **平台**：stdout／CLI／packaging 终证仅 Linux x86_64；macOS 仅辅助，不作判据；Windows／其他发行版不在本版。
+- **`println(*b)` 范围**：仅 `Box<i64>`；其余 Box 载荷与 `println(b)` 维持 rc=1 fail-closed；typed Box 泛型化不在本版，另票跟踪。
+- **`l2e-baseline` 接入**：尚未接入 `ci/run_ci.sh`，由 GATE／QA 以 `shasum -c` 手工核验；本版通过。
+- **`packaging-smoke`**：仍为 advisory；账本＋两连绿后再切 ruleset，切换前不作为 required。
+- **PA-L2e**：PA-L2e-01～08 待 0.3.4 账本合并后执行。
+- **性能**：`-O*` 只承诺接受与 cc 映射，不出性能数字、不作达标承诺。
+- 零 tag／Release；不构成安装、包管理器、跨平台或生产环境可用性承诺。
+
 ## [0.3.3] - 2026-10-22
 
 内部验证里程碑，非可用语言版本：本版为 L2d「复合类型输出与安装树 smoke」——在 0.3.2 的 stdout／CLI 契约之上，实现可打印复合值（tuple 0／≥2 元、array、struct、enum、嵌套）、`[u8;N]` 数组形态与只读投影 `p.x`／`t[0]`／`a[1]`，并提供 Linux x86_64 安装树 smoke。1 元组源形态 N/A；`-O*` 维持关闭并转 L2e。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装承诺或生产环境可用性承诺。
