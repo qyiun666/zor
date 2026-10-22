@@ -4,6 +4,51 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.2] - 2026-10-22
+
+内部验证里程碑，非可用语言版本：本版为 L2c「stdout 与结构化 CLI 契约」——在 0.3.1 的运行期诊断契约之上，定稿 stdout 契约 v1，落多实参分隔、终饰、12 原始类型、`[byte;N]` 与运行期终止前 stdout 原子输出，新增 `--diag=json`，冻结 `--version`／`-V`，并以独立 Linux x86_64 `stdout-contract` 门禁覆盖 stdout／CLI 字节级判据。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装承诺或生产环境可用性承诺。
+
+本版口径：stdout 契约 v1 六面**定稿**；实现面 **5／6**——多实参分隔符、终饰、12 原始类型、`[byte;N]`、运行期终止前 stdout；**复合类型输出实现归 L2d**，L2c 对复合 `println`、`print`、引用／`Box`／`Handle`／函数类型及含其成员的复合类型按 rc=1 fail-closed（`zorcc: codegen:`、零产物），不宣称六面实现全部闭合，也不宣称所有类型均可打印。`--diag=json` 以 NDJSON 写 stderr，六键固定序 `code`／`severity`／`message`／`file`／`line`／`col`；`--version`／`-V` 保持任意位置短路；用户可见 `-O*` 维持关闭（仅 `-O0`／`-O2`／缺省；`-Og`／`-O1`／`-O3`／`-Os` rc=2）。本版不新增 AC 编号、不新增 E 码；计数 41／53／53／3／94 与码表 `23/23/19/1/1/2/19/19/14` 不变；L2a manifest 48＝41 `compile-only`＋7 `build-run` 零改。
+
+### Added
+
+- **stdout 契约 v1／五面实现**：`println(a1, ..., aN)`（N ≥ 1）按参数顺序输出，相邻参数之间恰一个 ASCII 空格 `0x20`，无首／尾多余空格；整次调用恰一枚 LF `0x0A`，不追加 CR 或第二个 LF；`println("")` 为 `\n`，`println("", "")` 为 ` \n`；单参 `println("Hello, ZOR")` 保持 `Hello, ZOR\n`。12 原始类型 `i8／i16／i32／i64／u8／u16／u32／u64／f32／f64／bool／byte` 按契约格式化：整型十进制、无前导零／无 `+`；`bool` 小写；`byte` 十进制 0～255；`f32／f64` 最短往返十进制，`f64` 阈值 `-4 ≤ e < 16`、`f32` `-4 ≤ e < 7`，科学记数形 `d[.ddd]e±XX`，`-0`／`nan`／`inf`／`-inf` 小写；`unit` 输出 `()`。`[byte;N]` 原样输出 N 字节，不加引号／不转义／不截断，N=0 输出零字节，可含 NUL／LF。一次 `println` 的参数全部求值成功后才写 stdout；任一参数求值触发运行期终止时，该调用输出零字节，此前已完成调用保留。
+- **`--diag=json`**：编译期诊断以 NDJSON 写 stderr，每行一个对象，UTF-8、LF 结尾、无 BOM／多余空白；键恰为 `code`／`severity`／`message`／`file`／`line`／`col`，顺序固定，不新增键；`severity` 恒 `"error"`，`line`／`col` 为 1-based，`file` 为入参路径原样，`message` 与文本模式同一句。无诊断时 stderr 0 字节；rc 0／1／2 与文本模式一致；`-o` 失败零产物；CLI 误用仍走文本 `zorcc: CLI: …`；运行期 E30xx 仍走 `zor:` 文本，不输出 JSON。文本模式逐字节不变。
+- **`--version`／`-V` 冻结**：argv 任意位置命中即短路；stdout 恰 `zorcc <version>\n`、rc=0、stderr 0 B；不读源文件、不依赖 helper、不产生产物；与 `--diag=json`／`-o`／未知 flag 同现时版本优先。
+- **独立 `stdout-contract` 门禁**：CI 新增独立 `stdout-contract` job（`ubuntu-24.04` x86_64、timeout 20、artifact 90 天、`if: always()`、`if-no-files-found: error`、无 `continue-on-error`）；直调 `tests/stdout/run_stdout_contract.sh --strict`，stdout／CLI 两段 summary；72＝48 runtime＋10 负控＋14 CLI 全部真执行并以 ran 计数守门；两轮 rc／stdout／stderr SAME；Linux 双 locale（`LC_ALL=C` 与 `en_US.UTF-8`）8 条浮点字节 SAME（宿主可用时；不可用记路径分析，不判 FAIL）。artifact 仅证据文本，不含 `.zor`／`.bin` 夹具。
+- **CO-8／G-D-3 终审**：R1 §3 定稿 `,` 为唯一规范字段分隔符形态；`;` 仅为 0.1.x 兼容容忍形态，保留解析但不出现在新样例、文档或输出示例中；移除评估归 1.0 前，不在本版改解析器；错误文案仍为 `expected ';' or ',' after field, found <token>`。旧 golden／negative 逐字节零改。
+- **E1101 编目／G-D-4**：产出逐层实发点编目，lexer 3＋parser 19＋check 7＝**29** 发点；编目＝实测，不新增触发点、不新增 E 码；`spawn` 仍按未识别标识符／未知函数报 E1101、rc=1，不新增专属诊断。
+- **W-2 文档清理**：`compiler/README.md` 历史旗标名删除，改为「内部溢出模式覆盖位由 CI 注入，用户文档不展开」；用户文档／usage 不含内部溢出模式覆盖位旗标名。
+
+### Changed
+
+- **stdout 输出面**：由单字符串 `println` 扩展为多实参／12 原始类型／`[byte;N]`；0.2.0／0.2.1 的 `-o` 构建、无 `-o` 检查态、rc 0／1／2、零残留、零隐式产物零回退；`println("Hello, ZOR")` 等既有输出零回退。
+- **CLI 面**：新增 `--diag=json`；`--version`／`-V` 仅加断言与文档，不改既有短路行为；用户可见 `-O*` 维持关闭（`-O0` checked、`-O2`／缺省 wrap、`-g` 正交；`-Og`／`-O1`／`-O3`／`-Os` rc=2、零产物）；G-D-2 的 `-O*` 归独立 L2d 票，不在本版宣称整体闭合。
+- **计数与码表**：positive 41／negative 53／golden 53／compare 3／`tests/specs` `.zor` 94 不变；code-table 九值 `23/23/19/1/1/2/19/19/14` 不变（`DECLRT=2`、`EMIT=19`、`GOLDEN=19`）；L2a manifest 48＝41 `compile-only`＋7 `build-run` 零改；`runtime-codes` 29＋6＋8 零改；stdout 期望落 `tests/stdout/expected/`，不进 `tests/specs/golden`。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.1` 直锚 `0.3.2`（`Cargo.lock:3` 的 `version = 4` 零触）；`CHANGELOG.md` 本节顶部纯插入；`zorcc --version`／`-V` 实测 `zorcc 0.3.2`。
+
+### 门禁与回归读数
+
+- QA GATE-01（L2c）结论：**PASS**——`shared/ZOR-L2c-GATE-01-v2-20261022/ZOR-L2c-GATE-01-v2-QA-v1.md`（sha256 `d46ea764ac18b7c64f59cdabc2f0e1e8adbb532f6fea37534e1fb2ce9d29f606`）；main push run：`39766618919`／`0c0a87f`；`baseline`／`asan-linux`／`runtime-codes`／`stdout-contract` 四 job 结论：**success（4/4）**。
+- `stdout-contract`：runtime 48／负控 10／CLI 14，**72 全部真执行**；两段 `ran=`：`PASS|stdout-contract|runtime=48 negative=10 fail=0 ran=48/10`、`PASS|cli-contract|cases=14 fail=0 ran=14`；`stdout_fail=0 cli_fail=0`；两轮 SAME；Linux x86_64、`locale_float_bytes=SAME`；artifact：`stdout-contract-logs-39766618919-1`（104 文件，无 `.zor`／`.bin`）。
+- 旧门禁：baseline strict 七段 **7/7**；asan-linux 八段 **8/8**（`R=7` ASAN／LSAN 零报告）；runtime-codes **29＋6＋8**（runtime 58/58、width 12/12、CLI 8/8、`fail=0`、`run_rc=101` 34 行）；`cargo test`：**238/0**。
+- 计数与码表：**41／53／53／3／94**；九值 `23/23/19/1/1/2/19/19/14`（A1–A8b1／HDR 违规 0）；manifest **48／7**；`r2:9` 零触；`compiler/src` E30xx 字面 0。
+- 零 tag／零 Release；无 `[0.3.3]`；`[0.3.1]`／`[0.3.0]` 历史节零改。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **复合类型输出**：契约在册，实现归 **L2d**；L2c 对复合 `println` rc=1 fail-closed，不宣称复合可打印。`[u8;N]` 按数组形态归 L2d；L2c 构建态对 `[u8;N]` 标注 rc=1 fail-closed。
+- **`print`**：不在 stdout 契约、本版不实现；按 rc=1 fail-closed（`zorcc: codegen:`、零产物），不得以 `print` 替代 `println` 宣传。
+- **NaN**：L2c 无浮点算术／NaN 源形态；NaN 输出契约保留，由格式化函数单测（位模式）覆盖，无端到端样本（D-L2c-12）。
+- **检查态既有语义**：无 `-o` 时仅跑前端；不可 codegen 形态返回 0，构建态才 fail-closed。若需检查态也 fail-closed，另立 PRD 条款。
+- **R-1 打包路径**：安装树／`packaging-smoke` 未纳入本版；L2c 不宣称具备安装能力，归 L2d 打包切片。
+- **G-D-2／用户可见 `-O*`**：`-Og`／`-O1`／`-O3`／`-Os` 维持 rc=2；G-D-2 整体不在本版闭合，归独立 L2d 票。
+- **stdout job required**：独立 job 已接入并以 Linux x86_64 终证；required 状态随本版账本切换。
+- **跨平台**：stdout／CLI 字节级终证仅 Linux x86_64；macOS 仅辅助，不作 stdout 判据；Windows／其他发行版不在本版。
+- **运行期终止**：E30xx 终止不保证 drop／Box 释放；L2b 的 ASAN／LSAN 7 条 `build-run` 结论不外推。
+- 内存／性能：未出数，只写「目标」，不作达标承诺。
+- 零 tag／Release；不构成对外 API 稳定承诺。
+
 ## [0.3.1] - 2026-10-22
 
 内部验证里程碑，非可用语言版本：本版为 L2b「运行期错误与溢出契约」——在 0.3.0 的运行期安全地基之上，实发 E3001／E3002 运行期诊断（rc=101、`zor:` 前缀、源行号），落整数算术 checked／wrap 双档与除零一致语义，并新增独立 Linux `runtime-codes` 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成任何可安装或可发布承诺。
