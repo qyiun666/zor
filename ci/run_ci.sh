@@ -6,6 +6,7 @@
 # 阶段：cargo(可选,OQ-1方案B参考实现) → compile(debug/release 双模式,OQ-2) → unit-test → golden → code-table → rust-compare → run-smoke → [asan(Linux,--asan)] → [bench]
 # L2b：--runtime-codes 为独立模式（单段 summary），只执行宿主检查＋runtime-codes 判据；不改既有七段／八段语义。
 # L2c：--stdout-contract 为独立模式（stdout／cli 两段 summary），直调 QA 判据脚本；不改既有七段／八段／runtime-codes 语义。
+# L2d：--packaging-smoke 为独立模式（单段 summary），直调 QA 安装树判据脚本；不改既有七段／八段／runtime-codes／stdout 语义。
 set -uo pipefail
 shopt -s nullglob  # S-1：未命中 glob 展开为空数组，杜绝字面 glob 进循环的旁路
 
@@ -76,7 +77,7 @@ asan_host_pin_check() {
   return 0
 }
 
-STRICT=0; WITH_BENCH=0; WITH_ASAN=0; ASAN_HOST_CHECK=0; WITH_RUNTIME_CODES=0; WITH_STDOUT_CONTRACT=0
+STRICT=0; WITH_BENCH=0; WITH_ASAN=0; ASAN_HOST_CHECK=0; WITH_RUNTIME_CODES=0; WITH_STDOUT_CONTRACT=0; WITH_PACKAGING_SMOKE=0
 for arg in "$@"; do
   case "$arg" in
     --strict) STRICT=1 ;;
@@ -85,7 +86,8 @@ for arg in "$@"; do
     --asan-host-check) WITH_ASAN=1; ASAN_HOST_CHECK=1 ;;
     --runtime-codes) WITH_RUNTIME_CODES=1 ;;
     --stdout-contract) WITH_STDOUT_CONTRACT=1 ;;
-    *) echo "[ci] 未知参数 $arg (可用: --strict --bench --asan --asan-host-check --runtime-codes --stdout-contract)"; exit 2 ;;
+    --packaging-smoke) WITH_PACKAGING_SMOKE=1 ;;
+    *) echo "[ci] 未知参数 $arg (可用: --strict --bench --asan --asan-host-check --runtime-codes --stdout-contract --packaging-smoke)"; exit 2 ;;
   esac
 done
 
@@ -96,6 +98,11 @@ fi
 
 if [ "$WITH_STDOUT_CONTRACT" = 1 ] && { [ "$STRICT" = 1 ] || [ "$WITH_ASAN" = 1 ] || [ "$WITH_BENCH" = 1 ] || [ "$WITH_RUNTIME_CODES" = 1 ]; }; then
   echo "[ci] --stdout-contract 为独立模式，不可与 --strict／--asan／--bench／--runtime-codes 组合" >&2
+  exit 2
+fi
+
+if [ "$WITH_PACKAGING_SMOKE" = 1 ] && { [ "$STRICT" = 1 ] || [ "$WITH_ASAN" = 1 ] || [ "$WITH_BENCH" = 1 ] || [ "$WITH_RUNTIME_CODES" = 1 ] || [ "$WITH_STDOUT_CONTRACT" = 1 ]; }; then
+  echo "[ci] --packaging-smoke 为独立模式，不可与 --strict／--asan／--bench／--runtime-codes／--stdout-contract 组合" >&2
   exit 2
 fi
 
@@ -728,6 +735,15 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   local so_v cli_v so_rc=0 cli_rc=0
   so_v="$(stdout_section_verdict stdout-contract "$log" "$rc")"
   cli_v="$(stdout_section_verdict cli-contract "$log" "$rc")"
+  # L2d CI-01：冻结计数 62／10／14；判定 PASS 但判词计数不符（如 QA 旧资产 48）同样 FAIL，防静默洗绿。
+  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=62 negative=10 fail=0 ran=62/10' "$log"; then
+    echo "[stdout-contract] 计数不符：期望 runtime=62 negative=10 ran=62/10（L2d 冻结）" >> "$log"
+    so_v=FAIL
+  fi
+  if [ "$cli_v" = PASS ] && ! grep -Fq 'PASS|cli-contract|cases=14 fail=0 ran=14' "$log"; then
+    echo "[cli-contract] 计数不符：期望 cases=14 ran=14（L2d 冻结）" >> "$log"
+    cli_v=FAIL
+  fi
   [ "$so_v" = FAIL ] && so_rc=1
   [ "$cli_v" = FAIL ] && cli_rc=1
   echo "[stdout-contract] 判定=$so_v rc=$rc" >> "$log"
@@ -736,8 +752,50 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   record cli-contract "$cli_v" "$cli_rc" "$log"
 }
 
+stage_packaging_smoke() { # L2d CI-01：独立 Linux job；直调 QA 安装树脚本；单段 summary；fail-closed
+  local log; log="$(new_log packaging-smoke)"
+  local out="$LOG_DIR/packaging-smoke"
+  mkdir -p "$out"
+  if [ -z "$ZORC" ]; then
+    echo "zorcc 未安装：packaging-smoke 判 FAIL（不可 SKIP 洗绿）" > "$log"
+    record packaging-smoke FAIL 1 "$log"
+    return
+  fi
+  if [ ! -f tests/packaging/run_packaging_smoke.sh ]; then
+    echo "packaging-smoke 判据脚本缺失：tests/packaging/run_packaging_smoke.sh（QA-L2d-02 未合入）" > "$log"
+    record packaging-smoke FAIL 1 "$log"
+    return
+  fi
+  local rc=0
+  CC="${CC:-cc}" ZORC_BIN="$ZORC" OUT_DIR="$out" ZOR_INSTALLER="$REPO_ROOT/ci/install.sh" \
+    bash tests/packaging/run_packaging_smoke.sh --strict >>"$log" 2>&1 || rc=$?
+  grep -E '^(PASS|FAIL)\|packaging-smoke' "$log" || true
+  # L2d 冻结：显式 FAIL 优先；必须 rc=0 且判词为 cases=4 fail=0 ran=4；缺判词／计数不符／rc≠0 一律 FAIL。
+  local v=FAIL
+  if ! grep -q '^FAIL|packaging-smoke|' "$log" 2>/dev/null \
+     && [ "$rc" -eq 0 ] \
+     && grep -Fq 'PASS|packaging-smoke|cases=4 fail=0 ran=4' "$log"; then
+    v=PASS
+  elif [ "$rc" -eq 0 ] && ! grep -q '^FAIL|packaging-smoke|' "$log" 2>/dev/null; then
+    echo "[packaging-smoke] 缺少冻结判词或计数不符：期望 cases=4 fail=0 ran=4（L2d 冻结）" >> "$log"
+  fi
+  local prc=0; [ "$v" = FAIL ] && prc=1
+  echo "[packaging-smoke] 判定=$v rc=$rc" >> "$log"
+  record packaging-smoke "$v" "$prc" "$log"
+}
+
 if [ "$WITH_STDOUT_CONTRACT" = 1 ]; then
   stage_stdout_contract
+  {
+    echo "--- stage summary ($RUN_ID) ---"
+    for s in "${summary[@]}"; do echo "$s"; done
+  } | tee "$LOG_DIR/summary.txt"
+  echo "[ci] 证据目录: $LOG_DIR"
+  exit "$overall"
+fi
+
+if [ "$WITH_PACKAGING_SMOKE" = 1 ]; then
+  stage_packaging_smoke
   {
     echo "--- stage summary ($RUN_ID) ---"
     for s in "${summary[@]}"; do echo "$s"; done
