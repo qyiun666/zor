@@ -1,0 +1,4 @@
+fn main() {
+    let b: [f32; 2] = [f32::INFINITY, f32::NEG_INFINITY];
+    println(b);
+}

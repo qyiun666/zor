@@ -1,0 +1,4 @@
+struct R { x: f64, y: f64 }
+fn main() {
+    println(R { y: f64::NEG_INFINITY, x: f64::NAN });
+}

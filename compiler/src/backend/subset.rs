@@ -479,6 +479,18 @@ fn supported_value_expr(
     types: &TypeTable,
     prog: &Prog,
 ) -> bool {
+    supported_value_expr_in(e, bindings, types, prog, true)
+}
+
+/// `allow_special`：L2i 允许浮点特殊值作复合常量成员；枚举变体载荷固定
+/// 传 `false`（特殊载荷结转 L2j，维持 fail-closed）。
+fn supported_value_expr_in(
+    e: &Ex,
+    bindings: &HashMap<String, BindingKind>,
+    types: &TypeTable,
+    prog: &Prog,
+    allow_special: bool,
+) -> bool {
     let Some(t) = types.expr_ty(e) else {
         return false;
     };
@@ -486,6 +498,7 @@ fn supported_value_expr(
         return false;
     }
     match e {
+        Ex::FloatSpecial(..) => allow_special,
         Ex::Lit(Lit::Str(_), _, _) => is_byte_array_ty(t),
         Ex::Lit(Lit::Int(_) | Lit::Float(_) | Lit::Bool(_), _, _) | Ex::UnitLit(_, _) => true,
         Ex::Path(n, _, _) => match bindings.get(n) {
@@ -507,19 +520,20 @@ fn supported_value_expr(
         Ex::Record(_, fields, _, _) => {
             let mut names = HashSet::new();
             fields.iter().all(|(n, v)| {
-                names.insert(n.clone()) && supported_value_expr(v, bindings, types, prog)
+                names.insert(n.clone())
+                    && supported_value_expr_in(v, bindings, types, prog, allow_special)
             })
         }
         Ex::Tup(es, _, _) => es
             .iter()
-            .all(|x| supported_value_expr(x, bindings, types, prog)),
+            .all(|x| supported_value_expr_in(x, bindings, types, prog, allow_special)),
         Ex::ArrLit(es, _, _) => {
             let elem = if let Ty::Arr(elem, _) = t { elem.as_ref() } else { return false };
             if matches!(elem, Ty::Prim("byte") | Ty::Prim("u8")) {
                 es.iter().all(|x| is_const_value_expr(x))
             } else {
                 es.iter()
-                    .all(|x| supported_value_expr(x, bindings, types, prog))
+                    .all(|x| supported_value_expr_in(x, bindings, types, prog, allow_special))
             }
         }
         Ex::Call(callee, args, _, _) => {
@@ -534,7 +548,7 @@ fn supported_value_expr(
             payload.len() == args.len()
                 && args
                     .iter()
-                    .all(|a| supported_value_expr(a, bindings, types, prog))
+                    .all(|a| supported_value_expr_in(a, bindings, types, prog, false))
         }
         // check 不为纯 place root 写表项（Field 的 Path 基座）：按绑定种类判定。
         Ex::Field(base, _, _, _) => match base.as_ref() {
@@ -542,12 +556,12 @@ fn supported_value_expr(
                 bindings.get(n),
                 Some(BindingKind::Composite(_) | BindingKind::Str)
             ),
-            _ => supported_value_expr(base, bindings, types, prog),
+            _ => supported_value_expr_in(base, bindings, types, prog, allow_special),
         },
         // Q-4：下标须为整数字面量；非常量下标 fail-closed。
         Ex::Index(base, idx, _, _) => {
             matches!(idx.as_ref(), Ex::Lit(Lit::Int(_), _, _))
-                && supported_value_expr(base, bindings, types, prog)
+                && supported_value_expr_in(base, bindings, types, prog, allow_special)
         }
         _ => false,
     }
@@ -695,8 +709,8 @@ fn is_printable_arg(
     if !printable_ty(t, prog) {
         return false;
     }
-    // L2h：特殊值仅作直接 `println` 实参或 `let` 初值；复合内嵌由
-    // `supported_value_expr` 的兜底拒绝（裁定 4 fail-closed）。
+    // L2h／L2i：特殊值可直接作 `println` 实参、`let` 初值或复合常量成员；
+    // 枚举变体载荷仍由 `supported_value_expr_in` 以 allow_special=false 拒绝。
     if matches!(e, Ex::FloatSpecial(..)) {
         return matches!(t, Ty::Prim("f32") | Ty::Prim("f64"));
     }

@@ -599,10 +599,7 @@ fn lower_value(
             .konst
             .clone()
             .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：复合成员缺少编译期值"))?;
-        // L2h 裁定 4：复合内特殊值（含经绑定别名）fail-closed。
-        if matches!(val, ConstVal::F32Special(_) | ConstVal::F64Special(_)) {
-            return Err(SubsetError::new(*nl, *nc, "lower：复合内特殊值 fail-closed"));
-        }
+        // L2i：复合内特殊值（含经绑定别名）按既有浮点格式输出。
         return Ok(Value::Bytes(format_const(&val, &slot.ty)?));
     }
     let t = b
@@ -627,7 +624,8 @@ fn lower_value(
         | Ex::Lit(Lit::Float(_) | Lit::Bool(_), _, _)
         | Ex::UnitLit(..)
         | Ex::Un(..)
-        | Ex::Bin(..) => lower_scalar_value(e, &t, b, scope),
+        | Ex::Bin(..)
+        | Ex::FloatSpecial(..) => lower_scalar_value(e, &t, b, scope),
         Ex::Deref(base, dl, dc) => {
             let src = match base.as_ref() {
                 Ex::Path(n, _, _) => lookup(scope, n, *dl, *dc)?,

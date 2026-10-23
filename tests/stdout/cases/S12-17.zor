@@ -1,0 +1,6 @@
+struct P { x: f64, y: f64 }
+fn main() {
+    let p = P { x: f64::NAN, y: f64::INFINITY };
+    println(p);
+    println(p);
+}

@@ -1,0 +1,5 @@
+fn main() {
+    if f64::NAN < 1.0 {
+        println(1);
+    }
+}

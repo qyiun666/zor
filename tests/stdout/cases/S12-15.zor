@@ -1,0 +1,5 @@
+struct S { t: (f64, i64), a: [f32; 2] }
+fn main() {
+    let s = S { t: (f64::NAN, 1), a: [f32::INFINITY, 2.5] };
+    println(s.t[0], s.a[0]);
+}

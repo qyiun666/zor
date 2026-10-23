@@ -1,0 +1,5 @@
+fn main() {
+    let a: [f64; 2] = [1.0, 2.0];
+    let i = 0;
+    println(a[i]);
+}
