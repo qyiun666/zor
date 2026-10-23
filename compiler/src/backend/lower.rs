@@ -12,7 +12,8 @@
 
 use super::float_fmt;
 use super::ir::{
-    ArithOp, Func, IntExpr, IntTy, Local, LocalId, PrintArg, Program, Stmt, StrArg, Ty, Value,
+    ArithOp, BoxIntTy, Func, IntExpr, IntTy, Local, LocalId, PrintArg, Program, Stmt, StrArg, Ty,
+    Value,
 };
 use super::subset::{self, SubsetError};
 use crate::parser::{Ex, Lit, Prog, St, Ty as AstTy};
@@ -153,8 +154,8 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 Ty::Box(p) => (**p).clone(),
                                 _ => return Err(SubsetError::new(*l, *c, "lower：box 绑定类型非 Box<T>")),
                             };
-                            let ty = ir_int_ty(&payload).ok_or_else(|| {
-                                SubsetError::new(*l, *c, "lower：box 载荷类型非 i64／u8／u32")
+                            let ty = box_int_ty(&payload).ok_or_else(|| {
+                                SubsetError::new(*l, *c, "lower：box 载荷类型非 8 个整型宽度之一")
                             })?;
                             let value = box_lit(inner, ty)?;
                             body.push(Stmt::BindBox { local: id, ty, value, line: *l, col: *c });
@@ -183,7 +184,9 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
                         }
                         Ex::Deref(base, dl, dc) => {
-                            if ir_int_ty(&local_ty).is_none() {
+                            let known = ir_int_ty(&local_ty).is_some()
+                                || box_int_ty(&local_ty).is_some();
+                            if !known {
                                 return Err(SubsetError::new(*l, *c, "lower：解引用结果类型非整型"));
                             }
                             let src = match base.as_ref() {
@@ -221,6 +224,26 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     col: *nc,
                                 });
                                 slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
+                            } else if box_int_ty(&local_ty).is_some() {
+                                // L2g：五新宽度的运行期副本（仅来自 `*b`）；常量仍走编译期格式化。
+                                let src_slot = slots
+                                    .get(src.0 as usize)
+                                    .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：拷贝源槽位缺失"))?;
+                                if src_slot.ty != local_ty {
+                                    return Err(SubsetError::new(*nl, *nc, "lower：整型拷贝源类型与目标不符"));
+                                }
+                                if src_slot.konst.is_some() {
+                                    let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
+                                    slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
+                                } else {
+                                    body.push(Stmt::BindBoxIntCopy {
+                                        dst: id,
+                                        src,
+                                        line: *nl,
+                                        col: *nc,
+                                    });
+                                    slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
+                                }
                             } else if is_const_scalar_ty(&local_ty) {
                                 let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
                                 slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
@@ -359,8 +382,8 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 Some(Ty::Box(p)) => (**p).clone(),
                                 _ => return Err(SubsetError::new(*al, *ac, "lower：目标非 Box 绑定")),
                             };
-                            let ty = ir_int_ty(&payload).ok_or_else(|| {
-                                SubsetError::new(*al, *ac, "lower：box 载荷类型非 i64／u8／u32")
+                            let ty = box_int_ty(&payload).ok_or_else(|| {
+                                SubsetError::new(*al, *ac, "lower：box 载荷类型非 8 个整型宽度之一")
                             })?;
                             let value = box_lit(inner, ty)?;
                             let drop_dst = is_live(&slots, ia);
@@ -470,6 +493,14 @@ fn print_arg(
                     }
                     if let Some(ity) = ir_int_ty(ty) {
                         Ok(PrintArg::Int { ty: ity, expr: IntExpr::Local(id) })
+                    } else if let Some(bty) = box_int_ty(ty) {
+                        // L2g：五新宽度的运行期局部（`let v = *b` 或副本）；常量仍编译期格式化。
+                        if slot.konst.is_some() {
+                            let val = slot.konst.clone().expect("checked");
+                            Ok(PrintArg::Bytes(format_const(&val, ty)?))
+                        } else {
+                            Ok(PrintArg::BoxInt { ty: bty, local: id })
+                        }
                     } else {
                         let val = slot
                             .konst
@@ -486,17 +517,23 @@ fn print_arg(
                 _ => return Err(SubsetError::new(*dl, *dc, "lower：解引用源形态")),
             };
             let irt = ir_ty_of(b.types, e, "println 实参")?;
-            let ty = ir_int_ty(&irt)
-                .ok_or_else(|| SubsetError::new(*dl, *dc, "lower：解引用结果类型非整型"))?;
             let src_ty = b.slots.get(src.0 as usize).map(|s| s.ty.clone());
             if src_ty != Some(Ty::Box(Box::new(irt.clone()))) {
                 return Err(SubsetError::new(*dl, *dc, "lower：解引用源类型与实参不符"));
             }
+            if ir_int_ty(&irt).is_none() && box_int_ty(&irt).is_none() {
+                return Err(SubsetError::new(*dl, *dc, "lower：解引用结果类型非整型"));
+            }
             // 读入临时量：Box owner 槽位只声明 zor_box_<id>，不能把其 id
             // 当作载荷局部 id 使用。与 lower_value 的复合解引用路径保持一致。
-            let id = new_temp(b, irt);
+            let id = new_temp(b, irt.clone());
             b.body.push(Stmt::BindDeref { local: id, src, line: *dl, col: *dc });
-            Ok(PrintArg::Int { ty, expr: IntExpr::Local(id) })
+            if let Some(ty) = ir_int_ty(&irt) {
+                Ok(PrintArg::Int { ty, expr: IntExpr::Local(id) })
+            } else {
+                let bty = box_int_ty(&irt).expect("checked integer width");
+                Ok(PrintArg::BoxInt { ty: bty, local: id })
+            }
         }
         Ex::Un(..) | Ex::Bin(..) => {
             let irt = ir_ty_of(b.types, e, "println 实参")?;
@@ -1034,9 +1071,14 @@ fn ast_to_ir(t: &AstTy) -> Option<Ty> {
         AstTy::Prim("f64") => Some(Ty::F64),
         AstTy::BoxTy(inner) => {
             let payload = match inner.as_ref() {
+                AstTy::Prim("i8") => Ty::I8,
+                AstTy::Prim("i16") => Ty::I16,
+                AstTy::Prim("i32") => Ty::I32,
                 AstTy::Prim("i64") => Ty::I64,
                 AstTy::Prim("u8") => Ty::U8,
+                AstTy::Prim("u16") => Ty::U16,
                 AstTy::Prim("u32") => Ty::U32,
+                AstTy::Prim("u64") => Ty::U64,
                 _ => return None,
             };
             Some(Ty::Box(Box::new(payload)))
@@ -1051,6 +1093,21 @@ fn ir_int_ty(t: &Ty) -> Option<IntTy> {
         Ty::I64 => Some(IntTy::I64),
         Ty::U8 => Some(IntTy::U8),
         Ty::U32 => Some(IntTy::U32),
+        _ => None,
+    }
+}
+
+/// L2g Box 载荷宽度：8 个整型宽度（独立于算术 `IntTy`）。
+fn box_int_ty(t: &Ty) -> Option<BoxIntTy> {
+    match t {
+        Ty::I8 => Some(BoxIntTy::I8),
+        Ty::I16 => Some(BoxIntTy::I16),
+        Ty::I32 => Some(BoxIntTy::I32),
+        Ty::I64 => Some(BoxIntTy::I64),
+        Ty::U8 => Some(BoxIntTy::U8),
+        Ty::U16 => Some(BoxIntTy::U16),
+        Ty::U32 => Some(BoxIntTy::U32),
+        Ty::U64 => Some(BoxIntTy::U64),
         _ => None,
     }
 }
@@ -1147,9 +1204,28 @@ fn lower_int_expr(
     }
 }
 
-fn box_lit(e: &Ex, ty: IntTy) -> Result<i128, SubsetError> {
+fn box_lit(e: &Ex, ty: BoxIntTy) -> Result<i128, SubsetError> {
     match e {
-        Ex::Lit(Lit::Int(v), _, _) => int_const(v, ty, e),
+        Ex::Lit(Lit::Int(v), l, c) => {
+            let n = i128::try_from(*v)
+                .map_err(|_| SubsetError::new(*l, *c, "lower：整型字面量超出 i128"))?;
+            // L2g：载荷仅非负字面量；上限与标注宽度一致（越界由 check E1201 先拦）。
+            let max = match ty {
+                BoxIntTy::I8 => i8::MAX as i128,
+                BoxIntTy::I16 => i16::MAX as i128,
+                BoxIntTy::I32 => i32::MAX as i128,
+                BoxIntTy::I64 => i64::MAX as i128,
+                BoxIntTy::U8 => u8::MAX as i128,
+                BoxIntTy::U16 => u16::MAX as i128,
+                BoxIntTy::U32 => u32::MAX as i128,
+                BoxIntTy::U64 => u64::MAX as i128,
+            };
+            if (0..=max).contains(&n) {
+                Ok(n)
+            } else {
+                Err(SubsetError::new(*l, *c, "lower：整型字面量超出声明宽度"))
+            }
+        }
         other => {
             let (l, c) = subset::expr_span(other);
             Err(SubsetError::new(l, c, "lower：box 载荷非整型字面量"))

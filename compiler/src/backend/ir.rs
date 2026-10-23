@@ -57,6 +57,52 @@ impl IntTy {
     }
 }
 
+/// L2g Box 载荷宽度：8 个整型宽度。与算术 `IntTy` 分离，保证
+/// 非 Box 算术／比较仍只有 i64／u8／u32 可 codegen（零扩容红线）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BoxIntTy {
+    I8,
+    I16,
+    I32,
+    I64,
+    U8,
+    U16,
+    U32,
+    U64,
+}
+
+impl BoxIntTy {
+    pub fn ir_ty(self) -> Ty {
+        match self {
+            BoxIntTy::I8 => Ty::I8,
+            BoxIntTy::I16 => Ty::I16,
+            BoxIntTy::I32 => Ty::I32,
+            BoxIntTy::I64 => Ty::I64,
+            BoxIntTy::U8 => Ty::U8,
+            BoxIntTy::U16 => Ty::U16,
+            BoxIntTy::U32 => Ty::U32,
+            BoxIntTy::U64 => Ty::U64,
+        }
+    }
+
+    pub fn c_ty(self) -> &'static str {
+        match self {
+            BoxIntTy::I8 => "int8_t",
+            BoxIntTy::I16 => "int16_t",
+            BoxIntTy::I32 => "int32_t",
+            BoxIntTy::I64 => "int64_t",
+            BoxIntTy::U8 => "uint8_t",
+            BoxIntTy::U16 => "uint16_t",
+            BoxIntTy::U32 => "uint32_t",
+            BoxIntTy::U64 => "uint64_t",
+        }
+    }
+
+    pub fn is_signed(self) -> bool {
+        matches!(self, BoxIntTy::I8 | BoxIntTy::I16 | BoxIntTy::I32 | BoxIntTy::I64)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ArithOp {
     Add,
@@ -138,6 +184,9 @@ pub enum Value {
 pub enum PrintArg {
     Str(StrArg),
     Int { ty: IntTy, expr: IntExpr },
+    /// L2g：五新宽度的运行期值（直接 `println(*b)` 或其副本）。
+    /// 三型继续走 `Int`，保证既有 C 文本逐字节零漂移。
+    BoxInt { ty: BoxIntTy, local: LocalId },
     /// 布尔／byte／unit／窄整型／浮点的契约格式化结果（编译期确定）。
     Bytes(Vec<u8>),
     Composite(Value),
@@ -184,7 +233,7 @@ pub enum Stmt {
     /// `let x = box <int>;`：新建 Box 载荷（emit：malloc；`ty` 为载荷宽度）。
     BindBox {
         local: LocalId,
-        ty: IntTy,
+        ty: BoxIntTy,
         value: i128,
         line: usize,
         col: usize,
@@ -192,7 +241,7 @@ pub enum Stmt {
     /// `x = box <int>;`：重初始化；`drop_dst` 由 lower 静态判定（emit：必要时先 free）。
     BindBoxAssign {
         local: LocalId,
-        ty: IntTy,
+        ty: BoxIntTy,
         value: i128,
         drop_dst: bool,
         line: usize,
@@ -201,6 +250,13 @@ pub enum Stmt {
     /// `let v = *b;`：读 Box 载荷（Copy 结果）；宽度由 `local` 的 `Ty` 决定。
     BindDeref {
         local: LocalId,
+        src: LocalId,
+        line: usize,
+        col: usize,
+    },
+    /// L2g：五新宽度的运行期副本（`let w = v`；v 来自 `*b`）。
+    BindBoxIntCopy {
+        dst: LocalId,
         src: LocalId,
         line: usize,
         col: usize,

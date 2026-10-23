@@ -1,0 +1,10 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S10-01	tests/stdout/cases/S10-01.zor	run	0	expected/S10-01.stdout	-	Box<i8> 0/max
+S10-02	tests/stdout/cases/S10-02.zor	run	0	expected/S10-02.stdout	-	Box<i16> 0/max
+S10-03	tests/stdout/cases/S10-03.zor	run	0	expected/S10-03.stdout	-	Box<i32> 0/max
+S10-04	tests/stdout/cases/S10-04.zor	run	0	expected/S10-04.stdout	-	Box<u16> 0/max
+S10-05	tests/stdout/cases/S10-05.zor	run	0	expected/S10-05.stdout	-	Box<u64> 0/max
+S10-06	tests/stdout/cases/S10-06.zor	run	0	expected/S10-06.stdout	-	five-width mixed multi-Box same call plus literal
+S10-07	tests/stdout/cases/S10-07.zor	run	0	expected/S10-07.stdout	-	repeat read plus unbox, no consume
+S10-08	tests/stdout/cases/S10-08.zor	run	0	expected/S10-08.stdout	-	u16 reassign drops old payload
+S10-09	tests/stdout/cases/S10-09.zor	run	0	expected/S10-09.stdout	-	default box 1 remains Box<i64>

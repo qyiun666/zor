@@ -198,7 +198,9 @@ fn typed_boxes_are_stable_across_opt_levels() {
 
 #[test]
 fn invalid_typed_box_forms_are_rc1_and_fail_closed() {
-    let cases: [(&str, &str, &str); 20] = [
+    // N-21～N-25（`Box<i8>/<i16>/<i32>/<u16>/<u64> = box 1`）由 L2g 支持面承接，
+    // 已按冻结件从活跃执行退休；stdout 侧资产保持 byte-identical，不在本表重复。
+    let cases: [(&str, &str, &str); 15] = [
         (
             "n16",
             "fn main() {\n    let b: Box<u8> = box 256;\n    println(*b);\n}\n",
@@ -225,31 +227,6 @@ fn invalid_typed_box_forms_are_rc1_and_fail_closed() {
             "box 载荷非整型字面量",
         ),
         (
-            "n21",
-            "fn main() {\n    let b: Box<i8> = box 1;\n    println(*b);\n}\n",
-            "E1201",
-        ),
-        (
-            "n22",
-            "fn main() {\n    let b: Box<i16> = box 1;\n    println(*b);\n}\n",
-            "E1201",
-        ),
-        (
-            "n23",
-            "fn main() {\n    let b: Box<i32> = box 1;\n    println(*b);\n}\n",
-            "E1201",
-        ),
-        (
-            "n24",
-            "fn main() {\n    let b: Box<u16> = box 1;\n    println(*b);\n}\n",
-            "E1201",
-        ),
-        (
-            "n25",
-            "fn main() {\n    let b: Box<u64> = box 1;\n    println(*b);\n}\n",
-            "E1201",
-        ),
-        (
             "n26",
             "fn main() {\n    let b: Box<f32> = box 1.5;\n    println(*b);\n}\n",
             "E1201",
@@ -257,12 +234,12 @@ fn invalid_typed_box_forms_are_rc1_and_fail_closed() {
         (
             "n27",
             "fn main() {\n    let b: Box<f64> = box 1.5;\n    println(*b);\n}\n",
-            "Box 仅 i64",
+            "let 类型标注",
         ),
         (
             "n28",
             "fn main() {\n    let b: Box<bool> = box true;\n    println(*b);\n}\n",
-            "Box 仅 i64",
+            "let 类型标注",
         ),
         (
             "n29",
@@ -272,17 +249,17 @@ fn invalid_typed_box_forms_are_rc1_and_fail_closed() {
         (
             "n30",
             "fn main() {\n    let b: Box<unit> = box ();\n    println(*b);\n}\n",
-            "Box 仅 i64",
+            "let 类型标注",
         ),
         (
             "n31",
             "struct P { x: i64 }\nfn main() {\n    let p = P { x: 1 };\n    let b: Box<P> = box p;\n    println(*b);\n}\n",
-            "Box 仅 i64",
+            "let 类型标注",
         ),
         (
             "n32",
             "fn main() {\n    let a: [i64; 3] = [1, 2, 3];\n    let b: Box<[i64; 3]> = box a;\n    println(*b);\n}\n",
-            "Box 仅 i64",
+            "let 类型标注",
         ),
         (
             "n33",

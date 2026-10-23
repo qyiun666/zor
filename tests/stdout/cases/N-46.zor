@@ -1,0 +1,7 @@
+fn f() -> Box<i8> {
+    box 1
+}
+fn main() {
+    let b = f();
+    println(*b);
+}

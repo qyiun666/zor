@@ -1,0 +1,15 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-36	tests/stdout/cases/N-36.zor	1	none	E1201	zor: runtime error	i8 overflow E1201
+N-37	tests/stdout/cases/N-37.zor	1	none	E1201	zor: runtime error	i16 overflow E1201
+N-38	tests/stdout/cases/N-38.zor	1	none	E1201	zor: runtime error	i32 overflow E1201
+N-39	tests/stdout/cases/N-39.zor	1	none	E1201	zor: runtime error	u16 overflow E1201
+N-40	tests/stdout/cases/N-40.zor	1	none	E1201	zor: runtime error	u64 overflow E1201
+N-41	tests/stdout/cases/N-41.zor	1	none	box 载荷非整型字面量	zor: runtime error	negative payload fail-closed
+N-42	tests/stdout/cases/N-42.zor	1	none	box 载荷非整型字面量	zor: runtime error	non-literal payload fail-closed
+N-43	tests/stdout/cases/N-43.zor	1	none	E1201	zor: runtime error	non-Box i8 arithmetic stays E1201
+N-44	tests/stdout/cases/N-44.zor	1	none	E1201	zor: runtime error	non-Box u64 arithmetic stays E1201
+N-45	tests/stdout/cases/N-45.zor	1	none	额外函数 'f'（首片只支持 main）	zor: runtime error	non-i64 Box param fail-closed
+N-46	tests/stdout/cases/N-46.zor	1	none	额外函数 'f'（首片只支持 main）	zor: runtime error	non-i64 Box return fail-closed
+N-47	tests/stdout/cases/N-47.zor	1	none	let 初始化复合值不可打印或形态不支持	zor: runtime error	non-i64 Box struct field fail-closed
+N-48	tests/stdout/cases/N-48.zor	1	none	println 实参不可打印	zor: runtime error	composite deref print fail-closed
+N-49	tests/stdout/cases/N-49.zor	1	none	E1201	zor: runtime error	reassign overflow E1201

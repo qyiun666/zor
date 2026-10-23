@@ -1,0 +1,4 @@
+fn main() {
+    let b: Box<i32> = box 2147483648;
+    println(*b);
+}

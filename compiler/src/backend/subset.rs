@@ -147,7 +147,7 @@ fn check_block(
                             return Err(SubsetError::new(
                                 *l,
                                 *c,
-                                "let 类型标注（Box 仅 i64／u8／u32 可 codegen）",
+                                "let 类型标注（Box 仅 8 个整型宽度可 codegen）",
                             ))
                         }
                     },
@@ -396,20 +396,27 @@ fn is_byte_array_ty(t: &Ty) -> bool {
     matches!(t, Ty::Arr(elem, _) if matches!(elem.as_ref(), Ty::Prim("byte")))
 }
 
-/// L2f Box 载荷类型：仅 i64／u8／u32（冻结件 §二）。
+/// L2f／L2g Box 载荷类型：8 个整型宽度（L2g 追加 i8／i16／i32／u16／u64）。
 fn l2f_payload_ty(t: &Ty) -> Option<Ty> {
     match t {
-        Ty::Prim(p) if matches!(*p, "i64" | "u8" | "u32") => Some(t.clone()),
+        Ty::Prim(p) if matches!(*p, "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64") => {
+            Some(t.clone())
+        }
         _ => None,
     }
 }
 
-/// 载荷类型到绑定种类（三种均为在册原始类型）。
+/// 载荷类型到绑定种类（八种均为在册原始类型）。
 fn l2f_payload_binding(t: &Ty) -> Option<BindingKind> {
     match t {
+        Ty::Prim("i8") => Some(BindingKind::I8),
+        Ty::Prim("i16") => Some(BindingKind::I16),
+        Ty::Prim("i32") => Some(BindingKind::I32),
         Ty::Prim("i64") => Some(BindingKind::I64),
         Ty::Prim("u8") => Some(BindingKind::U8),
+        Ty::Prim("u16") => Some(BindingKind::U16),
         Ty::Prim("u32") => Some(BindingKind::U32),
+        Ty::Prim("u64") => Some(BindingKind::U64),
         _ => None,
     }
 }
