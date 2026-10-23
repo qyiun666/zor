@@ -1,0 +1,7 @@
+fn main() {
+    let a = f64::NAN;
+    let b: f32 = f32::INFINITY;
+    let c = f64::NEG_INFINITY;
+    let d: f32 = f32::NEG_INFINITY;
+    println(a, b, c, d, 1, -0.0);
+}

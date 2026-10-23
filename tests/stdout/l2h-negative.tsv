@@ -1,0 +1,33 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-50	tests/stdout/cases/N-50.zor	1	none	zorcc: codegen:	zor: runtime error	float + not supported (codegen)
+N-51	tests/stdout/cases/N-51.zor	1	none	zorcc: codegen:	zor: runtime error	float - not supported (codegen)
+N-52	tests/stdout/cases/N-52.zor	1	none	zorcc: codegen:	zor: runtime error	float * not supported (codegen)
+N-53	tests/stdout/cases/N-53.zor	1	none	zorcc: codegen:	zor: runtime error	float / not supported (codegen)
+N-54	tests/stdout/cases/N-54.zor	1	none	zorcc: codegen:	zor: runtime error	float % not supported (codegen)
+N-55	tests/stdout/cases/N-55.zor	1	none	zorcc: codegen:	zor: runtime error	float == not supported (codegen)
+N-56	tests/stdout/cases/N-56.zor	1	none	zorcc: codegen:	zor: runtime error	float != not supported (codegen)
+N-57	tests/stdout/cases/N-57.zor	1	none	zorcc: codegen:	zor: runtime error	float < not supported (codegen)
+N-58	tests/stdout/cases/N-58.zor	1	none	zorcc: codegen:	zor: runtime error	float <= not supported (codegen)
+N-59	tests/stdout/cases/N-59.zor	1	none	zorcc: codegen:	zor: runtime error	float > not supported (codegen)
+N-60	tests/stdout/cases/N-60.zor	1	none	zorcc: codegen:	zor: runtime error	float >= not supported (codegen)
+N-61	tests/stdout/cases/N-61.zor	1	none	zorcc: codegen:	zor: runtime error	float if condition not supported (codegen)
+N-62	tests/stdout/cases/N-62.zor	1	none	zorcc: codegen:	zor: runtime error	float while condition not supported (codegen); never run
+N-63	tests/stdout/cases/N-63.zor	1	none	E1201	zor: runtime error	unary minus on f64 special -> E1201
+N-64	tests/stdout/cases/N-64.zor	1	none	E1201	zor: runtime error	unary minus on f32 special -> E1201
+N-65	tests/stdout/cases/N-65.zor	1	none	E1201	zor: runtime error	special value via binding then unary minus; rc=1; token head-fixed
+N-66	tests/stdout/cases/N-66.zor	1	none	zorcc: codegen:	zor: runtime error	box float payload fail-closed (codegen)
+N-67	tests/stdout/cases/N-67.zor	1	none	E1201	zor: runtime error	float unbox on non-box -> E1201 (0.3.6 实测)
+N-68	tests/stdout/cases/N-68.zor	1	none	E1202	zor: runtime error	int literal annotated float -> E1202
+N-69	tests/stdout/cases/N-69.zor	1	none	E1202	zor: runtime error	float literal annotated int -> E1202
+N-70	tests/stdout/cases/N-70.zor	1	none	E1201	zor: runtime error	f64 special to f32 -> E1201 (cross-width)
+N-71	tests/stdout/cases/N-71.zor	1	none	E1201	zor: runtime error	f32 special to f64 -> E1201 (cross-width)
+N-72	tests/stdout/cases/N-72.zor	1	none	E1101	zor: runtime error	f64::MAX not in six forms -> E1101
+N-73	tests/stdout/cases/N-73.zor	1	none	E1101	zor: runtime error	f32::EPSILON not in six forms -> E1101
+N-74	tests/stdout/cases/N-74.zor	1	none	E1101	zor: runtime error	lowercase f64::nan -> E1101
+N-75	tests/stdout/cases/N-75.zor	1	none	E1101	zor: runtime error	NaN payload call -> E1101 candidate; token head-fixed
+N-76	tests/stdout/cases/N-76.zor	1	none	E1101	zor: runtime error	f64::NEG_NAN not in six forms -> E1101
+N-77	tests/stdout/cases/N-77.zor	1	none	E1101	zor: runtime error	float suffix 1.0f64 -> E1101 (lex/parse)
+N-78	tests/stdout/cases/N-78.zor	1	none	E1101	zor: runtime error	println context non-six-form member -> E1101 (Stage-1 订正)
+N-79	tests/stdout/cases/N-79.zor	1	none	E1101	zor: runtime error	bare nan stays identifier -> E1101
+N-80	tests/stdout/cases/N-80.zor	1	none	E1101	zor: runtime error	bare inf stays identifier -> E1101
+N-81	tests/stdout/cases/N-81.zor	1	none	zorcc: codegen:	zor: runtime error	special value inside composite fail-closed; token head-fixed

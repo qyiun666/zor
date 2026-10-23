@@ -13,11 +13,34 @@ pub struct Var {
     pub moved_fields: Vec<String>,
     pub shared: u32,
     pub mut_active: bool,
+    /// L2h：绑定的值来源是六个特殊值之一（含经 `let` 复制）；一元负号据此 E1201。
+    pub float_special: bool,
 }
 
 impl Var {
     fn fresh(ty: Ty) -> Self {
-        Var { ty, moved: false, unboxed: false, partial_moved: false, moved_fields: vec![], shared: 0, mut_active: false }
+        Var {
+            ty,
+            moved: false,
+            unboxed: false,
+            partial_moved: false,
+            moved_fields: vec![],
+            shared: 0,
+            mut_active: false,
+            float_special: false,
+        }
+    }
+}
+
+/// L2h：表达式是否为特殊值来源（直接形态或绑定别名）。
+fn special_origin(e: &Ex, env: &HashMap<String, Var>) -> Option<Ty> {
+    match e {
+        Ex::FloatSpecial(w, ..) => Some(w.ty()),
+        Ex::Path(n, ..) => env
+            .get(n)
+            .filter(|v| v.float_special)
+            .map(|v| v.ty.clone()),
+        _ => None,
     }
 }
 
@@ -412,6 +435,7 @@ impl<'a> Ck<'a> {
                     self.check_expr(init, None, env)
                 };
                 self.types.insert_let(*l, *c, vt.clone());
+                let keeps_special = special_origin(init, env).is_some();
                 if matches!(ann, Some(Ty::Ref(..))) { self.d("E1501", *l, *c, "引用类型只能出现在函数参数/局部借用，不得作为 let 标注持久化"); }
                 self.note_move_src(init, &vt, env);
                 // 持久借用记账：句柄绑定 `let h = &v / &mut v`（活跃至所在块尾，R2 §2）；
@@ -423,7 +447,9 @@ impl<'a> Ck<'a> {
                         }
                     }
                 }
-                env.insert(name.clone(), Var::fresh(vt));
+                let mut bound = Var::fresh(vt);
+                bound.float_special = keeps_special;
+                env.insert(name.clone(), bound);
             }
             St::LetDecl(name, _, l, c) => {
                 self.d("E1601", *l, *c, format!("let '{}' 缺少初始化（0.1.x 不支持无初始值绑定）", name));
@@ -443,6 +469,7 @@ impl<'a> Ck<'a> {
                     None
                 };
                 let rt = self.check_expr(rhs, rhs_expect.as_ref(), env);
+                let rhs_special = special_origin(rhs, env).is_some();
                 self.note_move_src(rhs, &rt, env);
                 let lt = match lhs {
                     Ex::Path(n, ll, lc) => {
@@ -454,7 +481,11 @@ impl<'a> Ck<'a> {
                                     let msg = format!("'{}' 有活跃借用，不可写入（R2 §2 owner 槽位直接访问）", n);
                                     self.e2203(n, *ll, *lc, msg);
                                 }
-                                let t = v.ty.clone(); *v = Var::fresh(rt.clone()); t
+                                let t = v.ty.clone();
+                                let mut nv = Var::fresh(rt.clone());
+                                nv.float_special = rhs_special;
+                                *v = nv;
+                                t
                             }
                             None => { self.d("E1101", *ll, *lc, format!("unknown identifier '{}'", n)); Ty::Bad }
                         }
@@ -567,6 +598,33 @@ impl<'a> Ck<'a> {
     fn check_expr_inner(&mut self, e: &Ex, expect: Option<&Ty>, env: &mut HashMap<String, Var>) -> Ty {
         match e {
             Ex::Lit(lit, l, c) => self.check_lit(lit, expect, *l, *c),
+            // L2h：特殊值宽度严格——期望宽度不符 E1201；整型标注 E1202；不新增 E 码。
+            Ex::FloatSpecial(w, _, l, c) => {
+                let t = w.ty();
+                match expect {
+                    Some(Ty::Bad) => Ty::Bad,
+                    Some(e) if *e == t => t,
+                    Some(Ty::Prim(p)) if int_bits(p).is_some() => {
+                        self.d(
+                            "E1202",
+                            *l,
+                            *c,
+                            format!("禁止隐式数值转换：特殊值 '{}' 标注于整型 '{}'", t.display(), p),
+                        );
+                        Ty::Bad
+                    }
+                    Some(x) => {
+                        self.d(
+                            "E1201",
+                            *l,
+                            *c,
+                            format!("特殊值宽度严格：'{}' 不可赋于 '{}'", t.display(), x.display()),
+                        );
+                        Ty::Bad
+                    }
+                    None => t,
+                }
+            }
             Ex::UnitLit(l, c) => {
                 if let Some(x) = expect { if x != &Ty::unit() && x != &Ty::Bad { self.mismatch((*l, *c), x, &Ty::unit()); } }
                 Ty::unit()
@@ -585,6 +643,21 @@ impl<'a> Ck<'a> {
             Ex::Un(op, a, l, c) => {
                 match op.as_str() {
                     "-" => {
+                        // L2h 裁定 3：一元负号只拒特殊值——直接六形式与经绑定的别名
+                        // 同为 E1201；有限字面量／有限非字面量 `-x` 的既有行为不动。
+                        if let Some(t) = special_origin(a, env) {
+                            self.check_expr(a, Some(&t), env);
+                            self.d(
+                                "E1201",
+                                *l,
+                                *c,
+                                format!(
+                                    "一元 '-' 不接受特殊值 '{}'（含绑定后读取；0.3.7 仅直接打印）",
+                                    t.display()
+                                ),
+                            );
+                            return t;
+                        }
                         // L2c：负字面量按期望宽度收敛（含补码最小值），不新增 E 码。
                         if let Ex::Lit(Lit::Int(v), ll, lc) = a.as_ref() {
                             let target: Option<Ty> = match expect {

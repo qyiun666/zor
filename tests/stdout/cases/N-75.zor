@@ -1,0 +1,4 @@
+fn main() {
+    let x: f64 = f64::NAN(1);
+    println(x);
+}

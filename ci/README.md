@@ -2,9 +2,9 @@
 
 归属：ZOR工具链与开发工程师。设计与验证记录：shared/ZOR-0.1x-CI基线-设计草案-v1.md；门禁判据单一来源：shared/ZOR-0.1x-质量门禁标准-v1.md（C/T/B 编号）。
 
-## 当前口径（L2g，0.3.6 起）
-- 三基线并存于 `--stdout-contract`：`l2e` 162／209（历史冻结）、`l2f` 188／246（历史冻结）、`l2g` 206／275（当前全矩阵）。
-- stdout 判词 `runtime=80 negative=41`，CLI 17（合计 138）；`runtime-codes` 39／6／19；`packaging-smoke` 4。
+## 当前口径（L2h，0.3.7 起）
+- 四基线并存于 `--stdout-contract`：`l2e` 162／209（历史冻结）、`l2f` 188／246（历史冻结）、`l2g` 206／275（历史冻结）、`l2h` 247／327（当前全矩阵）。
+- stdout 判词 `runtime=89 negative=73`，CLI 17（合计 179）；`runtime-codes` 39／6／19；`packaging-smoke` 4。
 - required（ruleset `25633324`）：`stdout-contract`＋`packaging-smoke`；无新 job、无 workflow YAML／ruleset 写入。
 - job：`stdout-contract`／`packaging-smoke` 均为 `ubuntu-24.04`、timeout 20；artifact 分别 `stdout-contract-logs-<run_id>-<attempt>`／`packaging-logs-<run_id>-<attempt>`，保留 90 天。
 - 下列版本节内计数均为其时点口径（历史），不得读作现态。
@@ -51,7 +51,7 @@
 - required 时机：实施 PR 内 advisory；QA GATE PASS 与 0.3.2 账本合入后再设为 required
 
 ## L2d 复合输出扩展与 packaging-smoke（0.3.3 起）
-- **L2d 时点（历史）**：`--stdout-contract` 计数冻结为 **86**：runtime **62**（L2c 48＋S5 11＋S7 3）＋负控 **10**＋CLI **14**；CI 除分段落账外，还校验两段判词原文 `PASS|stdout-contract|runtime=62 negative=10 fail=0 ran=62/10` 与 `PASS|cli-contract|cases=14 fail=0 ran=14`；判定 PASS 但计数不符（如 QA 旧资产 48）一律 FAIL，防静默洗绿；QA 脚本仍是唯一判据来源，CI 不自维护矩阵（当前口径见「当前口径（L2g）」）。
+- **L2d 时点（历史）**：`--stdout-contract` 计数冻结为 **86**：runtime **62**（L2c 48＋S5 11＋S7 3）＋负控 **10**＋CLI **14**；CI 除分段落账外，还校验两段判词原文 `PASS|stdout-contract|runtime=62 negative=10 fail=0 ran=62/10` 与 `PASS|cli-contract|cases=14 fail=0 ran=14`；判定 PASS 但计数不符（如 QA 旧资产 48）一律 FAIL，防静默洗绿；QA 脚本仍是唯一判据来源，CI 不自维护矩阵（当前口径见「当前口径（L2h）」）。
 - `bash ci/run_ci.sh --packaging-smoke`：独立模式（不可与 `--strict／--asan／--bench／--runtime-codes／--stdout-contract` 组合），只执行 `stage_packaging_smoke`，输出单段 `summary.txt`；直调 QA `tests/packaging/run_packaging_smoke.sh --strict`（env：`ZORC_BIN`／`CC`／`OUT_DIR`／`ZOR_INSTALLER`）；缺 zorcc／脚本／判词、或 `PASS|packaging-smoke|cases=4 fail=0 ran=4` 计数不符即 FAIL，不得 SKIP／`continue-on-error`／重跑洗绿
 - `bash ci/install.sh --prefix <绝对前缀> [--destdir <根>] [--zorcc <路径>] [--runtime <目录>]`：安装树构造（CI smoke 用，非用户安装承诺）；canonical 布局 `<DESTDIR><prefix>/bin/zorcc`＋`<DESTDIR><prefix>/share/zor/runtime/{zor_rt.c,h}`；缺 zorcc／helper 或前缀非绝对路径 rc=2
 - job：`packaging-smoke`（`ubuntu-24.04`、timeout 20、无 sanitizer、`env -u ZOR_RUNTIME_DIR`），artifact `packaging-logs-<run_id>-<attempt>` 90 天、仅文本；L2d 实施期为 advisory（历史）；自 L2e 起 required 为 `stdout-contract`＋`packaging-smoke`（ruleset `25633324`）；baseline 七段、asan-linux 八段、runtime-codes、stdout-contract 结构零改
@@ -65,14 +65,22 @@
 - `packaging-smoke` 4 条不变；**L2e 时点（历史）**：required 切换已于 0.3.4 账本合并＋连续两次 main 全绿后完成（ruleset `25633324`，回退一条 PATCH）；后续以 ruleset 为准
 
 ## L2f typed Box 与双基线（0.3.5 起）
-- `--stdout-contract` 判词 **runtime 71／negative 32／CLI 17**（合计 120）；CI 校验原文 `PASS|stdout-contract|runtime=71 negative=32 fail=0 ran=71/32` 与 `PASS|cli-contract|cases=17 fail=0 ran=17`
+- **L2f 时点（历史）**：`--stdout-contract` 判词 **runtime 71／negative 32／CLI 17**（合计 120）；CI 校验原文 `PASS|stdout-contract|runtime=71 negative=32 fail=0 ran=71/32` 与 `PASS|cli-contract|cases=17 fail=0 ran=17`
 - `stage_stdout_contract` 在 QA 两轮用例之前串行校验 `l2e`（162／209，历史冻结）与 `l2f`（188／246，L2f 全矩阵）；判词 `PASS|l2f-baseline|cases=188 files=246 unique=246 fail=0`；失败即两段 FAIL，缺件／路径不安全／重复／hash／计数不符一律 fail-closed
 - 无新 job、无 workflow YAML／ruleset 写入；`packaging-smoke` 维持 required；`-O*` 六档与 runtime-codes 39／6／19 不变
 
 ## L2g typed Box 五宽与三基线（0.3.6 起）
-- `--stdout-contract` 判词 **runtime 80／negative 41／CLI 17**（合计 138）；CI 校验原文 `PASS|stdout-contract|runtime=80 negative=41 fail=0 ran=80/41` 与 `PASS|cli-contract|cases=17 fail=0 ran=17`
-- 第三条 `l2g-baseline` 与前两条串行：`l2g` 206／275（全矩阵，files 以捕获实测为唯一值）；判词 `PASS|l2g-baseline|cases=206 files=275 unique=275 fail=0`
+- **L2g 时点（历史）**：`--stdout-contract` 判词 **runtime 80／negative 41／CLI 17**（合计 138）；CI 校验原文 `PASS|stdout-contract|runtime=80 negative=41 fail=0 ran=80/41` 与 `PASS|cli-contract|cases=17 fail=0 ran=17`
+- **L2g 时点（历史）**：第三条 `l2g-baseline` 与前两条串行：`l2g` 206／275（全矩阵，files 以捕获实测为唯一值）；判词 `PASS|l2g-baseline|cases=206 files=275 unique=275 fail=0`；L2h 另建 `l2h-baseline` 247／327，`l2g` 零改
 - 用例组新增 S10（五宽正例）与 N-36 起负控；N-21..N-25 仅在 runner 执行面退役（历史基线保留，不重签）
 - `l2e`／`l2f` 基线及 `new-cases.tsv` 等既有资产零改；L2g 只新增文件自成基线
 - 无新 job、无 workflow YAML／ruleset 写入；`packaging-smoke` 维持 required、4 条不变；runtime-codes 39／6／19 不变
 - 本节只记 CI 覆盖／门禁事实，不构成用户能力表述（浮点／NaN 结转、跨平台 N/A、安装／打包不做）
+
+## L2h 浮点源形态与四基线（0.3.7 起）
+- `--stdout-contract` 判词 **runtime 89／negative 73／CLI 17**（合计 179）；CI 校验原文 `PASS|stdout-contract|runtime=89 negative=73 fail=0 ran=89/73` 与 `PASS|cli-contract|cases=17 fail=0 ran=17`
+- 第四条 `l2h-baseline` 与前三条串行：`l2h` 247／327（全矩阵，files 以捕获实测为唯一值）；判词 `PASS|l2h-baseline|cases=247 files=327 unique=327 fail=0`
+- 用例组新增 S11-01～09（六特殊值源形态、`-0`、多实参、重复读、有限值回归）与 N-50～81 负控；浮点算术／比较／条件／一元负号特殊值／Box 浮点／隐式转换／其他 `Type::member` 仍 fail-closed
+- `l2e`／`l2f`／`l2g` 基线及 `new-cases.tsv` 等既有资产零改；L2h 只新增文件自成基线
+- 无新 job、无 workflow YAML／ruleset 写入；`packaging-smoke` 维持 required、4 条不变；runtime-codes 39／6／19 不变
+- 本节只记 CI 覆盖／门禁事实，不构成用户能力表述（不新增浮点算术；跨平台 N/A；安装／打包不做）

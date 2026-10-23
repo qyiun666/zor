@@ -312,6 +312,18 @@ fn let_init_kind(
             Some(BindingKind::F64) => Ok(BindingKind::F64),
             _ => Err(SubsetError::new(l, c, "let 类型标注与浮点初值不符")),
         },
+        // L2h：特殊值绑定宽度随源形态；跨宽／整型标注已由 check 报 E1201／E1202。
+        Ex::FloatSpecial(w, _, _, _) => {
+            let k = match w {
+                crate::parser::FloatWidth::F32 => BindingKind::F32,
+                crate::parser::FloatWidth::F64 => BindingKind::F64,
+            };
+            match ann {
+                None => Ok(k),
+                Some(a) if a == &k => Ok(k),
+                Some(_) => Err(SubsetError::new(l, c, "let 类型标注与特殊值初值不符")),
+            }
+        }
         Ex::Deref(base, il, ic) => match base.as_ref() {
             Ex::Path(n, _, _) => match bindings.get(n) {
                 Some(BindingKind::Box(p)) => match l2f_payload_binding(p) {
@@ -682,6 +694,11 @@ fn is_printable_arg(
     };
     if !printable_ty(t, prog) {
         return false;
+    }
+    // L2h：特殊值仅作直接 `println` 实参或 `let` 初值；复合内嵌由
+    // `supported_value_expr` 的兜底拒绝（裁定 4 fail-closed）。
+    if matches!(e, Ex::FloatSpecial(..)) {
+        return matches!(t, Ty::Prim("f32") | Ty::Prim("f64"));
     }
     // L2f：直接 `println(*b)` 放开三型 Box 载荷；复合／算术内嵌仍走
     // supported_value_expr 的既有 i64-only 边界（冻结件 §二）。
