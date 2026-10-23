@@ -1,0 +1,7 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S9-01	tests/stdout/cases/S9-01.zor	run	0	expected/S9-01.stdout	-	Box<i64> annotation min/max
+S9-02	tests/stdout/cases/S9-02.zor	run	0	expected/S9-02.stdout	-	Box<u8> annotation min/max
+S9-03	tests/stdout/cases/S9-03.zor	run	0	expected/S9-03.stdout	-	Box<u32> annotation min/max
+S9-04	tests/stdout/cases/S9-04.zor	run	0	expected/S9-04.stdout	-	mixed Box args plus scalar
+S9-05	tests/stdout/cases/S9-05.zor	run	0	expected/S9-05.stdout	-	repeat read plus unbox, no consume
+S9-06	tests/stdout/cases/S9-06.zor	run	0	expected/S9-06.stdout	-	u8 reassign drops old payload

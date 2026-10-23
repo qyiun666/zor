@@ -149,11 +149,15 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             });
                         }
                         Ex::Box(inner, _, _) => {
-                            if local_ty != Ty::Box(Box::new(Ty::I64)) {
-                                return Err(SubsetError::new(*l, *c, "lower：box 绑定类型非 Box<i64>"));
-                            }
-                            let value = int_lit(inner)?;
-                            body.push(Stmt::BindBox { local: id, value, line: *l, col: *c });
+                            let payload = match &local_ty {
+                                Ty::Box(p) => (**p).clone(),
+                                _ => return Err(SubsetError::new(*l, *c, "lower：box 绑定类型非 Box<T>")),
+                            };
+                            let ty = ir_int_ty(&payload).ok_or_else(|| {
+                                SubsetError::new(*l, *c, "lower：box 载荷类型非 i64／u8／u32")
+                            })?;
+                            let value = box_lit(inner, ty)?;
+                            body.push(Stmt::BindBox { local: id, ty, value, line: *l, col: *c });
                             slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
                         }
                         Ex::Lit(Lit::Int(v), il, ic) => match &local_ty {
@@ -179,8 +183,8 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
                         }
                         Ex::Deref(base, dl, dc) => {
-                            if local_ty != Ty::I64 {
-                                return Err(SubsetError::new(*l, *c, "lower：解引用结果类型非 i64"));
+                            if ir_int_ty(&local_ty).is_none() {
+                                return Err(SubsetError::new(*l, *c, "lower：解引用结果类型非整型"));
                             }
                             let src = match base.as_ref() {
                                 Ex::Path(n, _, _) => lookup(&scope, n, *dl, *dc)?,
@@ -189,11 +193,12 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     return Err(SubsetError::new(el, ec, "lower：解引用源形态"));
                                 }
                             };
-                            if slots.get(src.0 as usize).map(|s| &s.ty) != Some(&Ty::Box(Box::new(Ty::I64))) {
-                                return Err(SubsetError::new(*dl, *dc, "lower：解引用源非 Box<i64>"));
+                            let src_ty = slots.get(src.0 as usize).map(|s| &s.ty);
+                            if src_ty != Some(&Ty::Box(Box::new(local_ty.clone()))) {
+                                return Err(SubsetError::new(*dl, *dc, "lower：解引用源类型与目标不符"));
                             }
-                            body.push(Stmt::BindI64Deref { local: id, src, line: *dl, col: *dc });
-                            slots.push(Slot { ty: Ty::I64, live: true, konst: None, bytes: None });
+                            body.push(Stmt::BindDeref { local: id, src, line: *dl, col: *dc });
+                            slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
                         }
                         Ex::Path(n, nl, nc) => {
                             let src = lookup(&scope, n, *nl, *nc)?;
@@ -340,11 +345,18 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                         }
                         (Ex::Path(a, al, ac), Ex::Box(inner, _, _)) => {
                             let ia = lookup(&scope, a, *al, *ac)?;
-                            require_box(&slots, ia, *al, *ac)?;
-                            let value = int_lit(inner)?;
+                            let payload = match slots.get(ia.0 as usize).map(|s| &s.ty) {
+                                Some(Ty::Box(p)) => (**p).clone(),
+                                _ => return Err(SubsetError::new(*al, *ac, "lower：目标非 Box 绑定")),
+                            };
+                            let ty = ir_int_ty(&payload).ok_or_else(|| {
+                                SubsetError::new(*al, *ac, "lower：box 载荷类型非 i64／u8／u32")
+                            })?;
+                            let value = box_lit(inner, ty)?;
                             let drop_dst = is_live(&slots, ia);
                             body.push(Stmt::BindBoxAssign {
                                 local: ia,
+                                ty,
                                 value,
                                 drop_dst,
                                 line: *al,
@@ -463,20 +475,18 @@ fn print_arg(
                 Ex::Path(n, _, _) => lookup(scope, n, *dl, *dc)?,
                 _ => return Err(SubsetError::new(*dl, *dc, "lower：解引用源形态")),
             };
-            if b.slots.get(src.0 as usize).map(|s| &s.ty)
-                != Some(&Ty::Box(Box::new(Ty::I64)))
-            {
-                return Err(SubsetError::new(*dl, *dc, "lower：解引用源非 Box<i64>"));
-            }
             let irt = ir_ty_of(b.types, e, "println 实参")?;
-            if irt != Ty::I64 {
-                return Err(SubsetError::new(*dl, *dc, "lower：解引用结果类型非 i64"));
+            let ty = ir_int_ty(&irt)
+                .ok_or_else(|| SubsetError::new(*dl, *dc, "lower：解引用结果类型非整型"))?;
+            let src_ty = b.slots.get(src.0 as usize).map(|s| s.ty.clone());
+            if src_ty != Some(Ty::Box(Box::new(irt.clone()))) {
+                return Err(SubsetError::new(*dl, *dc, "lower：解引用源类型与实参不符"));
             }
-            // 读入 i64 临时量：Box owner 槽位只声明 zor_box_<id>，不能把其 id
-            // 当作 i64 局部 id 使用。与 lower_value 的复合解引用路径保持一致。
-            let id = new_temp(b, Ty::I64);
-            b.body.push(Stmt::BindI64Deref { local: id, src, line: *dl, col: *dc });
-            Ok(PrintArg::Int { ty: IntTy::I64, expr: IntExpr::Local(id) })
+            // 读入临时量：Box owner 槽位只声明 zor_box_<id>，不能把其 id
+            // 当作载荷局部 id 使用。与 lower_value 的复合解引用路径保持一致。
+            let id = new_temp(b, irt);
+            b.body.push(Stmt::BindDeref { local: id, src, line: *dl, col: *dc });
+            Ok(PrintArg::Int { ty, expr: IntExpr::Local(id) })
         }
         Ex::Un(..) | Ex::Bin(..) => {
             let irt = ir_ty_of(b.types, e, "println 实参")?;
@@ -574,7 +584,7 @@ fn lower_value(
                 return Err(SubsetError::new(*dl, *dc, "lower：解引用结果类型非 i64"));
             }
             let id = new_temp(b, Ty::I64);
-            b.body.push(Stmt::BindI64Deref { local: id, src, line: *dl, col: *dc });
+            b.body.push(Stmt::BindDeref { local: id, src, line: *dl, col: *dc });
             Ok(Value::Int { ty: IntTy::I64, expr: IntExpr::Local(id) })
         }
         Ex::Tup(es, _, _) => {
@@ -1012,8 +1022,14 @@ fn ast_to_ir(t: &AstTy) -> Option<Ty> {
         AstTy::Prim("unit") => Some(Ty::Unit),
         AstTy::Prim("f32") => Some(Ty::F32),
         AstTy::Prim("f64") => Some(Ty::F64),
-        AstTy::BoxTy(inner) if matches!(inner.as_ref(), AstTy::Prim("i64")) => {
-            Some(Ty::Box(Box::new(Ty::I64)))
+        AstTy::BoxTy(inner) => {
+            let payload = match inner.as_ref() {
+                AstTy::Prim("i64") => Ty::I64,
+                AstTy::Prim("u8") => Ty::U8,
+                AstTy::Prim("u32") => Ty::U32,
+                _ => return None,
+            };
+            Some(Ty::Box(Box::new(payload)))
         }
         _ => None,
     }
@@ -1121,10 +1137,9 @@ fn lower_int_expr(
     }
 }
 
-fn int_lit(e: &Ex) -> Result<i64, SubsetError> {
+fn box_lit(e: &Ex, ty: IntTy) -> Result<i128, SubsetError> {
     match e {
-        Ex::Lit(Lit::Int(v), l, c) => i64::try_from(*v)
-            .map_err(|_| SubsetError::new(*l, *c, "lower：整型字面量超出 i64")),
+        Ex::Lit(Lit::Int(v), _, _) => int_const(v, ty, e),
         other => {
             let (l, c) = subset::expr_span(other);
             Err(SubsetError::new(l, c, "lower：box 载荷非整型字面量"))
@@ -1291,7 +1306,7 @@ mod tests {
         let b = body("fn main() {\n    let b = box 1;\n    let v = *b;\n    unbox b;\n}\n");
         assert_eq!(b.len(), 3, "{b:?}");
         assert!(matches!(b[0], Stmt::BindBox { value: 1, .. }));
-        assert!(matches!(b[1], Stmt::BindI64Deref { .. }));
+        assert!(matches!(b[1], Stmt::BindDeref { .. }));
         assert!(matches!(b[2], Stmt::Unbox { .. }));
     }
 
@@ -1303,11 +1318,11 @@ mod tests {
         assert_eq!(b.len(), 4, "{b:?}");
         assert!(matches!(b[0], Stmt::BindBox { local: LocalId(0), value: 42, .. }));
         let temp = match &b[1] {
-            Stmt::BindI64Deref { local, src, .. } => {
+            Stmt::BindDeref { local, src, .. } => {
                 assert_eq!(src.0, 0, "解引用源必须是 Box 槽位");
                 *local
             }
-            other => panic!("expected BindI64Deref, got {other:?}"),
+            other => panic!("expected BindDeref, got {other:?}"),
         };
         assert_ne!(temp.0, 0, "临时量不得复用 Box 槽位 id");
         match &b[2] {

@@ -206,6 +206,11 @@ impl<'a> Ck<'a> {
         self.structs.contains_key(n) || self.enums.contains_key(n)
     }
 
+    /// L2f typed Box 载荷白名单：仅 i64／u8／u32（check 期望下推用）。
+    fn l2f_box_payload(t: &Ty) -> bool {
+        matches!(t, Ty::Prim(p) if matches!(*p, "i64" | "u8" | "u32"))
+    }
+
     /// R1 §5 Copy 集结构判定：prim/unit Copy；数组/元组/struct/enum 成员全 Copy 才 Copy；
     /// Box 非 Copy；&T Copy、&mut T unique-move 非 Copy。Bad 宽松放行。
     fn is_copy(&self, t: &Ty) -> bool {
@@ -421,7 +426,20 @@ impl<'a> Ck<'a> {
                 self.d("E1601", *l, *c, format!("let '{}' 缺少初始化（0.1.x 不支持无初始值绑定）", name));
             }
             St::Assign(lhs, rhs, l, c) => {
-                let rt = self.check_expr(rhs, None, env);
+                // L2f C2：仅当 lhs 为三型 Box 且 rhs 为 box 字面量时，把 Box<T>
+                // 期望传给右值（重赋值 `a = box 2` 的宽度推断）；其余保持 None。
+                let rhs_expect = if matches!(rhs, Ex::Box(..)) {
+                    match lhs {
+                        Ex::Path(n, _, _) => env.get(n).and_then(|v| match &v.ty {
+                            Ty::BoxTy(p) if Self::l2f_box_payload(p) => Some(Ty::BoxTy(p.clone())),
+                            _ => None,
+                        }),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                let rt = self.check_expr(rhs, rhs_expect.as_ref(), env);
                 self.note_move_src(rhs, &rt, env);
                 let lt = match lhs {
                     Ex::Path(n, ll, lc) => {
@@ -617,7 +635,13 @@ impl<'a> Ck<'a> {
                 }
             }
             Ex::Box(inner, _, _) => {
-                let t = self.check_expr(inner, None, env);
+                // L2f C1：标注 Box<T>（T 三型）时把载荷期望下推给字面量，
+                // 仅影响字面量宽度推断；其余 Box 载荷维持原推断（None）。
+                let payload_expect = match expect {
+                    Some(Ty::BoxTy(p)) if Self::l2f_box_payload(p) => Some((**p).clone()),
+                    _ => None,
+                };
+                let t = self.check_expr(inner, payload_expect.as_ref(), env);
                 // 值移入堆句柄（R2 §1 移动点：box 构造）
                 self.note_move_src(inner, &t, env);
                 Ty::BoxTy(Box::new(t))

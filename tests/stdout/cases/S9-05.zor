@@ -1,0 +1,10 @@
+fn main() {
+    let a: Box<u8> = box 1;
+    let b: Box<u32> = box 2;
+    println(*a);
+    println(*a);
+    println(*b);
+    println(*b);
+    unbox a;
+    unbox b;
+}

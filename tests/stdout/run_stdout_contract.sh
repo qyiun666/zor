@@ -16,8 +16,8 @@
 #   显式 FAIL 优先；任一段 FAIL → 脚本 rc=1。
 #
 # 判据：
-#   - 静态：62 runtime＋10 negative＋14 CLI＝86；new-cases 86；schema／路径／重复／expected 缺件。
-#   - 旧资产快照：legacy-snapshot.sha256 逐文件 sha256；l2c-baseline.sha256 锁 69 条未变用例；
+#   - 静态：71 runtime（65+6）＋32 negative（12+20）＋17 CLI＝120；new-cases 120；schema／路径／重复／expected 缺件。
+#   - 旧资产快照：legacy-snapshot.sha256 逐文件 sha256；l2c-baseline.sha256 锁 68 条未变用例；
 #     旧五值／runtime-codes／manifest 计数复核。
 #   - runtime：两轮构建＋运行；stdout 逐字节 cmp；run 模式 stderr 0 B；terminate 模式 rc=101 且只判 stdout。
 #   - negative：两轮 rc=1、零产物、stderr 含判词；不新增 E 码。
@@ -31,6 +31,8 @@ REPO_ROOT_REAL="$(cd "$REPO_ROOT" && pwd -P)"
 STDOUT_DIR="$REPO_ROOT/tests/stdout"
 RUNTIME_TSV="$STDOUT_DIR/stdout-cases.tsv"
 NEGATIVE_TSV="$STDOUT_DIR/negative.tsv"
+L2F_RUNTIME_TSV="$STDOUT_DIR/l2f-cases.tsv"
+L2F_NEGATIVE_TSV="$STDOUT_DIR/l2f-negative.tsv"
 CLI_TSV="$STDOUT_DIR/cli-cases.tsv"
 NEW_TSV="$STDOUT_DIR/new-cases.tsv"
 SNAPSHOT="$STDOUT_DIR/legacy-snapshot.sha256"
@@ -42,10 +44,16 @@ OUT_DIR="${OUT_DIR:-}"
 STRICT=0
 VALIDATE_ONLY=0
 ALLOW_NONLINUX=0
-EXPECT_RUNTIME=65
-EXPECT_NEGATIVE=12
+EXPECT_RUNTIME_LEGACY=65
+EXPECT_RUNTIME_L2F=6
+EXPECT_RUNTIME=71
+EXPECT_NEGATIVE_LEGACY=12
+EXPECT_NEGATIVE_L2F=20
+EXPECT_NEGATIVE=32
 EXPECT_CLI=17
-EXPECT_TOTAL=94
+EXPECT_TOTAL=120
+RUNTIME_ALL=""
+NEGATIVE_ALL=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -95,7 +103,7 @@ cli_fail_msg() { cli_fail+=("$1"); cli_n=$((cli_n+1)); }
 # ---------- 静态校验 ----------
 validate_assets() {
   local bad=0
-  for f in "$RUNTIME_TSV" "$NEGATIVE_TSV" "$CLI_TSV" "$NEW_TSV" "$SNAPSHOT" "$L2C_BASELINE" "$NDJSON_CHECK"; do
+  for f in "$RUNTIME_TSV" "$NEGATIVE_TSV" "$L2F_RUNTIME_TSV" "$L2F_NEGATIVE_TSV" "$CLI_TSV" "$NEW_TSV" "$SNAPSHOT" "$L2C_BASELINE" "$NDJSON_CHECK"; do
     if [ ! -f "$f" ]; then
       so_fail_msg "缺件:${f#$REPO_ROOT/}"
       bad=1
@@ -108,6 +116,10 @@ validate_assets() {
   [ "$hdr" = $'case_id\tsource_path\tmode\texpect_rc\texpect_stdout\tflags\tnotes' ] || { so_fail_msg "stdout-cases.tsv 表头"; bad=1; }
   hdr="$(head -n1 "$NEGATIVE_TSV")"
   [ "$hdr" = $'case_id\tsource_path\texpect_rc\texpect_artifact\texpect_stderr_contains\texpect_stderr_not_contains\tnotes' ] || { so_fail_msg "negative.tsv 表头"; bad=1; }
+  hdr="$(head -n1 "$L2F_RUNTIME_TSV")"
+  [ "$hdr" = $'case_id\tsource_path\tmode\texpect_rc\texpect_stdout\tflags\tnotes' ] || { so_fail_msg "l2f-cases.tsv 表头"; bad=1; }
+  hdr="$(head -n1 "$L2F_NEGATIVE_TSV")"
+  [ "$hdr" = $'case_id\tsource_path\texpect_rc\texpect_artifact\texpect_stderr_contains\texpect_stderr_not_contains\tnotes' ] || { so_fail_msg "l2f-negative.tsv 表头"; bad=1; }
   hdr="$(head -n1 "$CLI_TSV")"
   [ "$hdr" = $'case_id\tmode\targs\texpect_rc\tnotes' ] || { so_fail_msg "cli-cases.tsv 表头"; bad=1; }
   hdr="$(head -n1 "$NEW_TSV")"
@@ -115,9 +127,13 @@ validate_assets() {
   [ "$bad" = 0 ] || return 1
 
   rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$RUNTIME_TSV")"
-  [ "$rows" = "$EXPECT_RUNTIME" ] || { so_fail_msg "runtime 行数=$rows 期望 $EXPECT_RUNTIME"; bad=1; }
+  [ "$rows" = "$EXPECT_RUNTIME_LEGACY" ] || { so_fail_msg "legacy runtime 行数=$rows 期望 $EXPECT_RUNTIME_LEGACY"; bad=1; }
+  rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$L2F_RUNTIME_TSV")"
+  [ "$rows" = "$EXPECT_RUNTIME_L2F" ] || { so_fail_msg "L2f runtime 行数=$rows 期望 $EXPECT_RUNTIME_L2F"; bad=1; }
   rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$NEGATIVE_TSV")"
-  [ "$rows" = "$EXPECT_NEGATIVE" ] || { so_fail_msg "negative 行数=$rows 期望 $EXPECT_NEGATIVE"; bad=1; }
+  [ "$rows" = "$EXPECT_NEGATIVE_LEGACY" ] || { so_fail_msg "legacy negative 行数=$rows 期望 $EXPECT_NEGATIVE_LEGACY"; bad=1; }
+  rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$L2F_NEGATIVE_TSV")"
+  [ "$rows" = "$EXPECT_NEGATIVE_L2F" ] || { so_fail_msg "L2f negative 行数=$rows 期望 $EXPECT_NEGATIVE_L2F"; bad=1; }
   rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$CLI_TSV")"
   [ "$rows" = "$EXPECT_CLI" ] || { so_fail_msg "CLI 行数=$rows 期望 $EXPECT_CLI"; bad=1; }
   rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$NEW_TSV")"
@@ -139,6 +155,21 @@ validate_assets() {
     case "$flags" in ""|-|-O0) ;; *) so_fail_msg "$cid flags 非法:$flags"; bad=1 ;; esac
   done < "$RUNTIME_TSV"
 
+  while IFS=$'\t' read -r cid src mode erc exp flags note; do
+    [ "$cid" = "case_id" ] && continue
+    [ -n "$cid" ] || continue
+    case "$seen" in *" $cid "*) so_fail_msg "重复 ID:$cid"; bad=1 ;; esac
+    seen="$seen$cid "
+    case "$cid" in S9-0[1-6]) ;; *) so_fail_msg "非法 L2f runtime ID:$cid"; bad=1 ;; esac
+    case "$src" in tests/stdout/cases/*) ;; *) so_fail_msg "$cid 源路径不在 tests/stdout/cases"; bad=1 ;; esac
+    [ -f "$REPO_ROOT/$src" ] || { so_fail_msg "$cid 源缺件:$src"; bad=1; }
+    case "$exp" in expected/*) ;; *) so_fail_msg "$cid expected 路径非法"; bad=1 ;; esac
+    [ -f "$STDOUT_DIR/$exp" ] || { so_fail_msg "$cid expected 缺件:$exp"; bad=1; }
+    case "$mode" in run|stdout-terminate) ;; *) so_fail_msg "$cid mode 非法:$mode"; bad=1 ;; esac
+    case "$erc" in 0|101) ;; *) so_fail_msg "$cid expect_rc 非法:$erc"; bad=1 ;; esac
+    case "$flags" in ""|-|-O0) ;; *) so_fail_msg "$cid flags 非法:$flags"; bad=1 ;; esac
+  done < "$L2F_RUNTIME_TSV"
+
   local contains notc artifact
   while IFS=$'\t' read -r cid src erc artifact contains notc note; do
     [ "$cid" = "case_id" ] && continue
@@ -150,6 +181,23 @@ validate_assets() {
     [ "$artifact" = "none" ] || { so_fail_msg "$cid expect_artifact 非 none"; bad=1; }
     [ -n "$contains" ] || { so_fail_msg "$cid 缺 stderr 判词"; bad=1; }
   done < "$NEGATIVE_TSV"
+
+  while IFS=$'\t' read -r cid src erc artifact contains notc note; do
+    [ "$cid" = "case_id" ] && continue
+    [ -n "$cid" ] || continue
+    case "$seen" in *" $cid "*) so_fail_msg "重复 ID:$cid"; bad=1 ;; esac
+    seen="$seen$cid "
+    case "$cid" in N-1[6-9]|N-2[0-9]|N-3[0-5]) ;; *) so_fail_msg "非法 L2f negative ID:$cid"; bad=1 ;; esac
+    [ -f "$REPO_ROOT/$src" ] || { so_fail_msg "$cid 源缺件:$src"; bad=1; }
+    [ "$erc" = "1" ] || { so_fail_msg "$cid expect_rc 非 1"; bad=1; }
+    [ "$artifact" = "none" ] || { so_fail_msg "$cid expect_artifact 非 none"; bad=1; }
+    case "$contains" in E1201|"box 载荷非整型字面量"|"let 类型标注"|"println 实参不可打印"|E2301) ;; *) so_fail_msg "$cid 判词不在固定集合:$contains"; bad=1 ;; esac
+    [ "$notc" = "zor: runtime error" ] || { so_fail_msg "$cid 禁词非固定值"; bad=1; }
+  done < "$L2F_NEGATIVE_TSV"
+
+  local dups
+  dups="$(awk -F'\t' 'FNR>1 && NF {print $1}' "$RUNTIME_TSV" "$L2F_RUNTIME_TSV" "$NEGATIVE_TSV" "$L2F_NEGATIVE_TSV" "$CLI_TSV" | sort | uniq -d)"
+  [ -z "$dups" ] || { so_fail_msg "跨 TSV 重复 ID:$(printf '%s' "$dups" | tr '\n' ',')"; bad=1; }
 
   while IFS=$'\t' read -r cid mode args erc note; do
     [ "$cid" = "case_id" ] && continue
@@ -230,6 +278,13 @@ run_capture() { # run_capture <rcfile> <outfile> <errfile> <timeout> <cmd...>
   return 0
 }
 
+build_merged_tsvs() {
+  RUNTIME_ALL="$OUT_DIR/runtime-all.tsv"
+  NEGATIVE_ALL="$OUT_DIR/negative-all.tsv"
+  { head -n1 "$RUNTIME_TSV"; tail -n +2 "$RUNTIME_TSV"; tail -n +2 "$L2F_RUNTIME_TSV"; } > "$RUNTIME_ALL"
+  { head -n1 "$NEGATIVE_TSV"; tail -n +2 "$NEGATIVE_TSV"; tail -n +2 "$L2F_NEGATIVE_TSV"; } > "$NEGATIVE_ALL"
+}
+
 # ---------- runtime ----------
 run_runtime() {
   local cid src mode erc exp flags note round work bin rc stdout stderr
@@ -277,7 +332,7 @@ run_runtime() {
       [ "$ok" = 1 ] || break
     done
     [ "$ok" = 1 ] && echo "[stdout-contract] PASS $cid"
-  done < "$RUNTIME_TSV"
+  done < "$RUNTIME_ALL"
 }
 
 # ---------- negative ----------
@@ -298,6 +353,10 @@ run_negative() {
       rc="$(cat "$work/rc")"
       if [ "$rc" != "$erc" ]; then so_fail_msg "$cid r$round rc=$rc 期望 $erc"; ok=0; fi
       if [ -e "$out" ]; then so_fail_msg "$cid r$round 产物存在"; ok=0; fi
+      if [ "$rc" = "2" ]; then so_fail_msg "$cid r$round rc=2（禁止 cc/CLI 误用）"; ok=0; fi
+      if grep -Eq '(^|[^A-Za-z0-9_])error:|undeclared identifier' "$work/stderr"; then
+        so_fail_msg "$cid r$round stderr 命中 cc 失败文本"; ok=0
+      fi
       if ! grep -qF -- "$contains" "$work/stderr"; then so_fail_msg "$cid r$round stderr 缺判词 '$contains'"; ok=0; fi
       if [ -n "$notc" ] && grep -qF -- "$notc" "$work/stderr"; then so_fail_msg "$cid r$round stderr 含禁词 '$notc'"; ok=0; fi
       local sha; sha="$(sha256_of "$work/stderr")"
@@ -308,7 +367,7 @@ run_negative() {
       [ "$ok" = 1 ] || break
     done
     [ "$ok" = 1 ] && echo "[stdout-contract] PASS $cid"
-  done < "$NEGATIVE_TSV"
+  done < "$NEGATIVE_ALL"
 }
 
 # ---------- locale（D-L2c-15，仅浮点 8 条；不改 CI job） ----------
@@ -564,6 +623,7 @@ if [ "$VALIDATE_ONLY" = 0 ] && [ -z "$TIMEOUT_BIN" ] && [ "$ALLOW_NONLINUX" = 0 
 fi
 
 if [ "$static_bad" = 0 ] && [ "$so_n" -eq 0 ]; then
+  build_merged_tsvs
   run_runtime
   run_negative
 fi

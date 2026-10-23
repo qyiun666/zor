@@ -181,23 +181,25 @@ pub enum Stmt {
         line: usize,
         col: usize,
     },
-    /// `let x = box <int>;`：新建 Box 载荷（emit：malloc）。
+    /// `let x = box <int>;`：新建 Box 载荷（emit：malloc；`ty` 为载荷宽度）。
     BindBox {
         local: LocalId,
-        value: i64,
+        ty: IntTy,
+        value: i128,
         line: usize,
         col: usize,
     },
     /// `x = box <int>;`：重初始化；`drop_dst` 由 lower 静态判定（emit：必要时先 free）。
     BindBoxAssign {
         local: LocalId,
-        value: i64,
+        ty: IntTy,
+        value: i128,
         drop_dst: bool,
         line: usize,
         col: usize,
     },
-    /// `let v = *b;`：读 Box 载荷（Copy 结果）。
-    BindI64Deref {
+    /// `let v = *b;`：读 Box 载荷（Copy 结果）；宽度由 `local` 的 `Ty` 决定。
+    BindDeref {
         local: LocalId,
         src: LocalId,
         line: usize,
