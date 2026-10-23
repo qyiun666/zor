@@ -55,7 +55,9 @@ bash tests/stdout/run_stdout_contract.sh --strict
 - S9 三型：`Box<i64>`／`Box<u8>`／`Box<u32>` 注解构造；S9-01 为 `box 0`／`i64::MAX`，无 `i64::MIN`；六档为执行维度，不增 TSV 行。
 - S10 五宽：`Box<i8>`／`Box<i16>`／`Box<i32>`／`Box<u16>`／`Box<u64>` 注解构造；逐宽 0／max、五宽混排、重复读＋unbox、重赋值、默认 `box 1` 仍 `Box<i64>`；六档为执行维度，不增 TSV 行。
 - S11 六形式：`f64::NAN`／`f64::INFINITY`／`f64::NEG_INFINITY`／`f32::NAN`／`f32::INFINITY`／`f32::NEG_INFINITY` 逐条；S11-07 多实参 f32／f64／整型混排；S11-08 Copy 重复读并守卫裸 `nan` 仍为标识符；S11-09 守卫零／`-0` 双宽、有限非字面量 `-x` rc=0、有限浮点复合 `(1.5, 1)` rc=0。
-- L2i 复合：S12-01～19 覆盖 tuple／array／struct 常量成员、混合宽度、既有嵌套、投影（仅 `println` 实参）、struct 定义序、多实参／重复读、绑定别名（S12-19）；N-82～112 覆盖算术／比较／条件、Box 浮点、枚举载荷、非恒定元素／非字面量／越界下标、E1201／E1202、NaN 载荷、其他 `::`、裸 `nan`、投影 let fail-closed。S12 expected 在 Stage-2 捕获，Stage-1 不预写。
+- L2i 复合：S12-01～19 覆盖 tuple／array／struct 常量成员、混合宽度、既有嵌套、投影（仅 `println` 实参）、struct 定义序、多实参／重复读、绑定别名（S12-19）；N-82～112 覆盖算术／比较／条件、Box 浮点、枚举载荷、非字面量／越界下标、E1201／E1202、NaN 载荷、其他 `::`、裸 `nan`、投影 let fail-closed。S12 expected 在 Stage-2 捕获，Stage-1 不预写。
 - N-50～62：浮点算术／比较／条件 fail-closed；N-63～65：特殊值一元负号（`-f64::NAN`／`-f32::INFINITY` E1201，绑定后 `-x` rc=1）；N-66：`box` 浮点载荷 codegen；N-67：浮点 `unbox` 于非 Box E1201；N-68／69：隐式整型↔浮点 E1202；N-70／71：跨宽特殊值 E1201；N-72～77、N-79／80：非六形式 `Type::member`／后缀／裸标识符 E1101；N-78：`println` 上下文中的非六形式 member E1101；N-81：复合内特殊值 fail-closed（codegen）。
 - N-36～49：五宽越界、负数／非字面量载荷、非 Box 算术零扩容、非 i64 Box 参数／返回／字段、复合打印、重赋值越界；不得新增 E 码。
 - **Stage-1.1 判词订正（L2g）**：N-45／N-46 为 `额外函数 'f'（首片只支持 main）`；N-47 为 `let 初始化复合值不可打印或形态不支持`；其余 11 条同 Stage-1（N-41／N-42 `box 载荷非整型字面量`；N-48 `println 实参不可打印`；E1201 8 条）。仅判词订正，9／14 与活跃 L2g 138 不变。
+
+- **Stage-1 v1.1 订正（N-97）**：别名绑定特殊值作 array 元素在实现后为正例（与 S12-19 同义），原“非恒定数组元素”负控前提失效；N-97 同 ID 改为“含特殊值数组的非字面量下标”（`let a: [f64;2] = [f64::NAN, 1.5]; let i = 0; println(a[i]);`），head `6bacb3a` 实测 codegen rc=1、零产物；31 条与 token 分布 E1201 7／E1202 3／E1101 4／codegen 17 不变。

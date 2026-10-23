@@ -14,7 +14,7 @@ N-93	tests/stdout/cases/N-93.zor	1	none	E1201	zor: runtime error	Box<f32> width 
 N-94	tests/stdout/cases/N-94.zor	1	none	zorcc: codegen:	zor: runtime error	box special payload
 N-95	tests/stdout/cases/N-95.zor	1	none	zorcc: codegen:	zor: runtime error	Box<f64> float literal
 N-96	tests/stdout/cases/N-96.zor	1	none	E1101	zor: runtime error	enum tuple-variant special payload (parse fail-closed; L2j)
-N-97	tests/stdout/cases/N-97.zor	1	none	zorcc: codegen:	zor: runtime error	non-constant array element
+N-97	tests/stdout/cases/N-97.zor	1	none	zorcc: codegen:	zor: runtime error	non-literal index on array containing specials (v1.1; alias element is positive)
 N-98	tests/stdout/cases/N-98.zor	1	none	zorcc: codegen:	zor: runtime error	non-literal array index
 N-99	tests/stdout/cases/N-99.zor	1	none	zorcc: codegen:	zor: runtime error	out-of-range index
 N-100	tests/stdout/cases/N-100.zor	1	none	E1201	zor: runtime error	unknown struct field
