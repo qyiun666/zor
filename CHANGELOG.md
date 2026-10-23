@@ -4,6 +4,42 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.5] - 2026-10-23
+
+内部验证里程碑，非可用语言版本：本版为 L2f「typed Box 三型与双基线门禁」——在 0.3.4 的六档 `-O*` 与 `println(*b)` 修复之上，把 `println(*b)` 的载荷覆盖扩至 `Box<i64>`／`Box<u8>`／`Box<u32>` 三型整数注解构造，打印、重复读取、`unbox` 与 drop 语义保持；同时把 `l2e-baseline` 与 `l2f-baseline` 双基线接入 `ci/run_ci.sh` 的 `stdout-contract` 阶段 fail-closed 校验。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装承诺或生产环境可用性承诺。
+
+本版口径：typed Box 仅三型 `Box<i64>`／`Box<u8>`／`Box<u32>`，构造为 `let b: Box<T> = box <非负整数字面量>;`，载荷仅非负整数字面量；`Box<i64>` 范围 0～`i64::MAX`（min=0），`i64::MIN` 不可构造（N/A），`box -1` 维持 fail-closed；默认 `box 1` 仍为 `Box<i64>`。`println(*b)` 对三型按十进制输出，支持单实参、多实参（含同调用多个 Box 解引用）与重复读取，不消费 Box、作用域结束只 drop 一次，`unbox` 语义不变；六档 `-O*` 输出一致。`println(b)`、`Box<Box<T>>`、`Box<struct>`、`Box<[T;N]>`、含 Box 的复合值、其余 9 个原始类型与 `unit` 的 Box 维持 rc=1 fail-closed，不新增 E 码。计数 **124**＝stdout **120**（runtime 71＋负控 32＋CLI 17）＋packaging **4**；全量 **188**；runtime-codes **39＋6＋19**（64 行）；`l2f-baseline` **188** 条（sha256 清单 246 行）；`l2e-baseline` **162** 条（sha256 清单 209 行）零改；`l2c-baseline` **68** 条（sha256 清单 105 行）、`legacy-snapshot` **226** 零改。NaN 端到端与跨平台证据均 N/A；Linux x86_64 为唯一终证，macOS 仅辅助。
+
+### Added
+
+- **typed Box 三型**：`Box<i64>`／`Box<u8>`／`Box<u32>` 注解构造按声明宽度推断载荷类型（check 期望下推约 22 行，仅宽度推断，不改所有权／类型规则）；IR 解引用泛化，C 后端按 `int64_t*`／`uint8_t*`／`uint32_t*` 与对应十进制格式输出。
+- **`println(*b)` 三型覆盖**：单实参、多实参、同调用多个 Box 解引用（`println(*a, *b, *c)`）与重复读取；不消费 Box、不 move／unbox／drop 载荷，作用域结束只 drop 一次；`unbox` 后不得再读（既有 E2301）。
+- **双基线门禁**：`ci/run_ci.sh` 的 `stdout-contract` 阶段校验 `l2e-baseline`（162／209／209）与 `l2f-baseline`（188／246／246），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿。
+
+### Changed
+
+- **计数与资产**：stdout 由 **94**（65＋12＋17）扩至 **120**（71＋32＋17）＋packaging 4＝**124**（0.3.4 总 98 → 124）；全量 **162 → 188**；`l2f-baseline` 新建 188 条（sha256 清单 246 行）；`l2e-baseline` 162 条（209 行）、`l2c-baseline` 68 条（105 行）、`legacy-snapshot` 226 条零改；runtime-codes 维持 39＋6＋19（64 行）。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.4` 落至 `0.3.5`；`compiler/Cargo.toml:5` description 版本串同步；`compiler/Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.5`。
+- **CI**：不新建 job、不改 workflow YAML、不改 ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2f-01：**PASS**——main `c2923d2a59de56e7f6e992efce075002801d3805`；run `39902624395`；`baseline`／`asan-linux`／`runtime-codes`／`stdout-contract`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2e-baseline|cases=162 files=209 unique=209 fail=0`；`PASS|l2f-baseline|cases=188 files=246 unique=246 fail=0`；`PASS|stdout-contract|runtime=71 negative=32 fail=0 ran=71/32`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：baseline 七段 **7/7**；asan-linux 八段 **8/8**（`R=7` ASAN／LSAN 零报告）；`cargo test` **281/0**；`l2f-baseline` **246/246**、`l2e-baseline` **209/209**、`l2c-baseline` **105/105**、`legacy-snapshot` **226/226**；`compiler/src` E30xx 字面 **0**；`--help` 706 B 与 0.3.4 逐字节 SAME；`Box<i64>` C 快照与 0.3.4 逐字节 SAME；全 job `SKIP|` 0 行。
+- 证据：GATE 报告 `shared/ZOR-L2f-GATE-01-20261023/REPORT.md`（sha256 `6f5f8f12cf5da12070312fe562dc96c6d3417a9a9eec85e95ee9799aeb55f285`）；证据包 `SHA256SUMS`（16 文件）`3632abbff39dbb9f1d802972490f10d07d96573bec06c229261ff4060c1743f2`；Stage-2 expected 六条与产品会签逐字节一致（`evidence/CAPTURE.md` `e9431055368058cdefba22636e6ec63210df77dbd0bedf93c958a9c4fced9d66`）。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **typed Box 覆盖**：仅 `i64`／`u8`／`u32` 三型；其余 9 个原始类型、`unit`、嵌套与复合 Box 维持 fail-closed，另票跟踪。
+- **载荷形态**：仅非负整数字面量；`i64::MIN` 不可构造（N/A），`box -1` fail-closed；不放开有符号负字面量、算术表达式、标识符与函数返回值。
+- **`let v = *b`**：仅核心单测覆盖，不列入 stdout 新验收面、不计入 124／188，不作为用户能力表述。
+- **NaN**：端到端源形态 N/A；格式化位模式单测保持，不列入本版判据。
+- **平台**：Linux x86_64 为唯一终证；macOS 仅辅助，不作判据；Windows／其他发行版不在本版。
+- **PA-L2f**：PA-L2f-01～07 待 0.3.5 账本合并后执行。
+- **性能**：`-O*` 只承诺接受与 C 编译器映射，不出性能数字、不作达标承诺。
+- 零 tag／Release；不构成安装、包管理器、跨平台或生产环境可用性承诺。
+
 ## [0.3.4] - 2026-10-23
 
 内部验证里程碑，非可用语言版本：本版为 L2e「用户可见优化档、`--help` 与 `println(*b)` 修复」——在 0.3.3 的 stdout／CLI 与复合输出之上，开闸 `-O0`／`-O1`／`-O2`／`-O3`／`-Os`／`-Og` 六档并映射 C 编译器同名旗标，新增固定 `--help`，修复 `println(*b)` 的 `Box<i64>` 单 Box 解引用路径；安装树 `packaging-smoke` 仍为 advisory，待账本合并后连续两次 main 全绿再切 required。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装承诺或生产环境可用性承诺。
