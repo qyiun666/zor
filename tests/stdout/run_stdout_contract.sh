@@ -246,7 +246,7 @@ validate_assets() {
     [ -f "$REPO_ROOT/$src" ] || { so_fail_msg "$cid 源缺件:$src"; bad=1; }
     [ "$erc" = "1" ] || { so_fail_msg "$cid expect_rc 非 1"; bad=1; }
     [ "$artifact" = "none" ] || { so_fail_msg "$cid expect_artifact 非 none"; bad=1; }
-    case "$contains" in E1201|"box 载荷非整型字面量"|"let 类型标注"|"println 实参不可打印"|E2301) ;; *) so_fail_msg "$cid 判词不在固定集合:$contains"; bad=1 ;; esac
+    case "$contains" in E1201|"box 载荷非整型字面量"|"let 类型标注"|"println 实参不可打印"|E2301|"额外函数 'f'（首片只支持 main）"|"let 初始化复合值不可打印或形态不支持") ;; *) so_fail_msg "$cid 判词不在固定集合:$contains"; bad=1 ;; esac
     [ "$notc" = "zor: runtime error" ] || { so_fail_msg "$cid 禁词非固定值"; bad=1; }
   done < "$L2G_NEGATIVE_TSV"
 
