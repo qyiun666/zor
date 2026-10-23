@@ -4,6 +4,44 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.7] - 2026-10-23
+
+内部验证里程碑，非可用语言版本：本版为 L2h「f32／f64 特殊值源形态与打印」——在 0.3.6 的 8 个整型宽度 typed Box 与三基线之上，新增六个特殊值源形态 `f64::NAN`／`f64::INFINITY`／`f64::NEG_INFINITY`／`f32::NAN`／`f32::INFINITY`／`f32::NEG_INFINITY` 及 `println` 的 `nan`／`inf`／`-inf` 字节输出，并把 `l2h-baseline` 接入 `stdout-contract`，形成 `l2e`／`l2f`／`l2g`／`l2h` 四基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装承诺或生产环境可用性承诺。
+
+本版口径：新增仅为六个特殊值源形态与打印；有限 `f32`／`f64` 字面量与打印（含 `-0`／`0`／`inf`／`-inf` 既有源）为 0.3.6 既有能力、L2h 零改。六形式按宽度严格：`let x: f32 = f64::NAN;` 及反向 → E1201；整型标注 → E1202；不新增 E 码。`println` 输出小写 `nan`／`inf`／`-inf`，负零 `-0`、正零 `0`；有限值沿用最短往返与既有十进制／科学记数法阈值；支持多实参与重复读取；编译期字节输出，无运行期浮点库依赖。特殊值一元负号 → E1201（`-f64::NAN`、`let x = f64::NAN; -x`），有限非字面量 `-x` 保持 0.3.6 行为 rc=0；复合（tuple／array／struct）内特殊值与经绑定别名的特殊值 fail-closed；`Box<f32>`／`Box<f64>`／`box <float>`／浮点 `unbox`、浮点算术／比较／条件、隐式数值转换均维持 fail-closed；`::` 仅六形式，其他 `Type::member`、裸 `nan`／`inf`、`f64::NAN()` → E1101；`1e999`／`-1e999`／`1e-999` 既有行为保持；NaN 载荷／signaling N/A。计数：L2h 活跃 stdout **179**（runtime 89＋负控 73＋CLI 17）＋packaging **4**＝**183**；活跃全量 **247**；`l2h-baseline` **247** 条（sha256 清单 327 行）；0.3.6 历史 **142**／全量 **206** 冻结不漂移；`l2e-baseline` **162** 条（209 行）、`l2f-baseline` **188** 条（246 行）、`l2g-baseline` **206** 条（275 行）、`l2c-baseline` **68** 条（105 行）、`legacy-snapshot` **226** 条、runtime-codes **39＋6＋19**、`new-cases.tsv` **120** 均零改。① 本切片按上；② 跨平台证据 N/A（Linux x86_64 唯一终证，macOS 仅辅助）；③ 安装／包管理器不做；④ 文档债 doc-only（不进本账本）。
+
+### Added
+
+- **六个特殊值源形态**：`f64::NAN`／`f64::INFINITY`／`f64::NEG_INFINITY`、`f32::NAN`／`f32::INFINITY`／`f32::NEG_INFINITY`；`Ex::FloatSpecial(width,kind)`，`p_atom` 识别双冒号＋精确成员，不改 lexer、不新增关键字；宽度严格 E1201／E1202。
+- **特殊值打印**：`println` 输出 `nan`／`inf`／`-inf`；复用既有编译期 `float_fmt` 字节路径，无运行期浮点库、无 locale 依赖；支持多实参、重复读取、`-0`／`0`。
+- **`l2h-baseline` 第四基线**：`ci/run_ci.sh` 的 `stdout-contract` 阶段在 `l2e`／`l2f`／`l2g` 之后校验 `l2h-baseline`（247／327／327），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿。
+
+### Changed
+
+- **计数与资产**：活跃 stdout 由 **138**（80／41／17）扩至 **179**（89／73／17）＋packaging 4＝**183**；活跃全量 **206 → 247**；`l2h-baseline` 新建 247 条（sha256 清单 327 行）；`l2e` 162／209、`l2f` 188／246、`l2g` 206／275、`l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 零改；0.3.6 历史 142／206 冻结不漂移。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.6` 落至 `0.3.7`；`compiler/Cargo.toml:5` description 版本串同步；`compiler/Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.7`（以账本实测为准）。
+- **CI**：四基线并存；不新建 job、不改 workflow YAML、不改 ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2h-01：**PASS**——main `8f8546aa668a0f461cbc93fec80f59984ccd027a`；run `39993064651`；`baseline`／`asan-linux`／`runtime-codes`／`stdout-contract`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2e-baseline|cases=162 files=209 unique=209 fail=0`；`PASS|l2f-baseline|cases=188 files=246 unique=246 fail=0`；`PASS|l2g-baseline|cases=206 files=275 unique=275 fail=0`；`PASS|l2h-baseline|cases=247 files=327 unique=327 fail=0`；`PASS|stdout-contract|runtime=89 negative=73 fail=0 ran=89/73`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：四基线判词全 PASS；asan-linux **success**（`PASS|asan|exit=0`，`R=7` ASAN／LSAN 零报告）；S11-01～09 **9/9**、N-50～81 **32/32**；`l2h-baseline` **327/327**、`l2g-baseline` **275/275**、`l2f-baseline` **246/246**、`l2e-baseline` **209/209**、`l2c-baseline` **105/105**、legacy **226/226**；全 job `SKIP|`／`FAIL|` 0 行。
+- 证据：GATE 报告 `shared/ZOR-L2h-GATE-01-20261023/REPORT.md`（sha256 `cad734c472322d3a3d887945997f938c3f87e721f352910bef91b852f68c9483`）；证据包 `SHA256SUMS`（21 文件）`344bae1b4a460ade6cc89308af48ead91c076d9f090dd9a72090131b0ef71fc2`；PR #126 **65 files +1430／−44**；Stage-2 九条 expected 与产品会签 `b3deef91…6f25` 逐字节一致。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **特殊值覆盖**：仅六个精确形式；`f64::MAX`／`MIN`／`EPSILON` 等扩展常量、其他 `Type::member`、裸 `nan`／`inf`、`f64::NAN()` 维持 E1101；不新增关键字。
+- **浮点运算**：算术／比较／条件／类型转换不做；`Box<f32>`／`Box<f64>`、`box <float>`、浮点 `unbox`、复合内特殊值与绑定别名特殊值维持 fail-closed。
+- **负号口径**：特殊值一元负号 E1201；有限非字面量 `-x` 保持 rc=0；`1e999`／`-1e999`／`1e-999` 保持。
+- **复合**：特殊值进入 tuple／array／struct 或经绑定别名 fail-closed；有限浮点复合保持 0.3.6。
+- **E1101 目录**：新增单一 `err_float_member` 发点，parser 19→20、总数 29→30，仍为同一 E1101，不新增码位。
+- **NaN 载荷／signaling**：N/A，不提供载荷／符号语法。
+- **平台**：Linux x86_64 为唯一终证；macOS 仅辅助，不作判据；Windows／其他发行版不在本版。
+- **PA-L2h**：PA-L2h-01～07 待 0.3.7 账本合并后执行。
+- **性能**：`-O*` 只承诺接受与 C 编译器映射，不出性能数字、不作达标承诺。
+- 零 tag／Release；不构成安装、包管理器、跨平台或生产环境可用性承诺。
+
 ## [0.3.6] - 2026-10-23
 
 内部验证里程碑，非可用语言版本：本版为 L2g「typed Box 八宽扩容与第三基线」——在 0.3.5 的三型之上，把 typed Box 扩至 **8 个整型宽度**（新增 `Box<i8>`／`Box<i16>`／`Box<i32>`／`Box<u16>`／`Box<u64>`）的注解构造、`println(*b)`、`unbox`／drop 与局部重赋值；同时把 `l2g-baseline` 接入 `stdout-contract`，形成 `l2e`／`l2f`／`l2g` 三基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装承诺或生产环境可用性承诺。
