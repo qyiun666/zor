@@ -1,0 +1,6 @@
+fn f(b: Box<i8>) {
+    println(*b);
+}
+fn main() {
+    f(box 1);
+}

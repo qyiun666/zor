@@ -206,9 +206,12 @@ impl<'a> Ck<'a> {
         self.structs.contains_key(n) || self.enums.contains_key(n)
     }
 
-    /// L2f typed Box 载荷白名单：仅 i64／u8／u32（check 期望下推用）。
+    /// L2g typed Box 载荷白名单：8 个整型宽度（check 期望下推用）。
     fn l2f_box_payload(t: &Ty) -> bool {
-        matches!(t, Ty::Prim(p) if matches!(*p, "i64" | "u8" | "u32"))
+        matches!(
+            t,
+            Ty::Prim(p) if matches!(*p, "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64")
+        )
     }
 
     /// R1 §5 Copy 集结构判定：prim/unit Copy；数组/元组/struct/enum 成员全 Copy 才 Copy；

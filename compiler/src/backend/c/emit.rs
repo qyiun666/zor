@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 
 use super::super::ir::{
-    ArithOp, Func, IntExpr, IntTy, LocalId, PrintArg, Program, Stmt, StrArg, Ty, Value,
+    ArithOp, BoxIntTy, Func, IntExpr, IntTy, LocalId, PrintArg, Program, Stmt, StrArg, Ty, Value,
 };
 use crate::backend::OverflowMode;
 
@@ -16,6 +16,8 @@ use crate::backend::OverflowMode;
 enum Part {
     Bytes(String, usize),
     Int(IntTy, String),
+    /// L2g：五新宽度的运行期值；与三型 `Int` 分开，既有 C 文本零漂移。
+    BoxInt(BoxIntTy, String),
 }
 
 pub fn emit(prog: &Program, source_path: &str, overflow: OverflowMode) -> String {
@@ -250,6 +252,9 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
                             let v = emit_int_expr(out, expr, *ty, overflow, &mut tmp_counter);
                             parts.push(Part::Int(*ty, v));
                         }
+                        PrintArg::BoxInt { ty, local } => {
+                            parts.push(Part::BoxInt(*ty, box_int_local(*ty, local)));
+                        }
                         PrintArg::Str(StrArg::Local(id)) => {
                             let (label, len) = labels
                                 .get(id)
@@ -290,6 +295,16 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
                             Part::Int(IntTy::U8, v) | Part::Int(IntTy::U32, v) => {
                                 let _ = writeln!(out, "    printf(\"%u\", (unsigned)({}));", v);
                             }
+                            Part::BoxInt(ty, v) => {
+                                let (spec, cast) = match ty {
+                                    BoxIntTy::I8 | BoxIntTy::I16 | BoxIntTy::I32 => ("%d", "int"),
+                                    BoxIntTy::U16 => ("%u", "unsigned"),
+                                    BoxIntTy::U64 => ("%llu", "unsigned long long"),
+                                    BoxIntTy::I64 => ("%lld", "long long"),
+                                    BoxIntTy::U8 | BoxIntTy::U32 => ("%u", "unsigned"),
+                                };
+                                let _ = writeln!(out, "    printf(\"{spec}\", ({cast})({v}));");
+                            }
                         }
                     }
                 }
@@ -324,13 +339,24 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
             }
             Stmt::BindDeref { local, src: boxed, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
-                let ty = local_int_ty(f, *local).expect("deref local integer width");
+                let ty = local_box_int_ty(f, *local).expect("deref local integer width");
                 let _ = writeln!(
                     out,
                     "    {} {} = *zor_box_{};",
                     ty.c_ty(),
-                    int_local(ty, local),
+                    box_int_local(ty, local),
                     boxed.0
+                );
+            }
+            Stmt::BindBoxIntCopy { dst, src: from, line, .. } => {
+                let _ = writeln!(out, "#line {} \"{}\"", line, src);
+                let ty = local_box_int_ty(f, *dst).expect("copy local integer width");
+                let _ = writeln!(
+                    out,
+                    "    {} {} = {};",
+                    ty.c_ty(),
+                    box_int_local(ty, dst),
+                    box_int_local(ty, from)
                 );
             }
             Stmt::MoveAssign { dst, src: from, line, .. } => {
@@ -373,6 +399,21 @@ fn int_local(ty: IntTy, id: &LocalId) -> String {
     }
 }
 
+/// L2g Box 载荷局部变量名；i64／u8／u32 与 `int_local` 同名，保证三型 C 文本零漂移。
+fn box_int_local(ty: BoxIntTy, id: &LocalId) -> String {
+    let prefix = match ty {
+        BoxIntTy::I8 => "zor_i8",
+        BoxIntTy::I16 => "zor_i16",
+        BoxIntTy::I32 => "zor_i32",
+        BoxIntTy::I64 => "zor_i64",
+        BoxIntTy::U8 => "zor_u8",
+        BoxIntTy::U16 => "zor_u16",
+        BoxIntTy::U32 => "zor_u32",
+        BoxIntTy::U64 => "zor_u64",
+    };
+    format!("{prefix}_{}", id.0)
+}
+
 fn new_tmp(counter: &mut usize) -> String {
     let name = format!("zor_tmp_{}", *counter);
     *counter += 1;
@@ -384,6 +425,20 @@ fn c_int_const(v: i128, ty: IntTy) -> String {
         IntTy::I64 => c_i64(v as i64),
         IntTy::U8 => format!("UINT8_C({v})"),
         IntTy::U32 => format!("UINT32_C({v})"),
+    }
+}
+
+/// L2g Box 载荷常量：非负，宽度决定 `<stdint.h>` 常量宏。
+fn box_int_const(v: i128, ty: BoxIntTy) -> String {
+    match ty {
+        BoxIntTy::I8 => format!("INT8_C({v})"),
+        BoxIntTy::I16 => format!("INT16_C({v})"),
+        BoxIntTy::I32 => format!("INT32_C({v})"),
+        BoxIntTy::I64 => c_i64(v as i64),
+        BoxIntTy::U8 => format!("UINT8_C({v})"),
+        BoxIntTy::U16 => format!("UINT16_C({v})"),
+        BoxIntTy::U32 => format!("UINT32_C({v})"),
+        BoxIntTy::U64 => format!("UINT64_C({v})"),
     }
 }
 
@@ -529,7 +584,7 @@ fn emit_free_live(out: &mut String, id: &LocalId) {
     let _ = writeln!(out, "    }}");
 }
 
-fn emit_alloc_box(out: &mut String, id: &LocalId, ty: IntTy, value: i128) {
+fn emit_alloc_box(out: &mut String, id: &LocalId, ty: BoxIntTy, value: i128) {
     let _ = writeln!(
         out,
         "    zor_box_{} = ({} *)zor_alloc(sizeof({}));",
@@ -537,17 +592,22 @@ fn emit_alloc_box(out: &mut String, id: &LocalId, ty: IntTy, value: i128) {
         ty.c_ty(),
         ty.c_ty()
     );
-    let _ = writeln!(out, "    *zor_box_{} = {};", id.0, c_int_const(value, ty));
+    let _ = writeln!(out, "    *zor_box_{} = {};", id.0, box_int_const(value, ty));
     let _ = writeln!(out, "    zor_live_{} = 1;", id.0);
 }
 
 /// Box 本地槽位的载荷宽度（来自 lower 写入的 `Func.locals`）。
-fn box_payload_ty(f: &Func, id: LocalId) -> Option<IntTy> {
+fn box_payload_ty(f: &Func, id: LocalId) -> Option<BoxIntTy> {
     f.locals.iter().find(|l| l.id == id).and_then(|l| match &l.ty {
         Ty::Box(p) => match p.as_ref() {
-            Ty::I64 => Some(IntTy::I64),
-            Ty::U8 => Some(IntTy::U8),
-            Ty::U32 => Some(IntTy::U32),
+            Ty::I8 => Some(BoxIntTy::I8),
+            Ty::I16 => Some(BoxIntTy::I16),
+            Ty::I32 => Some(BoxIntTy::I32),
+            Ty::I64 => Some(BoxIntTy::I64),
+            Ty::U8 => Some(BoxIntTy::U8),
+            Ty::U16 => Some(BoxIntTy::U16),
+            Ty::U32 => Some(BoxIntTy::U32),
+            Ty::U64 => Some(BoxIntTy::U64),
             _ => None,
         },
         _ => None,
@@ -555,11 +615,16 @@ fn box_payload_ty(f: &Func, id: LocalId) -> Option<IntTy> {
 }
 
 /// 整型本地槽位宽度（`let v = *b` 的目标类型）。
-fn local_int_ty(f: &Func, id: LocalId) -> Option<IntTy> {
+fn local_box_int_ty(f: &Func, id: LocalId) -> Option<BoxIntTy> {
     f.locals.iter().find(|l| l.id == id).and_then(|l| match l.ty {
-        Ty::I64 => Some(IntTy::I64),
-        Ty::U8 => Some(IntTy::U8),
-        Ty::U32 => Some(IntTy::U32),
+        Ty::I8 => Some(BoxIntTy::I8),
+        Ty::I16 => Some(BoxIntTy::I16),
+        Ty::I32 => Some(BoxIntTy::I32),
+        Ty::I64 => Some(BoxIntTy::I64),
+        Ty::U8 => Some(BoxIntTy::U8),
+        Ty::U16 => Some(BoxIntTy::U16),
+        Ty::U32 => Some(BoxIntTy::U32),
+        Ty::U64 => Some(BoxIntTy::U64),
         _ => None,
     })
 }
@@ -609,6 +674,7 @@ fn box_locals(f: &Func) -> Vec<LocalId> {
             | Stmt::BindI64 { .. }
             | Stmt::BindInt { .. }
             | Stmt::EvalInt { .. }
+            | Stmt::BindBoxIntCopy { .. }
             | Stmt::SelfAssign { .. } => {}
         }
     }
@@ -831,6 +897,48 @@ mod tests {
         assert!(c.contains("uint32_t zor_u32_3 = *zor_box_1;"), "{c}");
         assert!(c.contains("printf(\"%u\", (unsigned)(zor_u8_2));"), "{c}");
         assert!(c.contains("printf(\"%u\", (unsigned)(zor_u32_3));"), "{c}");
+    }
+
+    /// L2g：五宽载荷按声明宽度生成指针声明、分配、常量与 printf 格式。
+    #[test]
+    fn five_width_box_emits_payload_width_alloc_load_and_printf() {
+        let p = ir("fn main() {\n    let a: Box<i8> = box 127;\n    let b: Box<i16> = box 32767;\n    let c: Box<i32> = box 2147483647;\n    let d: Box<u16> = box 65535;\n    let e: Box<u64> = box 18446744073709551615;\n    println(*a, *b, *c, *d, *e);\n}\n");
+        let c = emit(&p, "t.zor");
+        assert!(c.contains("int8_t *zor_box_0 = NULL;"), "{c}");
+        assert!(c.contains("int16_t *zor_box_1 = NULL;"), "{c}");
+        assert!(c.contains("int32_t *zor_box_2 = NULL;"), "{c}");
+        assert!(c.contains("uint16_t *zor_box_3 = NULL;"), "{c}");
+        assert!(c.contains("uint64_t *zor_box_4 = NULL;"), "{c}");
+        assert!(c.contains("zor_box_0 = (int8_t *)zor_alloc(sizeof(int8_t));"), "{c}");
+        assert!(c.contains("*zor_box_0 = INT8_C(127);"), "{c}");
+        assert!(c.contains("*zor_box_1 = INT16_C(32767);"), "{c}");
+        assert!(c.contains("*zor_box_2 = INT32_C(2147483647);"), "{c}");
+        assert!(c.contains("*zor_box_3 = UINT16_C(65535);"), "{c}");
+        assert!(c.contains("*zor_box_4 = UINT64_C(18446744073709551615);"), "{c}");
+        assert!(c.contains("int8_t zor_i8_5 = *zor_box_0;"), "{c}");
+        assert!(c.contains("int16_t zor_i16_6 = *zor_box_1;"), "{c}");
+        assert!(c.contains("int32_t zor_i32_7 = *zor_box_2;"), "{c}");
+        assert!(c.contains("uint16_t zor_u16_8 = *zor_box_3;"), "{c}");
+        assert!(c.contains("uint64_t zor_u64_9 = *zor_box_4;"), "{c}");
+        assert!(c.contains("printf(\"%d\", (int)(zor_i8_5));"), "{c}");
+        assert!(c.contains("printf(\"%d\", (int)(zor_i16_6));"), "{c}");
+        assert!(c.contains("printf(\"%d\", (int)(zor_i32_7));"), "{c}");
+        assert!(c.contains("printf(\"%u\", (unsigned)(zor_u16_8));"), "{c}");
+        assert!(
+            c.contains("printf(\"%llu\", (unsigned long long)(zor_u64_9));"),
+            "{c}"
+        );
+        assert_eq!(c.matches("free(zor_box_").count(), 5, "{c}");
+    }
+
+    /// L2g：运行期副本（`let w = v`）生成同宽标量拷贝。
+    #[test]
+    fn box_int_copy_emits_scalar_copy() {
+        let p = ir("fn main() {\n    let b: Box<u64> = box 18446744073709551615;\n    let v = *b;\n    let w = v;\n    println(w);\n}\n");
+        let c = emit(&p, "t.zor");
+        assert!(c.contains("uint64_t zor_u64_1 = *zor_box_0;"), "{c}");
+        assert!(c.contains("uint64_t zor_u64_2 = zor_u64_1;"), "{c}");
+        assert!(c.contains("printf(\"%llu\", (unsigned long long)(zor_u64_2));"), "{c}");
     }
 
     #[test]

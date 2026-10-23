@@ -1,0 +1,6 @@
+fn main() {
+    let a: Box<i8> = box 127;
+    let b: Box<u64> = box 18446744073709551615;
+    let c: Box<i16> = box 32767;
+    println(*a, *b, *c, 1);
+}
