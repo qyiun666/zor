@@ -324,6 +324,16 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             let ib = lookup(&scope, b, *bl, *bc)?;
                             require_box(&slots, ia, *al, *ac)?;
                             require_box(&slots, ib, *bl, *bc)?;
+                            // 二次防线：subset 已保证同载荷；漂移时在此 fail-closed。
+                            let ta = slots.get(ia.0 as usize).map(|s| s.ty.clone());
+                            let tb = slots.get(ib.0 as usize).map(|s| s.ty.clone());
+                            if ta != tb {
+                                return Err(SubsetError::new(
+                                    *al,
+                                    *ac,
+                                    "lower：Box 赋值两侧载荷类型不符",
+                                ));
+                            }
                             if ia == ib {
                                 body.push(Stmt::SelfAssign { local: ia, line: *al, col: *ac });
                             } else {
