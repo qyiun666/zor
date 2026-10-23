@@ -1,0 +1,4 @@
+struct Q { x: f32, y: f64 }
+fn main() {
+    println(Q { x: f32::INFINITY, y: f64::NEG_INFINITY });
+}

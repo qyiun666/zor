@@ -263,30 +263,6 @@ fn other_float_members_and_bare_names_are_e1101() {
 }
 
 #[test]
-fn composites_with_specials_fail_closed() {
-    assert_rc1(
-        "c1",
-        "fn main() {\n    println((f64::NAN, 1));\n}\n",
-        "codegen",
-    );
-    assert_rc1(
-        "c2",
-        "fn main() {\n    let x = f64::NAN;\n    println((x, 1));\n}\n",
-        "codegen",
-    );
-    assert_rc1(
-        "c3",
-        "fn main() {\n    println([f64::NAN, 1.0]);\n}\n",
-        "codegen",
-    );
-    assert_rc1(
-        "c4",
-        "struct S { a: f64 }\nfn main() {\n    let s = S { a: f64::NAN };\n    println(s);\n}\n",
-        "codegen",
-    );
-}
-
-#[test]
 fn special_after_literal_string_is_plain_multi_arg_print() {
     // QA Stage-1 订正：`println` 为多实参字面打印，无格式串语义。
     assert_runs(

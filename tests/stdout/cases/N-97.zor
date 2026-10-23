@@ -1,0 +1,5 @@
+fn main() {
+    let x = f64::NAN;
+    let a: [f64; 2] = [x, 1.0];
+    println(a);
+}

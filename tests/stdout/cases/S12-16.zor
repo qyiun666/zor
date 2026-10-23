@@ -1,0 +1,4 @@
+struct P { x: f64, y: f64 }
+fn main() {
+    println("p", P { x: f64::NAN, y: 1.5 }, -0.0);
+}

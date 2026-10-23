@@ -1,0 +1,4 @@
+fn main() {
+    let t = (f64::NAN, f32::INFINITY);
+    println(t[0], t[1]);
+}

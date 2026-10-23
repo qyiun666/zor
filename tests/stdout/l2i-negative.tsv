@@ -1,0 +1,32 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-82	tests/stdout/cases/N-82.zor	1	none	zorcc: codegen:	zor: runtime error	float arithmetic +
+N-83	tests/stdout/cases/N-83.zor	1	none	zorcc: codegen:	zor: runtime error	float arithmetic -
+N-84	tests/stdout/cases/N-84.zor	1	none	zorcc: codegen:	zor: runtime error	float arithmetic *
+N-85	tests/stdout/cases/N-85.zor	1	none	zorcc: codegen:	zor: runtime error	float arithmetic /
+N-86	tests/stdout/cases/N-86.zor	1	none	zorcc: codegen:	zor: runtime error	float arithmetic %
+N-87	tests/stdout/cases/N-87.zor	1	none	zorcc: codegen:	zor: runtime error	float comparison ==
+N-88	tests/stdout/cases/N-88.zor	1	none	zorcc: codegen:	zor: runtime error	float comparison !=
+N-89	tests/stdout/cases/N-89.zor	1	none	zorcc: codegen:	zor: runtime error	float comparison <
+N-90	tests/stdout/cases/N-90.zor	1	none	zorcc: codegen:	zor: runtime error	float comparison <=
+N-91	tests/stdout/cases/N-91.zor	1	none	zorcc: codegen:	zor: runtime error	float comparison >=
+N-92	tests/stdout/cases/N-92.zor	1	none	zorcc: codegen:	zor: runtime error	float condition if
+N-93	tests/stdout/cases/N-93.zor	1	none	E1201	zor: runtime error	Box<f32> width mismatch
+N-94	tests/stdout/cases/N-94.zor	1	none	zorcc: codegen:	zor: runtime error	box special payload
+N-95	tests/stdout/cases/N-95.zor	1	none	zorcc: codegen:	zor: runtime error	Box<f64> float literal
+N-96	tests/stdout/cases/N-96.zor	1	none	E1101	zor: runtime error	enum tuple-variant special payload (parse fail-closed; L2j)
+N-97	tests/stdout/cases/N-97.zor	1	none	zorcc: codegen:	zor: runtime error	non-constant array element
+N-98	tests/stdout/cases/N-98.zor	1	none	zorcc: codegen:	zor: runtime error	non-literal array index
+N-99	tests/stdout/cases/N-99.zor	1	none	zorcc: codegen:	zor: runtime error	out-of-range index
+N-100	tests/stdout/cases/N-100.zor	1	none	E1201	zor: runtime error	unknown struct field
+N-101	tests/stdout/cases/N-101.zor	1	none	E1201	zor: runtime error	cross width f64->f32
+N-102	tests/stdout/cases/N-102.zor	1	none	E1201	zor: runtime error	cross width f32->f64
+N-103	tests/stdout/cases/N-103.zor	1	none	E1202	zor: runtime error	E1202 direct special->int annotation
+N-104	tests/stdout/cases/N-104.zor	1	none	E1202	zor: runtime error	E1202 struct field special->int
+N-105	tests/stdout/cases/N-105.zor	1	none	E1202	zor: runtime error	E1202 array int literal->float
+N-106	tests/stdout/cases/N-106.zor	1	none	E1201	zor: runtime error	E1201 tuple annotation mismatch
+N-107	tests/stdout/cases/N-107.zor	1	none	E1201	zor: runtime error	unary minus on special
+N-108	tests/stdout/cases/N-108.zor	1	none	E1201	zor: runtime error	unary minus on bound special
+N-109	tests/stdout/cases/N-109.zor	1	none	E1101	zor: runtime error	NaN payload call
+N-110	tests/stdout/cases/N-110.zor	1	none	E1101	zor: runtime error	other Type::member f64::MAX
+N-111	tests/stdout/cases/N-111.zor	1	none	E1101	zor: runtime error	bare nan identifier
+N-112	tests/stdout/cases/N-112.zor	1	none	zorcc: codegen:	zor: runtime error	projection only as println arg; let projection fail-closed

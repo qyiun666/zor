@@ -1,0 +1,4 @@
+fn main() {
+    let a: [f64; 3] = [f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
+    println(a);
+}

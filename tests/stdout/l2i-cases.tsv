@@ -1,0 +1,20 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S12-01	tests/stdout/cases/S12-01.zor	run	0	expected/S12-01.stdout	-	tuple direct f64 specials
+S12-02	tests/stdout/cases/S12-02.zor	run	0	expected/S12-02.stdout	-	tuple special+finite+-0.0
+S12-03	tests/stdout/cases/S12-03.zor	run	0	expected/S12-03.stdout	-	tuple mixed f32/f64 specials
+S12-04	tests/stdout/cases/S12-04.zor	run	0	expected/S12-04.stdout	-	nested tuple
+S12-05	tests/stdout/cases/S12-05.zor	run	0	expected/S12-05.stdout	-	tuple projection t[0]/t[1]
+S12-06	tests/stdout/cases/S12-06.zor	run	0	expected/S12-06.stdout	-	array [f64;3] specials
+S12-07	tests/stdout/cases/S12-07.zor	run	0	expected/S12-07.stdout	-	array [f32;2] specials
+S12-08	tests/stdout/cases/S12-08.zor	run	0	expected/S12-08.stdout	-	nested array
+S12-09	tests/stdout/cases/S12-09.zor	run	0	expected/S12-09.stdout	-	array projection a[0]/a[1]
+S12-10	tests/stdout/cases/S12-10.zor	run	0	expected/S12-10.stdout	-	struct two f64 fields
+S12-11	tests/stdout/cases/S12-11.zor	run	0	expected/S12-11.stdout	-	struct mixed f32/f64 fields
+S12-12	tests/stdout/cases/S12-12.zor	run	0	expected/S12-12.stdout	-	struct definition order
+S12-13	tests/stdout/cases/S12-13.zor	run	0	expected/S12-13.stdout	-	struct field projection p.x/p.y
+S12-14	tests/stdout/cases/S12-14.zor	run	0	expected/S12-14.stdout	-	struct tuple/array fields with specials
+S12-15	tests/stdout/cases/S12-15.zor	run	0	expected/S12-15.stdout	-	nested projection s.t[0]/s.a[0]
+S12-16	tests/stdout/cases/S12-16.zor	run	0	expected/S12-16.stdout	-	multi-arg string+struct+-0.0
+S12-17	tests/stdout/cases/S12-17.zor	run	0	expected/S12-17.stdout	-	repeat read same struct
+S12-18	tests/stdout/cases/S12-18.zor	run	0	expected/S12-18.stdout	-	deep nesting tuple/array
+S12-19	tests/stdout/cases/S12-19.zor	run	0	expected/S12-19.stdout	-	binding alias composite in tuple
