@@ -39,11 +39,27 @@ impl Ty {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Lit { Int(u128), Float(f64), Str(String), Bool(bool) }
 
+/// L2h：特殊浮点值的宽度由源形态自带（宽度严格，禁跨宽推断）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FloatWidth { F32, F64 }
+
+/// L2h：0.3.7 仅三个特殊值形态；NaN 载荷／信号 NaN 不在面内。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FloatSpecialKind { Nan, Infinity, NegInfinity }
+
+impl FloatWidth {
+    pub fn ty(self) -> Ty {
+        Ty::Prim(match self { FloatWidth::F32 => "f32", FloatWidth::F64 => "f64" })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Ex {
     Lit(Lit, usize, usize),
     Path(String, usize, usize),
     UnitLit(usize, usize),
+    /// L2h：`f32|f64::NAN|INFINITY|NEG_INFINITY`（六形式；宽度随形态携带）。
+    FloatSpecial(FloatWidth, FloatSpecialKind, usize, usize),
     Bin(String, Box<Ex>, Box<Ex>, usize, usize),
     Un(String, Box<Ex>, usize, usize),
     Call(Box<Ex>, Vec<Ex>, usize, usize),
@@ -67,6 +83,7 @@ impl Ex {
             Ex::Lit(_, l, c)
             | Ex::Path(_, l, c)
             | Ex::UnitLit(l, c)
+            | Ex::FloatSpecial(_, _, l, c)
             | Ex::Bin(_, _, _, l, c)
             | Ex::Un(_, _, l, c)
             | Ex::Call(_, _, l, c)
@@ -157,6 +174,7 @@ impl Parser {
         Parser { toks, pos: 0, diags, no_record: false }
     }
     fn peek(&self) -> &Tok { &self.toks[self.pos].0 }
+    fn peek_at(&self, n: usize) -> &Tok { &self.toks[(self.pos + n).min(self.toks.len() - 1)].0 }
     fn at(&self) -> (usize, usize) { (self.toks[self.pos].1, self.toks[self.pos].2) }
     fn bump(&mut self) -> Tok {
         let t = self.toks[self.pos].0.clone();
@@ -180,6 +198,11 @@ impl Parser {
     }
     fn diag_at(&mut self, code: &str, l: usize, c: usize, msg: impl Into<String>) {
         self.diags.push(Diag::new(code, l, c, msg));
+    }
+    /// L2h 裁定 5：`::` 仅六个特殊值形式；其余成员形态统一 E1101。
+    /// 单一发点，便于 e1101_catalog 守卫只记 +1。
+    fn err_float_member(&mut self, l: usize, c: usize, msg: impl Into<String>) {
+        self.diag_at("E1101", l, c, msg);
     }
 
     pub fn parse_program(&mut self) -> Prog {
@@ -621,6 +644,52 @@ impl Parser {
             Tok::Ident(s) if s == "true" => Ex::Lit(Lit::Bool(true), l, c),
             Tok::Ident(s) if s == "false" => Ex::Lit(Lit::Bool(false), l, c),
             Tok::Ident(s) if s == "mut" => { self.diag_at("E1101", l, c, "'mut' 仅用于 &mut 位置"); Ex::Lit(Lit::Bool(true), l, c) }
+            // L2h：`f32|f64::MEMBER` 双冒号前瞻（不改 lexer、不新增关键字）。
+            // 仅六个精确组合成为特殊值；其余 `::` 成员一律 E1101（裁定 5）。
+            Tok::Ident(s)
+                if (s == "f32" || s == "f64")
+                    && matches!(self.peek(), Tok::Colon)
+                    && matches!(self.peek_at(1), Tok::Colon) =>
+            {
+                let width = if s == "f32" { FloatWidth::F32 } else { FloatWidth::F64 };
+                self.bump();
+                self.bump();
+                let (ml, mc) = self.at();
+                let member = match self.bump() {
+                    Tok::Ident(m) => m,
+                    t => {
+                        self.err_float_member(ml, mc, format!("'{}::' 后需成员名，found {:?}", s, t));
+                        return Ex::Path(s, l, c);
+                    }
+                };
+                let kind = match member.as_str() {
+                    "NAN" => Some(FloatSpecialKind::Nan),
+                    "INFINITY" => Some(FloatSpecialKind::Infinity),
+                    "NEG_INFINITY" => Some(FloatSpecialKind::NegInfinity),
+                    _ => None,
+                };
+                match kind {
+                    Some(k) => {
+                        if matches!(self.peek(), Tok::LParen) {
+                            let (cl, cc) = self.at();
+                            self.err_float_member(
+                                cl,
+                                cc,
+                                "特殊值不是函数，不可调用（NaN 载荷不在 0.3.7 面内）",
+                            );
+                        }
+                        Ex::FloatSpecial(width, k, l, c)
+                    }
+                    None => {
+                        self.err_float_member(
+                            ml,
+                            mc,
+                            format!("'{}::{}' 不在 0.3.7 支持面（仅六个特殊值形式）", s, member),
+                        );
+                        Ex::Path(s, l, c)
+                    }
+                }
+            }
             Tok::Ident(s) => Ex::Path(s, l, c),
             Tok::LParen => {
                 let mut es = Vec::new();

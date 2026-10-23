@@ -1,0 +1,4 @@
+fn main() {
+    let x: f32 = f32::EPSILON;
+    println(x);
+}

@@ -1,0 +1,7 @@
+fn main() {
+    let x = f64::NAN;
+    println(x);
+    println(x);
+    let nan = 1.0;
+    println(nan);
+}

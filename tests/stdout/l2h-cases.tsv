@@ -1,0 +1,10 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S11-01	tests/stdout/cases/S11-01.zor	run	0	expected/S11-01.stdout	-	f64 NaN source form
+S11-02	tests/stdout/cases/S11-02.zor	run	0	expected/S11-02.stdout	-	f64 +Inf source form
+S11-03	tests/stdout/cases/S11-03.zor	run	0	expected/S11-03.stdout	-	f64 -Inf source form
+S11-04	tests/stdout/cases/S11-04.zor	run	0	expected/S11-04.stdout	-	f32 NaN source form
+S11-05	tests/stdout/cases/S11-05.zor	run	0	expected/S11-05.stdout	-	f32 +Inf source form
+S11-06	tests/stdout/cases/S11-06.zor	run	0	expected/S11-06.stdout	-	f32 -Inf source form
+S11-07	tests/stdout/cases/S11-07.zor	run	0	expected/S11-07.stdout	-	multi-arg f64/f32 mixed print
+S11-08	tests/stdout/cases/S11-08.zor	run	0	expected/S11-08.stdout	-	Copy repeat read; bare nan stays identifier
+S11-09	tests/stdout/cases/S11-09.zor	run	0	expected/S11-09.stdout	-	zeros/-0 two widths; finite -x rc0; finite float composite rc0

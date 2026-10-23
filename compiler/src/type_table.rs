@@ -28,6 +28,8 @@ pub enum ExTag {
     Deref,
     Unbox,
     Block,
+    /// L2h：`f32|f64::NAN|INFINITY|NEG_INFINITY` 特殊值源形态。
+    FloatSpecial,
 }
 
 impl ExTag {
@@ -49,6 +51,7 @@ impl ExTag {
             Ex::Box(..) => ExTag::Box,
             Ex::Deref(..) => ExTag::Deref,
             Ex::Unbox(..) => ExTag::Unbox,
+            Ex::FloatSpecial(..) => ExTag::FloatSpecial,
             Ex::Block(..) => ExTag::Block,
         }
     }

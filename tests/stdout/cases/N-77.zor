@@ -1,0 +1,4 @@
+fn main() {
+    let x: f64 = 1.0f64;
+    println(x);
+}

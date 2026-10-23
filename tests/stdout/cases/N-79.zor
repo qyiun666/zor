@@ -1,0 +1,4 @@
+fn main() {
+    let x = nan;
+    println(x);
+}

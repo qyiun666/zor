@@ -16,7 +16,7 @@ use super::ir::{
     Value,
 };
 use super::subset::{self, SubsetError};
-use crate::parser::{Ex, Lit, Prog, St, Ty as AstTy};
+use crate::parser::{Ex, FloatSpecialKind, FloatWidth, Lit, Prog, St, Ty as AstTy};
 use crate::type_table::{self, TypeTable};
 use std::collections::HashMap;
 
@@ -28,6 +28,10 @@ enum ConstVal {
     Unit,
     F32(f32),
     F64(f64),
+    /// L2h：特殊值保留来源标记——区别于 `1e999` 等有限字面量溢出得到的 inf，
+    /// 使绑定后的一元负号 `-x` 可按裁定 3 fail-closed。
+    F32Special(FloatSpecialKind),
+    F64Special(FloatSpecialKind),
 }
 
 /// L2a 局部槽位状态：`live` 是静态可判的 owner 活跃位。
@@ -179,7 +183,9 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
                             }
                         },
-                        Ex::Lit(Lit::Bool(_) | Lit::Float(_), _, _) | Ex::UnitLit(..) => {
+                        Ex::Lit(Lit::Bool(_) | Lit::Float(_), _, _)
+                        | Ex::UnitLit(..)
+                        | Ex::FloatSpecial(..) => {
                             let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
                             slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
                         }
@@ -466,7 +472,9 @@ fn print_arg(
             let expr = lower_int_expr(e, ty, b.types, b.slots, scope)?;
             Ok(PrintArg::Int { ty, expr })
         }
-        Ex::Lit(Lit::Float(_) | Lit::Bool(_), _, _) | Ex::UnitLit(..) => {
+        Ex::Lit(Lit::Float(_) | Lit::Bool(_), _, _)
+        | Ex::UnitLit(..)
+        | Ex::FloatSpecial(..) => {
             let irt = ir_ty_of(b.types, e, "println 实参")?;
             let val = const_scalar(e, &irt, b.types, b.slots, scope)?;
             Ok(PrintArg::Bytes(format_const(&val, &irt)?))
@@ -591,6 +599,10 @@ fn lower_value(
             .konst
             .clone()
             .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：复合成员缺少编译期值"))?;
+        // L2h 裁定 4：复合内特殊值（含经绑定别名）fail-closed。
+        if matches!(val, ConstVal::F32Special(_) | ConstVal::F64Special(_)) {
+            return Err(SubsetError::new(*nl, *nc, "lower：复合内特殊值 fail-closed"));
+        }
         return Ok(Value::Bytes(format_const(&val, &slot.ty)?));
     }
     let t = b
@@ -890,6 +902,12 @@ fn const_scalar(
             Ty::F64 => Ok(ConstVal::F64(*v)),
             _ => Err(SubsetError::new(l, c, "lower：浮点初值类型与绑定不符")),
         },
+        // L2h：特殊值在编译期格式化；宽度必须与源形态一致（check 已严格判定）。
+        Ex::FloatSpecial(w, kind, il, ic) => match (want, w) {
+            (Ty::F32, FloatWidth::F32) => Ok(ConstVal::F32Special(*kind)),
+            (Ty::F64, FloatWidth::F64) => Ok(ConstVal::F64Special(*kind)),
+            _ => Err(SubsetError::new(*il, *ic, "lower：特殊值宽度与绑定不符")),
+        },
         Ex::Lit(Lit::Bool(v), _, _) => match want {
             Ty::Bool => Ok(ConstVal::Bool(*v)),
             _ => Err(SubsetError::new(l, c, "lower：bool 初值类型与绑定不符")),
@@ -942,6 +960,13 @@ fn const_scalar(
                 }
                 ConstVal::F32(v) => Ok(ConstVal::F32(-v)),
                 ConstVal::F64(v) => Ok(ConstVal::F64(-v)),
+                // L2h 裁定 3：特殊值经绑定后的一元负号同样 fail-closed；
+                // 有限 `-x`（含 `1e999` 溢出得到的 inf）保持 0.3.6 行为。
+                ConstVal::F32Special(_) | ConstVal::F64Special(_) => Err(SubsetError::new(
+                    *ul,
+                    *uc,
+                    "lower：一元 '-' 不接受特殊值（按冻结裁定 3）",
+                )),
                 _ => Err(SubsetError::new(*ul, *uc, "lower：一元 '-' 非常量数值")),
             }
         }
@@ -953,6 +978,22 @@ fn const_scalar(
             let (el, ec) = subset::expr_span(other);
             Err(SubsetError::new(el, ec, "lower：常量形态不在 L2c codegen 子集"))
         }
+    }
+}
+
+fn special_f32(k: FloatSpecialKind) -> f32 {
+    match k {
+        FloatSpecialKind::Nan => f32::NAN,
+        FloatSpecialKind::Infinity => f32::INFINITY,
+        FloatSpecialKind::NegInfinity => f32::NEG_INFINITY,
+    }
+}
+
+fn special_f64(k: FloatSpecialKind) -> f64 {
+    match k {
+        FloatSpecialKind::Nan => f64::NAN,
+        FloatSpecialKind::Infinity => f64::INFINITY,
+        FloatSpecialKind::NegInfinity => f64::NEG_INFINITY,
     }
 }
 
@@ -988,6 +1029,9 @@ fn format_const(v: &ConstVal, ty: &Ty) -> Result<Vec<u8>, SubsetError> {
         (ConstVal::Unit, Ty::Unit) => Ok(b"()".to_vec()),
         (ConstVal::F32(v), Ty::F32) => Ok(float_fmt::format_f32(*v).into_bytes()),
         (ConstVal::F64(v), Ty::F64) => Ok(float_fmt::format_f64(*v).into_bytes()),
+        // L2h：特殊值复用既有 float_fmt（nan／inf／-inf），零运行期依赖。
+        (ConstVal::F32Special(k), Ty::F32) => Ok(float_fmt::format_f32(special_f32(*k)).into_bytes()),
+        (ConstVal::F64Special(k), Ty::F64) => Ok(float_fmt::format_f64(special_f64(*k)).into_bytes()),
         _ => Err(SubsetError::new(0, 0, "lower：常量格式化类型不符")),
     }
 }
