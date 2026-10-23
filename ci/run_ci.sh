@@ -8,6 +8,7 @@
 # L2c：--stdout-contract 为独立模式（stdout／cli 两段 summary），直调 QA 判据脚本；不改既有七段／八段／runtime-codes 语义。
 # L2d：--packaging-smoke 为独立模式（单段 summary），直调 QA 安装树判据脚本；不改既有七段／八段／runtime-codes／stdout 语义。
 # L2e：stdout 判词 65／12／17、runtime-codes 39／6／19；仅同步计数门禁，不建 opt-matrix，不改 job 结构。
+# L2f：stdout 判词 71／32／17；stdout-contract 内加 l2e／l2f 双基线 gate；runtime-codes 39／6／19；不建新 job。
 set -uo pipefail
 shopt -s nullglob  # S-1：未命中 glob 展开为空数组，杜绝字面 glob 进循环的旁路
 
@@ -722,6 +723,63 @@ stdout_section_verdict() { # 显式 FAIL 判词优先（即使脚本 rc=0）；�
   printf 'FAIL'
 }
 
+verify_baseline() { # L2f CI-01：verify_baseline <l2e|l2f> <outdir> <cases> <files>
+  local name="$1" out="$2" cases_expected="$3" files_expected="$4"
+  local base="tests/stdout/${name}-baseline.sha256"
+  local tsv="tests/stdout/${name}-baseline.tsv"
+  local log="$out/${name}-baseline.log"
+  : > "$log"
+  local files=0 unique=0 cases=0
+  if [ ! -f "$base" ] || [ ! -f "$tsv" ]; then
+    echo "FAIL|${name}-baseline|cases=0 files=0 unique=0 fail=1 reason=missing" >> "$log"
+    return 1
+  fi
+  files="$(awk 'NF{n++} END{print n+0}' "$base")"
+  unique="$(awk 'NF{print $2}' "$base" | sort -u | wc -l | tr -d ' ')"
+  cases="$(awk 'NR>1 && NF{n++} END{print n+0}' "$tsv")"
+  # 路径卫生：仅 tests/ 相对路径，含 64hex ＋ 两空格格式；拒绝绝对路径／..／空格／反斜杠／glob。
+  if ! awk 'NF<2 {bad=1; next} {p=$2; if (p !~ /^tests\/[A-Za-z0-9._\/-]+$/ || p ~ /\.\./) bad=1} END{exit bad?1:0}' "$base"; then
+    echo "FAIL|${name}-baseline|cases=$cases files=$files unique=$unique fail=1 reason=unsafe_path" >> "$log"
+    return 1
+  fi
+  if [ "$files" -le 0 ] || [ "$unique" -ne "$files" ]; then
+    echo "FAIL|${name}-baseline|cases=$cases files=$files unique=$unique fail=1 reason=duplicate_path" >> "$log"
+    return 1
+  fi
+  # 必须锁定自身 TSV（防删条目规避）。
+  if ! grep -Fq " ${tsv}" "$base"; then
+    echo "FAIL|${name}-baseline|cases=$cases files=$files unique=$unique fail=1 reason=self_not_locked" >> "$log"
+    return 1
+  fi
+  local hrc=0 check_out=""
+  if command -v sha256sum >/dev/null 2>&1; then
+    ( cd "$REPO_ROOT" && sha256sum -c --quiet "$base" ) >> "$log" 2>&1 || hrc=1
+  elif command -v shasum >/dev/null 2>&1; then
+    check_out="$( cd "$REPO_ROOT" && shasum -a 256 -c "$base" 2>&1 )" || hrc=1
+    [ "$hrc" -eq 0 ] || printf '%s\n' "$check_out" >> "$log"
+  else
+    echo "FAIL|${name}-baseline|cases=$cases files=$files unique=$unique fail=1 reason=no_sha256_tool" >> "$log"
+    return 1
+  fi
+  if [ "$hrc" -ne 0 ]; then
+    echo "FAIL|${name}-baseline|cases=$cases files=$files unique=$unique fail=1 reason=hash_mismatch" >> "$log"
+    return 1
+  fi
+  if [ "$cases" -ne "$cases_expected" ] || [ "$files" -ne "$files_expected" ]; then
+    echo "FAIL|${name}-baseline|cases=$cases files=$files unique=$unique fail=1 reason=count_mismatch" >> "$log"
+    return 1
+  fi
+  echo "PASS|${name}-baseline|cases=$cases files=$files unique=$unique fail=0" >> "$log"
+  if command -v sha256sum >/dev/null 2>&1; then
+    echo "${name}-baseline.sha256=$(sha256sum "$base" | awk '{print $1}')" >> "$log"
+  else
+    echo "${name}-baseline.sha256=$(shasum -a 256 "$base" | awk '{print $1}')" >> "$log"
+  fi
+  cp "$base" "$out/${name}-baseline.sha256"
+  cp "$tsv" "$out/${name}-baseline.tsv"
+  return 0
+}
+
 stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚本；stdout／cli 两段 summary；fail-closed
   local log; log="$(new_log stdout-contract)"
   local out="$LOG_DIR/stdout-contract"
@@ -738,6 +796,24 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
     record cli-contract FAIL 1 "$log"
     return
   fi
+  # L2f CI-01：双基线 gate（先于两轮用例）。l2e 历史冻结 162／209；l2f 全矩阵 188／246。
+  # 任一失败即两段 FAIL 并返回；缺件／路径不安全／重复／hash 不符／计数不符一律 FAIL，不可 SKIP。
+  if ! verify_baseline l2e "$out" 162 209; then
+    grep -hE '^(PASS|FAIL)\|l2e-baseline' "$out/l2e-baseline.log" >> "$log" 2>/dev/null || true
+    echo "[l2e-baseline] 校验失败（见 l2e-baseline.log）；stdout-contract／cli-contract 判 FAIL" >> "$log"
+    record stdout-contract FAIL 1 "$log"
+    record cli-contract FAIL 1 "$log"
+    return
+  fi
+  grep -hE '^(PASS|FAIL)\|l2e-baseline' "$out/l2e-baseline.log" >> "$log" 2>/dev/null || true
+  if ! verify_baseline l2f "$out" 188 246; then
+    grep -hE '^(PASS|FAIL)\|l2f-baseline' "$out/l2f-baseline.log" >> "$log" 2>/dev/null || true
+    echo "[l2f-baseline] 校验失败（见 l2f-baseline.log）；stdout-contract／cli-contract 判 FAIL" >> "$log"
+    record stdout-contract FAIL 1 "$log"
+    record cli-contract FAIL 1 "$log"
+    return
+  fi
+  grep -hE '^(PASS|FAIL)\|l2f-baseline' "$out/l2f-baseline.log" >> "$log" 2>/dev/null || true
   local rc=0
   CC="${CC:-cc}" ZORC_BIN="$ZORC" OUT_DIR="$out" \
     bash tests/stdout/run_stdout_contract.sh --strict >>"$log" 2>&1 || rc=$?
@@ -746,14 +822,23 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   local so_v cli_v so_rc=0 cli_rc=0
   so_v="$(stdout_section_verdict stdout-contract "$log" "$rc")"
   cli_v="$(stdout_section_verdict cli-contract "$log" "$rc")"
-  # L2e CI-01：冻结计数 65／12／17；判定 PASS 但判词计数不符（如旧资产 62／10／14）同样 FAIL，防静默洗绿。
-  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=65 negative=12 fail=0 ran=65/12' "$log"; then
-    echo "[stdout-contract] 计数不符：期望 runtime=65 negative=12 ran=65/12（L2e 冻结）" >> "$log"
+  # L2f CI-01：冻结计数 71／32／17；判定 PASS 但判词计数不符（如旧资产 65／12／17）同样 FAIL，防静默洗绿。
+  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=71 negative=32 fail=0 ran=71/32' "$log"; then
+    echo "[stdout-contract] 计数不符：期望 runtime=71 negative=32 ran=71/32（L2f 冻结）" >> "$log"
     so_v=FAIL
   fi
   if [ "$cli_v" = PASS ] && ! grep -Fq 'PASS|cli-contract|cases=17 fail=0 ran=17' "$log"; then
-    echo "[cli-contract] 计数不符：期望 cases=17 ran=17（L2e 冻结）" >> "$log"
+    echo "[cli-contract] 计数不符：期望 cases=17 ran=17（L2f 冻结）" >> "$log"
     cli_v=FAIL
+  fi
+  # L2f CI-01：双基线精确判词（含 fail=0）；计数不符同样 FAIL。
+  if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l2e-baseline|cases=162 files=209 unique=209 fail=0' "$out/l2e-baseline.log"; then
+    echo "[l2e-baseline] 计数不符：期望 cases=162 files=209 unique=209（历史冻结）" >> "$log"
+    so_v=FAIL
+  fi
+  if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l2f-baseline|cases=188 files=246 unique=246 fail=0' "$out/l2f-baseline.log"; then
+    echo "[l2f-baseline] 计数不符：期望 cases=188 files=246 unique=246（L2f 冻结）" >> "$log"
+    so_v=FAIL
   fi
   [ "$so_v" = FAIL ] && so_rc=1
   [ "$cli_v" = FAIL ] && cli_rc=1
