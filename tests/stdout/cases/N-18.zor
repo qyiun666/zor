@@ -1,0 +1,4 @@
+fn main() {
+    let b: Box<i64> = box 9223372036854775808;
+    println(*b);
+}

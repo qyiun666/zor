@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 
 use super::super::ir::{
-    ArithOp, Func, IntExpr, IntTy, LocalId, PrintArg, Program, Stmt, StrArg, Value,
+    ArithOp, Func, IntExpr, IntTy, LocalId, PrintArg, Program, Stmt, StrArg, Ty, Value,
 };
 use crate::backend::OverflowMode;
 
@@ -223,7 +223,8 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
     // 每枚 Box owner 槽位：载荷指针 + 运行期 drop flag（静态 drop_dst 的运行时载体）。
     let box_locals = box_locals(f);
     for id in &box_locals {
-        let _ = writeln!(out, "    int64_t *zor_box_{} = NULL;", id.0);
+        let ty = box_payload_ty(f, *id).expect("box local payload width");
+        let _ = writeln!(out, "    {} *zor_box_{} = NULL;", ty.c_ty(), id.0);
         let _ = writeln!(out, "    uint8_t zor_live_{} = 0;", id.0);
     }
     if !box_locals.is_empty() {
@@ -310,23 +311,26 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
                 let v = emit_int_expr(out, expr, *ty, overflow, &mut tmp_counter);
                 let _ = writeln!(out, "    (void){};", v);
             }
-            Stmt::BindBox { local, value, line, .. } => {
+            Stmt::BindBox { local, ty, value, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
-                emit_alloc_box(out, local, *value);
+                emit_alloc_box(out, local, *ty, *value);
             }
-            Stmt::BindBoxAssign { local, value, drop_dst, line, .. } => {
+            Stmt::BindBoxAssign { local, ty, value, drop_dst, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
                 if *drop_dst {
                     emit_free_live(out, local);
                 }
-                emit_alloc_box(out, local, *value);
+                emit_alloc_box(out, local, *ty, *value);
             }
-            Stmt::BindI64Deref { local, src: boxed, line, .. } => {
+            Stmt::BindDeref { local, src: boxed, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
+                let ty = local_int_ty(f, *local).expect("deref local integer width");
                 let _ = writeln!(
                     out,
-                    "    int64_t zor_i64_{} = *zor_box_{};",
-                    local.0, boxed.0
+                    "    {} {} = *zor_box_{};",
+                    ty.c_ty(),
+                    int_local(ty, local),
+                    boxed.0
                 );
             }
             Stmt::MoveAssign { dst, src: from, line, .. } => {
@@ -525,14 +529,39 @@ fn emit_free_live(out: &mut String, id: &LocalId) {
     let _ = writeln!(out, "    }}");
 }
 
-fn emit_alloc_box(out: &mut String, id: &LocalId, value: i64) {
+fn emit_alloc_box(out: &mut String, id: &LocalId, ty: IntTy, value: i128) {
     let _ = writeln!(
         out,
-        "    zor_box_{} = (int64_t *)zor_alloc(sizeof(int64_t));",
-        id.0
+        "    zor_box_{} = ({} *)zor_alloc(sizeof({}));",
+        id.0,
+        ty.c_ty(),
+        ty.c_ty()
     );
-    let _ = writeln!(out, "    *zor_box_{} = {};", id.0, c_i64(value));
+    let _ = writeln!(out, "    *zor_box_{} = {};", id.0, c_int_const(value, ty));
     let _ = writeln!(out, "    zor_live_{} = 1;", id.0);
+}
+
+/// Box 本地槽位的载荷宽度（来自 lower 写入的 `Func.locals`）。
+fn box_payload_ty(f: &Func, id: LocalId) -> Option<IntTy> {
+    f.locals.iter().find(|l| l.id == id).and_then(|l| match &l.ty {
+        Ty::Box(p) => match p.as_ref() {
+            Ty::I64 => Some(IntTy::I64),
+            Ty::U8 => Some(IntTy::U8),
+            Ty::U32 => Some(IntTy::U32),
+            _ => None,
+        },
+        _ => None,
+    })
+}
+
+/// 整型本地槽位宽度（`let v = *b` 的目标类型）。
+fn local_int_ty(f: &Func, id: LocalId) -> Option<IntTy> {
+    f.locals.iter().find(|l| l.id == id).and_then(|l| match l.ty {
+        Ty::I64 => Some(IntTy::I64),
+        Ty::U8 => Some(IntTy::U8),
+        Ty::U32 => Some(IntTy::U32),
+        _ => None,
+    })
 }
 
 /// 移动：所有权转给目标，源槽位置为无活值；不释放载荷。
@@ -565,7 +594,7 @@ fn box_locals(f: &Func) -> Vec<LocalId> {
             Stmt::BindBox { local, .. }
             | Stmt::BindBoxAssign { local, .. }
             | Stmt::Unbox { local, .. } => add(&mut ids, *local),
-            Stmt::BindI64Deref { src, .. } => add(&mut ids, *src),
+            Stmt::BindDeref { src, .. } => add(&mut ids, *src),
             Stmt::MoveAssign { dst, src, .. } | Stmt::OverwriteAssign { dst, src, .. } => {
                 add(&mut ids, *dst);
                 add(&mut ids, *src);
@@ -779,6 +808,29 @@ mod tests {
         assert!(c.contains("printf(\"%lld\", (long long)(zor_i64_1));"), "{c}");
         assert!(!c.contains("(zor_i64_0)"), "{c}");
         assert_eq!(c.matches("free(zor_box_0);").count(), 1, "{c}");
+    }
+
+    /// L2f：u8／u32 载荷按声明宽度生成指针声明、分配与读取。
+    #[test]
+    fn typed_box_emits_payload_width_alloc_and_load() {
+        let p = ir("fn main() {\n    let a: Box<u8> = box 255;\n    let b: Box<u32> = box 4294967295;\n    let x = *a;\n    let y = *b;\n    println(x, y);\n}\n");
+        let c = emit(&p, "t.zor");
+        assert!(c.contains("uint8_t *zor_box_0 = NULL;"), "{c}");
+        assert!(c.contains("uint32_t *zor_box_1 = NULL;"), "{c}");
+        assert!(
+            c.contains("zor_box_0 = (uint8_t *)zor_alloc(sizeof(uint8_t));"),
+            "{c}"
+        );
+        assert!(c.contains("*zor_box_0 = UINT8_C(255);"), "{c}");
+        assert!(
+            c.contains("zor_box_1 = (uint32_t *)zor_alloc(sizeof(uint32_t));"),
+            "{c}"
+        );
+        assert!(c.contains("*zor_box_1 = UINT32_C(4294967295);"), "{c}");
+        assert!(c.contains("uint8_t zor_u8_2 = *zor_box_0;"), "{c}");
+        assert!(c.contains("uint32_t zor_u32_3 = *zor_box_1;"), "{c}");
+        assert!(c.contains("printf(\"%u\", (unsigned)(zor_u8_2));"), "{c}");
+        assert!(c.contains("printf(\"%u\", (unsigned)(zor_u32_3));"), "{c}");
     }
 
     #[test]

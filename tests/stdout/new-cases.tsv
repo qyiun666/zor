@@ -93,3 +93,29 @@ N-15	N	compile-negative	tests/stdout/cases/N-15.zor	-	Box<Box<i64>> deref fail-c
 C5-01	C5	cli	-	-	--help fixed text
 C5-02	C5	cli	-	-	--help precedence
 C5-03	C5	cli	-	-	--version over --help
+S9-01	S9	runtime	tests/stdout/cases/S9-01.zor	expected/S9-01.stdout	Box<i64> annotation min/max
+S9-02	S9	runtime	tests/stdout/cases/S9-02.zor	expected/S9-02.stdout	Box<u8> annotation min/max
+S9-03	S9	runtime	tests/stdout/cases/S9-03.zor	expected/S9-03.stdout	Box<u32> annotation min/max
+S9-04	S9	runtime	tests/stdout/cases/S9-04.zor	expected/S9-04.stdout	mixed Box args plus scalar
+S9-05	S9	runtime	tests/stdout/cases/S9-05.zor	expected/S9-05.stdout	repeat read plus unbox, no consume
+S9-06	S9	runtime	tests/stdout/cases/S9-06.zor	expected/S9-06.stdout	u8 reassign drops old payload
+N-16	N	compile-negative	tests/stdout/cases/N-16.zor	-	u8 overflow E1201
+N-17	N	compile-negative	tests/stdout/cases/N-17.zor	-	u32 overflow E1201
+N-18	N	compile-negative	tests/stdout/cases/N-18.zor	-	i64 overflow E1201
+N-19	N	compile-negative	tests/stdout/cases/N-19.zor	-	negative payload fail-closed
+N-20	N	compile-negative	tests/stdout/cases/N-20.zor	-	non-literal payload fail-closed
+N-21	N	compile-negative	tests/stdout/cases/N-21.zor	-	i8 Box fail-closed E1201
+N-22	N	compile-negative	tests/stdout/cases/N-22.zor	-	i16 Box fail-closed E1201
+N-23	N	compile-negative	tests/stdout/cases/N-23.zor	-	i32 Box fail-closed E1201
+N-24	N	compile-negative	tests/stdout/cases/N-24.zor	-	u16 Box fail-closed E1201
+N-25	N	compile-negative	tests/stdout/cases/N-25.zor	-	u64 Box fail-closed E1201
+N-26	N	compile-negative	tests/stdout/cases/N-26.zor	-	f32 Box fail-closed E1201
+N-27	N	compile-negative	tests/stdout/cases/N-27.zor	-	f64 Box fail-closed codegen
+N-28	N	compile-negative	tests/stdout/cases/N-28.zor	-	bool Box fail-closed codegen
+N-29	N	compile-negative	tests/stdout/cases/N-29.zor	-	byte Box fail-closed E1201
+N-30	N	compile-negative	tests/stdout/cases/N-30.zor	-	unit Box fail-closed codegen
+N-31	N	compile-negative	tests/stdout/cases/N-31.zor	-	struct payload fail-closed codegen
+N-32	N	compile-negative	tests/stdout/cases/N-32.zor	-	array payload fail-closed codegen
+N-33	N	compile-negative	tests/stdout/cases/N-33.zor	-	composite u8 deref fail-closed codegen
+N-34	N	compile-negative	tests/stdout/cases/N-34.zor	-	read after unbox E2301
+N-35	N	compile-negative	tests/stdout/cases/N-35.zor	-	reassign overflow E1201

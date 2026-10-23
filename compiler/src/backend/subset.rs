@@ -11,11 +11,11 @@ use crate::parser::{Blk, Ex, FnDecl, Lit, Prog, St, Ty};
 use crate::type_table::TypeTable;
 use std::collections::{HashMap, HashSet};
 
-/// 绑定种类：字节串／Box<i64>／全部在册原始类型／可打印复合类型。
+/// 绑定种类：字节串／三型 Box（i64／u8／u32）／全部在册原始类型／可打印复合类型。
 #[derive(Clone, Debug, PartialEq)]
 enum BindingKind {
     Str,
-    BoxI64,
+    Box(Ty),
     I8,
     I16,
     I32,
@@ -141,6 +141,16 @@ fn check_block(
                     Some(Ty::Arr(elem, _)) if matches!(elem.as_ref(), Ty::Prim("byte")) => {
                         Some(BindingKind::Str)
                     }
+                    Some(Ty::BoxTy(inner)) => match l2f_payload_ty(inner) {
+                        Some(p) => Some(BindingKind::Box(p)),
+                        None => {
+                            return Err(SubsetError::new(
+                                *l,
+                                *c,
+                                "let 类型标注（Box 仅 i64／u8／u32 可 codegen）",
+                            ))
+                        }
+                    },
                     Some(t @ (Ty::Arr(_, _) | Ty::Tuple(_) | Ty::Named(_)))
                         if printable_ty(t, prog) =>
                     {
@@ -192,7 +202,7 @@ fn check_block(
                 }
             }
             St::Expr(Some(Ex::Unbox(n, ul, uc)), _, _) => {
-                if bindings.get(n) != Some(&BindingKind::BoxI64) {
+                if !matches!(bindings.get(n), Some(BindingKind::Box(_))) {
                     return Err(SubsetError::new(
                         *ul,
                         *uc,
@@ -218,12 +228,17 @@ fn check_block(
             St::Assign(lhs, rhs, l, c) => {
                 let ok = match (lhs, rhs) {
                     (Ex::Path(a, _, _), Ex::Path(b, _, _)) => {
-                        bindings.get(a) == Some(&BindingKind::BoxI64)
-                            && bindings.get(b) == Some(&BindingKind::BoxI64)
+                        matches!(
+                            (bindings.get(a), bindings.get(b)),
+                            (Some(BindingKind::Box(ta)), Some(BindingKind::Box(tb))) if ta == tb
+                        )
                     }
                     (Ex::Path(a, _, _), Ex::Box(inner, _, _)) => {
-                        bindings.get(a) == Some(&BindingKind::BoxI64)
-                            && matches!(inner.as_ref(), Ex::Lit(Lit::Int(_), _, _))
+                        let same_payload = match (bindings.get(a), types.expr_ty(rhs)) {
+                            (Some(BindingKind::Box(t)), Some(Ty::BoxTy(p))) => t == p.as_ref(),
+                            _ => false,
+                        };
+                        matches!(inner.as_ref(), Ex::Lit(Lit::Int(_), _, _)) && same_payload
                     }
                     _ => false,
                 };
@@ -266,10 +281,17 @@ fn let_init_kind(
             if !matches!(inner.as_ref(), Ex::Lit(Lit::Int(_), _, _)) {
                 return Err(SubsetError::new(*il, *ic, "box 载荷非整型字面量"));
             }
-            if ann.is_some() {
-                return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符"));
+            let payload = match ann {
+                None => Ty::Prim("i64"),
+                Some(BindingKind::Box(p)) => p.clone(),
+                Some(_) => return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符")),
+            };
+            // 与 check 的 C1 期望下推结果对齐：字面量载荷宽度由标注决定。
+            match types.expr_ty(init) {
+                Some(Ty::BoxTy(t)) if **t == payload => {}
+                _ => return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符")),
             }
-            Ok(BindingKind::BoxI64)
+            Ok(BindingKind::Box(payload))
         }
         Ex::Lit(Lit::Int(_), _, _) => match ann {
             None => Ok(BindingKind::I64),
@@ -291,18 +313,25 @@ fn let_init_kind(
             _ => Err(SubsetError::new(l, c, "let 类型标注与浮点初值不符")),
         },
         Ex::Deref(base, il, ic) => match base.as_ref() {
-            Ex::Path(n, _, _) if bindings.get(n) == Some(&BindingKind::BoxI64) => match ann {
-                None | Some(BindingKind::I64) => Ok(BindingKind::I64),
-                Some(_) => Err(SubsetError::new(l, c, "let 类型标注与解引用初值不符")),
+            Ex::Path(n, _, _) => match bindings.get(n) {
+                Some(BindingKind::Box(p)) => match l2f_payload_binding(p) {
+                    Some(k) => match ann {
+                        None => Ok(k),
+                        Some(a) if a == &k => Ok(k),
+                        Some(_) => Err(SubsetError::new(l, c, "let 类型标注与解引用初值不符")),
+                    },
+                    None => Err(SubsetError::new(*il, *ic, "解引用源不是 Box 绑定")),
+                },
+                _ => Err(SubsetError::new(*il, *ic, "解引用源不是 Box 绑定")),
             },
             _ => Err(SubsetError::new(*il, *ic, "解引用源不是 Box 绑定")),
         },
         Ex::Path(n, il, ic) => match bindings.get(n) {
-            Some(BindingKind::BoxI64) => {
+            Some(BindingKind::Box(p)) => {
                 if ann.is_some() {
                     return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符"));
                 }
-                Ok(BindingKind::BoxI64)
+                Ok(BindingKind::Box(p.clone()))
             }
             Some(BindingKind::Composite(t)) => {
                 let got = types
@@ -367,6 +396,28 @@ fn is_byte_array_ty(t: &Ty) -> bool {
     matches!(t, Ty::Arr(elem, _) if matches!(elem.as_ref(), Ty::Prim("byte")))
 }
 
+/// L2f Box 载荷类型：仅 i64／u8／u32（冻结件 §二）。
+fn l2f_payload_ty(t: &Ty) -> Option<Ty> {
+    match t {
+        Ty::Prim(p) if matches!(*p, "i64" | "u8" | "u32") => Some(t.clone()),
+        _ => None,
+    }
+}
+
+/// 载荷类型到绑定种类（三种均为在册原始类型）。
+fn l2f_payload_binding(t: &Ty) -> Option<BindingKind> {
+    match t {
+        Ty::Prim("i64") => Some(BindingKind::I64),
+        Ty::Prim("u8") => Some(BindingKind::U8),
+        Ty::Prim("u32") => Some(BindingKind::U32),
+        _ => None,
+    }
+}
+
+fn is_box_i64(k: &BindingKind) -> bool {
+    matches!(k, BindingKind::Box(t) if t == &Ty::Prim("i64"))
+}
+
 /// 可打印类型：类型级递归；enum 任一变体载荷不可打印则整类型不可打印（Q-2）。
 fn printable_ty(t: &Ty, prog: &Prog) -> bool {
     let mut seen = HashSet::new();
@@ -427,7 +478,7 @@ fn supported_value_expr(
         Ex::Deref(base, _, _) => {
             matches!(
                 base.as_ref(),
-                Ex::Path(n, _, _) if bindings.get(n) == Some(&BindingKind::BoxI64)
+                Ex::Path(n, _, _) if bindings.get(n).is_some_and(is_box_i64)
             ) && t == &Ty::Prim("i64")
         }
         Ex::Un(..) => {
@@ -550,7 +601,7 @@ fn int_expr_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> Option<Bind
             .cloned()
             .filter(|k| is_int_kind(k)),
         Ex::Deref(base, _, _) => match base.as_ref() {
-            Ex::Path(n, _, _) if bindings.get(n) == Some(&BindingKind::BoxI64) => {
+            Ex::Path(n, _, _) if bindings.get(n).is_some_and(is_box_i64) => {
                 Some(BindingKind::I64)
             }
             _ => None,
@@ -622,7 +673,19 @@ fn is_printable_arg(
     let Some(t) = types.expr_ty(e) else {
         return false;
     };
-    printable_ty(t, prog) && supported_value_expr(e, bindings, types, prog)
+    if !printable_ty(t, prog) {
+        return false;
+    }
+    // L2f：直接 `println(*b)` 放开三型 Box 载荷；复合／算术内嵌仍走
+    // supported_value_expr 的既有 i64-only 边界（冻结件 §二）。
+    if let Ex::Deref(base, _, _) = e {
+        if let Ex::Path(n, _, _) = base.as_ref() {
+            if let Some(BindingKind::Box(p)) = bindings.get(n) {
+                return t == p;
+            }
+        }
+    }
+    supported_value_expr(e, bindings, types, prog)
 }
 
 #[cfg(test)]

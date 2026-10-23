@@ -1,0 +1,21 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-16	tests/stdout/cases/N-16.zor	1	none	E1201	zor: runtime error	u8 overflow E1201
+N-17	tests/stdout/cases/N-17.zor	1	none	E1201	zor: runtime error	u32 overflow E1201
+N-18	tests/stdout/cases/N-18.zor	1	none	E1201	zor: runtime error	i64 overflow E1201
+N-19	tests/stdout/cases/N-19.zor	1	none	box 载荷非整型字面量	zor: runtime error	negative payload fail-closed
+N-20	tests/stdout/cases/N-20.zor	1	none	box 载荷非整型字面量	zor: runtime error	non-literal payload fail-closed
+N-21	tests/stdout/cases/N-21.zor	1	none	E1201	zor: runtime error	i8 Box fail-closed E1201
+N-22	tests/stdout/cases/N-22.zor	1	none	E1201	zor: runtime error	i16 Box fail-closed E1201
+N-23	tests/stdout/cases/N-23.zor	1	none	E1201	zor: runtime error	i32 Box fail-closed E1201
+N-24	tests/stdout/cases/N-24.zor	1	none	E1201	zor: runtime error	u16 Box fail-closed E1201
+N-25	tests/stdout/cases/N-25.zor	1	none	E1201	zor: runtime error	u64 Box fail-closed E1201
+N-26	tests/stdout/cases/N-26.zor	1	none	E1201	zor: runtime error	f32 Box fail-closed E1201
+N-27	tests/stdout/cases/N-27.zor	1	none	let 类型标注	zor: runtime error	f64 Box fail-closed codegen
+N-28	tests/stdout/cases/N-28.zor	1	none	let 类型标注	zor: runtime error	bool Box fail-closed codegen
+N-29	tests/stdout/cases/N-29.zor	1	none	E1201	zor: runtime error	byte Box fail-closed E1201
+N-30	tests/stdout/cases/N-30.zor	1	none	let 类型标注	zor: runtime error	unit Box fail-closed codegen
+N-31	tests/stdout/cases/N-31.zor	1	none	let 类型标注	zor: runtime error	struct payload fail-closed codegen
+N-32	tests/stdout/cases/N-32.zor	1	none	let 类型标注	zor: runtime error	array payload fail-closed codegen
+N-33	tests/stdout/cases/N-33.zor	1	none	println 实参不可打印	zor: runtime error	composite u8 deref fail-closed codegen
+N-34	tests/stdout/cases/N-34.zor	1	none	E2301	zor: runtime error	read after unbox E2301
+N-35	tests/stdout/cases/N-35.zor	1	none	E1201	zor: runtime error	reassign overflow E1201

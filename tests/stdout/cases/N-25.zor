@@ -1,0 +1,4 @@
+fn main() {
+    let b: Box<u64> = box 1;
+    println(*b);
+}

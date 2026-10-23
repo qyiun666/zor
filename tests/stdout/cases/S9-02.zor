@@ -1,0 +1,6 @@
+fn main() {
+    let a: Box<u8> = box 0;
+    let b: Box<u8> = box 255;
+    println(*a);
+    println(*b);
+}
