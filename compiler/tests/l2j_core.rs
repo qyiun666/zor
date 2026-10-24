@@ -189,18 +189,49 @@ fn double_unbox_and_use_after_unbox_stay_e2301() {
     );
 }
 
+/// L2k：`println(*b)` 与同值普通复合打印逐字节同构（不写死期望字节）。
+fn assert_isomorphic(tag: &str, src: &str) {
+    let d = TempDir::new(tag);
+    let path = write(d.path(), "m.zor", src);
+    let (b, r) = build_run(d.path(), &path, &[], tag);
+    assert_eq!(b.status.code(), Some(0), "{tag} build={}", stderr_text(&b));
+    let r = r.expect("artifact");
+    assert_eq!(r.status.code(), Some(0), "{tag}");
+    let out = String::from_utf8_lossy(&r.stdout).into_owned();
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines.len(), 2, "{tag} stdout={out:?}");
+    assert_eq!(lines[0], lines[1], "{tag} 解引用打印须与普通打印同构");
+    assert_no_temp(d.path());
+}
+
 #[test]
-fn finite_float_payloads_stay_fail_closed_with_existing_wording() {
-    for (tag, src) in [
-        ("finite-f64", "fn main() {\n    let b: Box<f64> = box 1.5;\n    println(*b);\n}\n"),
-        ("neg-zero", "fn main() {\n    let b: Box<f64> = box -0.0;\n    println(*b);\n}\n"),
-        ("pos-zero", "fn main() {\n    let b: Box<f64> = box 0.0;\n    println(*b);\n}\n"),
-    ] {
-        assert_rc1(tag, src, "let 类型标注");
-    }
-    assert_rc1(
+fn finite_float_payloads_are_supported_and_print_like_plain_values() {
+    // L2k：有限浮点字面量载荷（宽度按标注收窄；上溢按既有常量求值）。
+    assert_isomorphic(
+        "finite-f64",
+        "fn main() {\n    let b: Box<f64> = box 1.5;\n    println(1.5);\n    println(*b);\n}\n",
+    );
+    assert_isomorphic(
+        "neg-zero",
+        "fn main() {\n    let b: Box<f64> = box -0.0;\n    println(-0.0);\n    println(*b);\n}\n",
+    );
+    assert_isomorphic(
+        "pos-zero",
+        "fn main() {\n    let b: Box<f64> = box 0.0;\n    println(0.0);\n    println(*b);\n}\n",
+    );
+    assert_isomorphic(
         "finite-f32",
-        "fn main() {\n    let b: Box<f32> = box 1.5;\n    println(*b);\n}\n",
+        "fn main() {\n    let b: Box<f32> = box 1.5;\n    let x: f32 = 1.5;\n    println(x);\n    println(*b);\n}\n",
+    );
+    // 红线：整型载荷进浮点 Box 仍是 E1201，不得变 E1202。
+    assert_rc1(
+        "int-into-f32",
+        "fn main() {\n    let b: Box<f32> = box 1;\n    println(*b);\n}\n",
+        "E1201",
+    );
+    assert_rc1(
+        "int-into-f64",
+        "fn main() {\n    let b: Box<f64> = box 1;\n    println(*b);\n}\n",
         "E1201",
     );
 }
@@ -217,15 +248,16 @@ fn unannotated_and_nested_box_forms_stay_fail_closed() {
         "fn main() {\n    let b: Box<Box<i8>> = box box 1;\n    println(*b);\n}\n",
         "E1201",
     );
+    // L2k：字面量复合载荷已支持；变量载荷维持 fail-closed（见新 token 负控）。
     assert_rc1(
-        "box-array",
-        "fn main() {\n    let b: Box<[i8; 3]> = box [1, 2, 3];\n    println(*b);\n}\n",
-        "E1201",
+        "box-array-variable",
+        "fn main() {\n    let a: [i8; 3] = [1, 2, 3];\n    let b: Box<[i8; 3]> = box a;\n    println(*b);\n}\n",
+        "box 载荷须为字面量常量",
     );
     assert_rc1(
-        "box-struct",
-        "struct S { x: i8 }\nfn main() {\n    let b: Box<S> = box S { x: 1 };\n    println(*b);\n}\n",
-        "let 类型标注",
+        "box-struct-variable",
+        "struct S { x: i8 }\nfn main() {\n    let s = S { x: 1 };\n    let b: Box<S> = box s;\n    println(*b);\n}\n",
+        "box 载荷须为字面量常量",
     );
     assert_rc1(
         "box-bool",
