@@ -1,6 +1,7 @@
 //! L2i 核心集成测试：浮点特殊值作 tuple／array／struct 的常量成员，含既有嵌套
-//! 形态与投影打印、混合宽度、定义序、多实参与重复读取、绑定别名；枚举特殊载荷／
-//! 浮点算术／Box 浮点／投影绑定／非法下标维持 fail-closed。
+//! 形态与投影打印、混合宽度、定义序、多实参与重复读取、绑定别名；枚举特殊载荷
+//! 自 L2l 起放行单载荷直接形式（见 l2l_core），浮点算术／Box 浮点／投影绑定／
+//! 非法下标维持 fail-closed。
 //! 只依赖宿主 `cc`；不访问网络。
 
 use std::fs;
@@ -212,11 +213,13 @@ fn finite_composites_zero_regression() {
 }
 
 #[test]
-fn enum_special_payload_stays_fail_closed() {
-    assert_rc1(
+fn enum_single_payload_special_literal_prints() {
+    // L2l（O-4 批准）：单载荷变体的特殊值字面量直接形式转正；
+    // 多字段／嵌套直接形式与绑定旁路边界见 l2l_core。
+    assert_runs(
+        "enum E { A(f64), B(f32) }\nfn main() {\n    println(A(f64::NAN));\n    println(B(f32::NEG_INFINITY));\n}\n",
         "enum",
-        "enum E { A(f64) }\nfn main() {\n    println(A(f64::NAN));\n}\n",
-        "codegen",
+        b"A(nan)\nB(-inf)\n",
     );
 }
 
