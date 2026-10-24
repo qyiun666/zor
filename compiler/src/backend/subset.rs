@@ -142,6 +142,20 @@ fn check_block(
                         Some(BindingKind::Str)
                     }
                     Some(Ty::BoxTy(inner)) => match l2f_payload_ty(inner) {
+                        // L2j：浮点载荷标注仅在初值为特殊值时成立；有限浮点沿用原判词。
+                        Some(p)
+                            if matches!(p, Ty::Prim("f32") | Ty::Prim("f64"))
+                                && !matches!(
+                                    init,
+                                    Ex::Box(b, _, _) if matches!(b.as_ref(), Ex::FloatSpecial(..))
+                                ) =>
+                        {
+                            return Err(SubsetError::new(
+                                *l,
+                                *c,
+                                "let 类型标注（Box 仅 8 个整型宽度可 codegen）",
+                            ))
+                        }
                         Some(p) => Some(BindingKind::Box(p)),
                         None => {
                             return Err(SubsetError::new(
@@ -238,7 +252,10 @@ fn check_block(
                             (Some(BindingKind::Box(t)), Some(Ty::BoxTy(p))) => t == p.as_ref(),
                             _ => false,
                         };
-                        matches!(inner.as_ref(), Ex::Lit(Lit::Int(_), _, _)) && same_payload
+                        matches!(
+                            inner.as_ref(),
+                            Ex::Lit(Lit::Int(_), _, _) | Ex::FloatSpecial(..)
+                        ) && same_payload
                     }
                     _ => false,
                 };
@@ -278,7 +295,21 @@ fn let_init_kind(
             Ok(BindingKind::Str)
         }
         Ex::Box(inner, il, ic) => {
-            if !matches!(inner.as_ref(), Ex::Lit(Lit::Int(_), _, _)) {
+            // L2j：仅特殊值载荷可进入 Box<f32>／Box<f64>；有限浮点维持 fail-closed。
+            let ok_payload = match inner.as_ref() {
+                Ex::Lit(Lit::Int(_), _, _) => true,
+                Ex::FloatSpecial(w, _, _, _) => matches!(
+                    (w, ann.as_ref()),
+                    (crate::parser::FloatWidth::F32, Some(BindingKind::Box(t)))
+                        if t == &Ty::Prim("f32")
+                ) || matches!(
+                    (w, ann.as_ref()),
+                    (crate::parser::FloatWidth::F64, Some(BindingKind::Box(t)))
+                        if t == &Ty::Prim("f64")
+                ),
+                _ => false,
+            };
+            if !ok_payload {
                 return Err(SubsetError::new(*il, *ic, "box 载荷非整型字面量"));
             }
             let payload = match ann {
@@ -411,7 +442,12 @@ fn is_byte_array_ty(t: &Ty) -> bool {
 /// L2f／L2g Box 载荷类型：8 个整型宽度（L2g 追加 i8／i16／i32／u16／u64）。
 fn l2f_payload_ty(t: &Ty) -> Option<Ty> {
     match t {
-        Ty::Prim(p) if matches!(*p, "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64") => {
+        Ty::Prim(p)
+            if matches!(
+                *p,
+                "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64"
+            ) =>
+        {
             Some(t.clone())
         }
         _ => None,

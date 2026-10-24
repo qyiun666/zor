@@ -161,9 +161,14 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             let ty = box_int_ty(&payload).ok_or_else(|| {
                                 SubsetError::new(*l, *c, "lower：box 载荷类型非 8 个整型宽度之一")
                             })?;
-                            let value = box_lit(inner, ty)?;
+                            let (value, konst) = if matches!(payload, Ty::F32 | Ty::F64) {
+                                let val = const_scalar(inner, &payload, types, &slots, &scope)?;
+                                (box_float_bits(&val, ty)?, Some(val))
+                            } else {
+                                (box_lit(inner, ty)?, None)
+                            };
                             body.push(Stmt::BindBox { local: id, ty, value, line: *l, col: *c });
-                            slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
+                            slots.push(Slot { ty: local_ty, live: true, konst, bytes: None });
                         }
                         Ex::Lit(Lit::Int(v), il, ic) => match &local_ty {
                             Ty::I64 => {
@@ -215,9 +220,22 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 if slots.get(src.0 as usize).map(|s| &s.ty) != Some(&local_ty) {
                                     return Err(SubsetError::new(*nl, *nc, "lower：移动源类型与目标不符"));
                                 }
+                                let is_float = matches!(&local_ty, Ty::Box(p) if matches!(**p, Ty::F32 | Ty::F64));
+                                let konst = if is_float {
+                                    Some(
+                                        slots
+                                            .get(src.0 as usize)
+                                            .and_then(|s| s.konst.clone())
+                                            .ok_or_else(|| {
+                                                SubsetError::new(*nl, *nc, "lower：Box 浮点移动源缺少编译期值")
+                                            })?,
+                                    )
+                                } else {
+                                    None
+                                };
                                 body.push(Stmt::MoveAssign { dst: id, src, line: *nl, col: *nc });
                                 set_live(&mut slots, src, false);
-                                slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
+                                slots.push(Slot { ty: local_ty, live: true, konst, bytes: None });
                             } else if let Some(ty) = ir_int_ty(&local_ty) {
                                 if slots.get(src.0 as usize).map(|s| &s.ty) != Some(&local_ty) {
                                     return Err(SubsetError::new(*nl, *nc, "lower：整型拷贝源类型与目标不符"));
@@ -380,6 +398,10 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 }
                                 set_live(&mut slots, ib, false);
                                 set_live(&mut slots, ia, true);
+                                let konst = slots.get(ib.0 as usize).and_then(|s| s.konst.clone());
+                                if let Some(slot) = slots.get_mut(ia.0 as usize) {
+                                    slot.konst = konst;
+                                }
                             }
                         }
                         (Ex::Path(a, al, ac), Ex::Box(inner, _, _)) => {
@@ -391,7 +413,12 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             let ty = box_int_ty(&payload).ok_or_else(|| {
                                 SubsetError::new(*al, *ac, "lower：box 载荷类型非 8 个整型宽度之一")
                             })?;
-                            let value = box_lit(inner, ty)?;
+                            let (value, konst) = if matches!(payload, Ty::F32 | Ty::F64) {
+                                let val = const_scalar(inner, &payload, types, &slots, &scope)?;
+                                (box_float_bits(&val, ty)?, Some(val))
+                            } else {
+                                (box_lit(inner, ty)?, None)
+                            };
                             let drop_dst = is_live(&slots, ia);
                             body.push(Stmt::BindBoxAssign {
                                 local: ia,
@@ -402,6 +429,9 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 col: *ac,
                             });
                             set_live(&mut slots, ia, true);
+                            if let Some(slot) = slots.get_mut(ia.0 as usize) {
+                                slot.konst = konst;
+                            }
                         }
                         _ => return Err(SubsetError::new(*l, *c, "lower：赋值形态")),
                     }
@@ -531,6 +561,15 @@ fn print_arg(
             }
             if ir_int_ty(&irt).is_none() && box_int_ty(&irt).is_none() {
                 return Err(SubsetError::new(*dl, *dc, "lower：解引用结果类型非整型"));
+            }
+            // L2j：Box<f32>／Box<f64> 载荷恒为编译期特殊值，直接复用 float_fmt 字节。
+            if matches!(irt, Ty::F32 | Ty::F64) {
+                let val = b
+                    .slots
+                    .get(src.0 as usize)
+                    .and_then(|s| s.konst.clone())
+                    .ok_or_else(|| SubsetError::new(*dl, *dc, "lower：Box 浮点载荷缺少编译期值"))?;
+                return Ok(PrintArg::Bytes(format_const(&val, &irt)?));
             }
             // 读入临时量：Box owner 槽位只声明 zor_box_<id>，不能把其 id
             // 当作载荷局部 id 使用。与 lower_value 的复合解引用路径保持一致。
@@ -1121,6 +1160,9 @@ fn ast_to_ir(t: &AstTy) -> Option<Ty> {
                 AstTy::Prim("u16") => Ty::U16,
                 AstTy::Prim("u32") => Ty::U32,
                 AstTy::Prim("u64") => Ty::U64,
+                // L2j：仅特殊值载荷可用（有限浮点由 subset 拒绝）。
+                AstTy::Prim("f32") => Ty::F32,
+                AstTy::Prim("f64") => Ty::F64,
                 _ => return None,
             };
             Some(Ty::Box(Box::new(payload)))
@@ -1150,6 +1192,8 @@ fn box_int_ty(t: &Ty) -> Option<BoxIntTy> {
         Ty::U16 => Some(BoxIntTy::U16),
         Ty::U32 => Some(BoxIntTy::U32),
         Ty::U64 => Some(BoxIntTy::U64),
+        Ty::F32 => Some(BoxIntTy::F32),
+        Ty::F64 => Some(BoxIntTy::F64),
         _ => None,
     }
 }
@@ -1246,6 +1290,16 @@ fn lower_int_expr(
     }
 }
 
+/// L2j：特殊值载荷的存储位型（float／double 的 IEEE754 位模式）。
+/// 打印仍走编译期 `float_fmt` 字节；此处仅保证载荷按真实位型落堆。
+fn box_float_bits(val: &ConstVal, ty: BoxIntTy) -> Result<i128, SubsetError> {
+    match (val, ty) {
+        (ConstVal::F32Special(k), BoxIntTy::F32) => Ok(special_f32(*k).to_bits() as i128),
+        (ConstVal::F64Special(k), BoxIntTy::F64) => Ok(special_f64(*k).to_bits() as i128),
+        _ => Err(SubsetError::new(0, 0, "lower：Box 浮点载荷非特殊值")),
+    }
+}
+
 fn box_lit(e: &Ex, ty: BoxIntTy) -> Result<i128, SubsetError> {
     match e {
         Ex::Lit(Lit::Int(v), l, c) => {
@@ -1261,6 +1315,10 @@ fn box_lit(e: &Ex, ty: BoxIntTy) -> Result<i128, SubsetError> {
                 BoxIntTy::U16 => u16::MAX as i128,
                 BoxIntTy::U32 => u32::MAX as i128,
                 BoxIntTy::U64 => u64::MAX as i128,
+                // L2j：浮点载荷不经过整型字面量路径。
+                BoxIntTy::F32 | BoxIntTy::F64 => {
+                    return Err(SubsetError::new(*l, *c, "lower：浮点载荷非整型字面量"));
+                }
             };
             if (0..=max).contains(&n) {
                 Ok(n)
