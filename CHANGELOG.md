@@ -4,6 +4,43 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.10] - 2026-10-24
+
+内部验证里程碑，非可用语言版本：本版为 L2k「Box 常量载荷」——在 0.3.9 的 typed Box 8 个整型宽度、L2j 特殊值载荷与 L2i 复合承载之上，使 `Box<struct>`／`Box<[T;N]>` 可承载**字面量常量**载荷（注解构造、`println(*b)`、多 Box／重复读取、局部移动／重赋值、`unbox`／作用域 drop 一次），并为 `Box<f32>`／`Box<f64>` 补齐**有限字面量**载荷；`println(*b)` 与同类型同值普通复合 `println` 逐字节同构，输出沿用既有 stdout 契约字节。本版不引入运行期浮点库、不做浮点算术，`Box<Box<T>>` 与含 Box 复合值维持 fail-closed；并把 `l2k-baseline` 接入 `stdout-contract`，形成 `l2e`／`l2f`／`l2g`／`l2h`／`l2i`／`l2j`／`l2k` 七基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：新增仅为常量字面量载荷进入 `Box<struct>`／`Box<[T;N]>`（元素标注下推覆盖全部允许叶子；空 struct／`[T;0]` 以不可观测占位承载；负整数字面量叶子可构造）与有限字面量进入 `Box<f32>`／`Box<f64>`（上溢为 `inf`、下溢为 `0`，按既有常量求值）；变量载荷、含 Box 复合值、`Box<Box<T>>`、`Box<enum>`、`Box<[byte;N]>`（含嵌套）、`Box<bool>`／`Box<byte>`／`Box<unit>`、函数参数／返回值／struct 字段、`println(b)`／`println(*b, b)`／`println((*b, 1))`／`let v = *b`、投影与经 Box 写字段维持 fail-closed；析构仍为单层释放，不做递归释放；打印复用既有编译期字节路径，不读堆、不引入运行期浮点库、不读 locale；跨宽与数组长度不符沿用既有诊断码，不新增转换、不新增 E 码；仍不含浮点算术／比较、扩展常量与枚举特殊载荷。① 本切片；② 扩展常量结转 L2l；③ 浮点算术／比较不做；④ 安装／打包不做；⑤ 跨平台证据 N/A（Linux x86_64 唯一终证，macOS 仅辅助）；⑥ 诊断增强结转 L2l；⑦ 文档债 doc-only（独立 2-file docs PR，不进本账本）。计数：L2k 活跃 stdout **335**（runtime 175＋负控 143＋CLI 17）＋packaging **4**＝**339**；`l2k-baseline` **417** 条（sha256 清单 **590** 行）；0.3.9 历史 stdout **275**（126／132／17）＋packaging 4＝**279**／全量 **345** 冻结不漂移；`l2e-baseline` **162** 条（209 行）、`l2f-baseline` **188** 条（246 行）、`l2g-baseline` **206** 条（275 行）、`l2h-baseline` **247** 条（327 行）、`l2i-baseline` **297** 条（398 行）、`l2j-baseline` **345** 条（466 行）、`l2c-baseline` **68** 条（105 行）、`legacy-snapshot` **226** 条、runtime-codes **39＋6＋19**、`new-cases.tsv` **120** 均零改；L2k 新增正例 **49**、新负控 **23**、既有负控转正／退休 **12**（仅执行面，旧资产与旧基线字节零改）。
+
+### Added
+
+- **Box 常量载荷（struct／定长数组）**：`Box<struct>`／`Box<[T;N]>` 可承载字面量常量载荷；注解构造；`println(*b)` 与同类型同值普通复合 `println` 逐字节同构；多 Box／重复读取、局部移动／重赋值（旧值释放一次）、`unbox`／作用域 drop 一次；元素标注下推覆盖全部允许叶子（i8…u64／f32／f64／bool 及允许的嵌套 struct／数组）；空 struct／`[T;0]` 以不可观测占位承载；复合载荷内负整数字面量叶子（含 i8::MIN／i64::MIN）可构造。
+- **有限浮点标量载荷**：`Box<f32>`／`Box<f64>` 增加有限字面量载荷（`1.5`／`0.0`／`-0.0`／负值）；宽度由标注收窄；`1e999` 按既有常量求值输出 `inf`、`1e-999` 输出 `0`；六个特殊值载荷零回退。
+- **`l2k-baseline` 第七基线**：`stdout-contract` 在 `l2e`…`l2j` 之后校验 `l2k-baseline`（417／590／590），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿；ASAN 补充判据走第二 manifest（6 条，默认 48／41／7 零改）。
+
+### Changed
+
+- **计数与资产**：活跃 stdout 由 **275**（126／132／17）扩至 **335**（175／143／17）＋packaging 4＝**339**；`l2k-baseline` 新建 417 条（sha256 清单 590 行）；旧六基线 162／209、188／246、206／275、247／327、297／398、345／466 与 `l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 零改；0.3.9 历史 275／279／345 冻结不漂移。
+- **版本锚**：本账本恰 3 files：`CHANGELOG.md`／`compiler/Cargo.toml`／`compiler/Cargo.lock`；`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.9` 落至 `0.3.10`；`compiler/Cargo.toml:5` description 版本串同步；`compiler/Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.10`（**13 B**，含换行，以账本实测为准）。
+- **CI**：七基线并存；不新建 job、不改 workflow YAML、不改 ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2k-01：**PASS**——main `e44ac74a3d2dffab9f0d3e02666eecbde0462bac`；run `40083843274`；`baseline`／`stdout-contract`／`runtime-codes`／`asan-linux`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2e-baseline|cases=162 files=209 unique=209 fail=0`；`PASS|l2f-baseline|cases=188 files=246 unique=246 fail=0`；`PASS|l2g-baseline|cases=206 files=275 unique=275 fail=0`；`PASS|l2h-baseline|cases=247 files=327 unique=327 fail=0`；`PASS|l2i-baseline|cases=297 files=398 unique=398 fail=0`；`PASS|l2j-baseline|cases=345 files=466 unique=466 fail=0`；`PASS|l2k-baseline|cases=417 files=590 unique=590 fail=0`；`PASS|stdout-contract|runtime=175 negative=143 fail=0 ran=175/143`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；`PASS|asan-l2k|cases=6 fail=0 ran=6/6`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：七基线判词全 PASS；ASAN 第二 manifest **6/6**、默认 manifest **48／41／7** 零改；S14-01～31／S15-01～18 **49/49**、N-143～165 **23/23**；六档 `-O*` **294/294**、locale **23/23 SAME**（Stage-2 证据，不进 CI，OA-1）；`cargo test --release --locked` **360 passed／0 failed**；`l2k-baseline` **590/590**、`l2j-baseline` 466/466、`l2i` 398/398、`l2h` 327/327、`l2g` 275/275、`l2f` 246/246、`l2e` 209/209、`l2c` 105/105、legacy 226/226；全 job `SKIP|`／`FAIL|` 0 行。
+- 计数口径：P=**49**／Q=**23**／Ret=**12**／R=**175**／G=**143**／T=**335**／A=**339**／N=**417**／M=**590**。
+- 证据：GATE 报告 `shared/ZOR-L2k-GATE-01-20261024/REPORT.md`（sha256 `88d0bc8564bb22b2802a8e6dd50e05253dce461f840219ab5da597781ba6e121`）；GATE 证据包 `SHA256SUMS`（17 行）`sha256sum -c` rc=0；PR #138 **140 files +3452／−168**；产品会签 `shared/ZOR-L2k-Stage2-S14会签-产品-v1.md`（sha256 `993212060a9449643086457b757947bd8e7c5802c5f7be132485f1c33a65c578`，49/49 PASS）；`l2k-baseline.tsv` `22e7228412677e4e0b2dd0543ac266c73228e412c5199a37051bea85a0c23998`；`l2k-baseline.sha256` `95802621efa41caf5118c6e4ddbbd7d380b713f8ab0e178604354e77e8f1d696`；ASAN manifest `327db74db62af65ec714e58c67f04bf41f9fc0764898fa21253d5e0140950ea8`。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **版本语境**：0.3.9 及更早节的 fail-closed 表述（含“有限浮点载荷不在本版”“Box 能力面结转 L2k”）按版本语境保留、**不回改**；历史节逐字节零改。
+- **Box 常量性边界**：仅字面量常量载荷；变量载荷、含 Box 复合值、`Box<Box<T>>`、`Box<enum>`、`Box<[byte;N]>`（含嵌套）、`Box<bool>`／`Box<byte>`／`Box<unit>`、函数参数／返回值／struct 字段、`println(b)`／`println(*b, b)`／`println((*b, 1))`／`let v = *b`、投影与经 Box 写字段维持 fail-closed，结转 L2l。
+- **有限浮点**：仅有限字面量与六个特殊值；浮点算术／比较／条件／隐式转换不做；扩展常量结转 L2l；有限浮点字面量按既有常量求值（上溢为 `inf`、下溢为 `0`）。
+- **载荷不可程序内回读**：`println(*b)` 字节由编译期常量树决定（不读堆）；本版不提供 `let s = *b`／投影／经 Box 写字段，程序内不能回读 Box 载荷。
+- **析构**：复合载荷不含 Box／引用，单层释放；不提供递归释放。
+- **诊断文案债**：`N-140` 第二行仍写 `0.3.7`，属既有文案，本版不改（⑥ 结转 L2l）。
+- **平台／发布／性能**：Linux x86_64 唯一终证，macOS 仅辅助；零 tag／Release，不构成安装或环境可用性承诺；不出性能数字、不作性能承诺。
+- **PA-L2k**：PA-L2k-01～07 待 0.3.10 账本合并后执行。
+
 ## [0.3.9] - 2026-10-24
 
 内部验证里程碑，非可用语言版本：本版为 L2j「Box<f32>／Box<f64> 浮点特殊值载荷」——在 0.3.8 的浮点特殊值复合承载与打印之上，新增 `Box<f32>`／`Box<f64>` 承载六个特殊值源形态（`f64::NAN`／`f64::INFINITY`／`f64::NEG_INFINITY`、`f32::NAN`／`f32::INFINITY`／`f32::NEG_INFINITY`）：注解构造（`let b: Box<f64> = box f64::NAN;`）、`println(*b)` 输出 `nan`／`inf`／`-inf`、多 Box／重复读取、局部移动／重赋值、`unbox`／作用域 drop 一次；并把 `l2j-baseline` 接入 `stdout-contract`，形成 `l2e`／`l2f`／`l2g`／`l2h`／`l2i`／`l2j` 六基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
