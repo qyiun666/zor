@@ -1,0 +1,2 @@
+enum E { A(Box<f64>) }
+fn main() { let b: Box<f64> = box f64::NAN; println(A(b)); }

@@ -302,6 +302,8 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
                                     BoxIntTy::U64 => ("%llu", "unsigned long long"),
                                     BoxIntTy::I64 => ("%lld", "long long"),
                                     BoxIntTy::U8 | BoxIntTy::U32 => ("%u", "unsigned"),
+                                    // L2j：浮点载荷恒走编译期字节（PrintArg::Bytes），此处不可达。
+                                    BoxIntTy::F32 | BoxIntTy::F64 => ("", ""),
                                 };
                                 let _ = writeln!(out, "    printf(\"{spec}\", ({cast})({v}));");
                             }
@@ -410,6 +412,8 @@ fn box_int_local(ty: BoxIntTy, id: &LocalId) -> String {
         BoxIntTy::U16 => "zor_u16",
         BoxIntTy::U32 => "zor_u32",
         BoxIntTy::U64 => "zor_u64",
+        BoxIntTy::F32 => "zor_f32",
+        BoxIntTy::F64 => "zor_f64",
     };
     format!("{prefix}_{}", id.0)
 }
@@ -439,6 +443,15 @@ fn box_int_const(v: i128, ty: BoxIntTy) -> String {
         BoxIntTy::U16 => format!("UINT16_C({v})"),
         BoxIntTy::U32 => format!("UINT32_C({v})"),
         BoxIntTy::U64 => format!("UINT64_C({v})"),
+        // L2j：特殊值载荷按 IEEE754 位模式落堆（联合体常量为 C11，无需 libm／运行期格式化）。
+        BoxIntTy::F32 => format!(
+            "((union {{ float f; uint32_t u; }}){{ .u = UINT32_C({:#010x}) }}).f",
+            v as u32
+        ),
+        BoxIntTy::F64 => format!(
+            "((union {{ double d; uint64_t u; }}){{ .u = UINT64_C({:#018x}) }}).d",
+            v as u64
+        ),
     }
 }
 
@@ -608,6 +621,9 @@ fn box_payload_ty(f: &Func, id: LocalId) -> Option<BoxIntTy> {
             Ty::U16 => Some(BoxIntTy::U16),
             Ty::U32 => Some(BoxIntTy::U32),
             Ty::U64 => Some(BoxIntTy::U64),
+            // L2j：特殊值载荷（打印走编译期字节）。
+            Ty::F32 => Some(BoxIntTy::F32),
+            Ty::F64 => Some(BoxIntTy::F64),
             _ => None,
         },
         _ => None,

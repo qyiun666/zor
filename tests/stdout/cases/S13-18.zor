@@ -1,0 +1,5 @@
+fn main() {
+    let b: Box<f32> = box f32::NEG_INFINITY;
+    b = box f32::NAN;
+    println(*b);
+}

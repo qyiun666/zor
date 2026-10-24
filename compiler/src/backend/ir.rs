@@ -69,6 +69,9 @@ pub enum BoxIntTy {
     U16,
     U32,
     U64,
+    /// L2j：特殊值载荷宽度（载荷恒为编译期特殊值；有限浮点不在子集）。
+    F32,
+    F64,
 }
 
 impl BoxIntTy {
@@ -82,6 +85,8 @@ impl BoxIntTy {
             BoxIntTy::U16 => Ty::U16,
             BoxIntTy::U32 => Ty::U32,
             BoxIntTy::U64 => Ty::U64,
+            BoxIntTy::F32 => Ty::F32,
+            BoxIntTy::F64 => Ty::F64,
         }
     }
 
@@ -95,6 +100,8 @@ impl BoxIntTy {
             BoxIntTy::U16 => "uint16_t",
             BoxIntTy::U32 => "uint32_t",
             BoxIntTy::U64 => "uint64_t",
+            BoxIntTy::F32 => "float",
+            BoxIntTy::F64 => "double",
         }
     }
 

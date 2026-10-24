@@ -1,0 +1,6 @@
+fn main() {
+    let b: Box<f32> = box f32::NAN;
+    unbox b;
+    b = box f32::INFINITY;
+    println(*b);
+}
