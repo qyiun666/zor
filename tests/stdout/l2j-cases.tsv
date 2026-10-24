@@ -1,0 +1,19 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S13-01	tests/stdout/cases/S13-01.zor	run	0	expected/S13-01.stdout	-	f64 NaN annotated box, deref print
+S13-02	tests/stdout/cases/S13-02.zor	run	0	expected/S13-02.stdout	-	f64 +Inf annotated box, deref print
+S13-03	tests/stdout/cases/S13-03.zor	run	0	expected/S13-03.stdout	-	f64 -Inf annotated box, deref print
+S13-04	tests/stdout/cases/S13-04.zor	run	0	expected/S13-04.stdout	-	f32 NaN annotated box, deref print
+S13-05	tests/stdout/cases/S13-05.zor	run	0	expected/S13-05.stdout	-	f32 +Inf annotated box, deref print
+S13-06	tests/stdout/cases/S13-06.zor	run	0	expected/S13-06.stdout	-	f32 -Inf annotated box, deref print
+S13-07	tests/stdout/cases/S13-07.zor	run	0	expected/S13-07.stdout	-	two f64 boxes, multi-arg print
+S13-08	tests/stdout/cases/S13-08.zor	run	0	expected/S13-08.stdout	-	same box deref read twice
+S13-09	tests/stdout/cases/S13-09.zor	run	0	expected/S13-09.stdout	-	local move then deref read
+S13-10	tests/stdout/cases/S13-10.zor	run	0	expected/S13-10.stdout	-	local reassign NAN to +Inf
+S13-11	tests/stdout/cases/S13-11.zor	run	0	expected/S13-11.stdout	-	unbox only, no output
+S13-12	tests/stdout/cases/S13-12.zor	run	0	expected/S13-12.stdout	-	mixed f32 and f64 multi-arg print
+S13-13	tests/stdout/cases/S13-13.zor	run	0	expected/S13-13.stdout	-	two f32 boxes, repeated deref read
+S13-14	tests/stdout/cases/S13-14.zor	run	0	expected/S13-14.stdout	-	move chain a to b to c
+S13-15	tests/stdout/cases/S13-15.zor	run	0	expected/S13-15.stdout	-	unbox then reinit f32
+S13-16	tests/stdout/cases/S13-16.zor	run	0	expected/S13-16.stdout	-	three f64 specials plus integer literal
+S13-17	tests/stdout/cases/S13-17.zor	run	0	expected/S13-17.stdout	-	repeated deref read then unbox
+S13-18	tests/stdout/cases/S13-18.zor	run	0	expected/S13-18.stdout	-	f32 reassign -Inf to NAN

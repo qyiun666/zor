@@ -1,0 +1,6 @@
+fn main() {
+    let b: Box<f64> = box f64::NAN;
+    println(*b);
+    println(*b);
+    unbox b;
+}

@@ -1,0 +1,2 @@
+struct S { b: Box<f64> }
+fn main() { let s = S { b: box f64::NAN }; println(s.b); }

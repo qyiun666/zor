@@ -1,0 +1,31 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-113	tests/stdout/cases/N-113.zor	1	none	E1201	zor: runtime error	cross-width f32 <- f64 NaN
+N-114	tests/stdout/cases/N-114.zor	1	none	E1201	zor: runtime error	cross-width f64 <- f32 NaN
+N-115	tests/stdout/cases/N-115.zor	1	none	E1201	zor: runtime error	integer payload into Box<f32>
+N-116	tests/stdout/cases/N-116.zor	1	none	E1201	zor: runtime error	integer payload into Box<f64>
+N-117	tests/stdout/cases/N-117.zor	1	none	zorcc: codegen:	zor: runtime error	finite payload f64 -0.0
+N-118	tests/stdout/cases/N-118.zor	1	none	zorcc: codegen:	zor: runtime error	finite payload f64 0.0
+N-119	tests/stdout/cases/N-119.zor	1	none	E1201	zor: runtime error	finite payload f32 -0.0
+N-120	tests/stdout/cases/N-120.zor	1	none	E1201	zor: runtime error	finite payload f32 0.0
+N-121	tests/stdout/cases/N-121.zor	1	none	zorcc: codegen:	zor: runtime error	unannotated box f64 NaN
+N-122	tests/stdout/cases/N-122.zor	1	none	zorcc: codegen:	zor: runtime error	unannotated box f32 +Inf
+N-123	tests/stdout/cases/N-123.zor	1	none	zorcc: codegen:	zor: runtime error	unannotated box -0.0
+N-124	tests/stdout/cases/N-124.zor	1	none	zorcc: codegen:	zor: runtime error	nested Box<Box<i64>>
+N-125	tests/stdout/cases/N-125.zor	1	none	zorcc: codegen:	zor: runtime error	Box<struct> payload
+N-126	tests/stdout/cases/N-126.zor	1	none	zorcc: codegen:	zor: runtime error	Box<array> payload
+N-127	tests/stdout/cases/N-127.zor	1	none	zorcc: codegen:	zor: runtime error	Box<bool> payload
+N-128	tests/stdout/cases/N-128.zor	1	none	E1201	zor: runtime error	Box<byte> payload
+N-129	tests/stdout/cases/N-129.zor	1	none	zorcc: codegen:	zor: runtime error	fn param Box<f64>
+N-130	tests/stdout/cases/N-130.zor	1	none	zorcc: codegen:	zor: runtime error	fn return Box<f64>
+N-131	tests/stdout/cases/N-131.zor	1	none	zorcc: codegen:	zor: runtime error	fn param Box<f32>
+N-132	tests/stdout/cases/N-132.zor	1	none	zorcc: codegen:	zor: runtime error	struct field Box<f64>
+N-133	tests/stdout/cases/N-133.zor	1	none	zorcc: codegen:	zor: runtime error	print box itself
+N-134	tests/stdout/cases/N-134.zor	1	none	zorcc: codegen:	zor: runtime error	print tuple containing box deref
+N-135	tests/stdout/cases/N-135.zor	1	none	zorcc: codegen:	zor: runtime error	deref arithmetic
+N-136	tests/stdout/cases/N-136.zor	1	none	zorcc: codegen:	zor: runtime error	deref comparison
+N-137	tests/stdout/cases/N-137.zor	1	none	zorcc: codegen:	zor: runtime error	deref in if condition
+N-138	tests/stdout/cases/N-138.zor	1	none	E1201	zor: runtime error	implicit special to i64 binding
+N-139	tests/stdout/cases/N-139.zor	1	none	zorcc: codegen:	zor: runtime error	enum Box<f64> payload
+N-140	tests/stdout/cases/N-140.zor	1	none	E1101	zor: runtime error	extended constant f64 MAX
+N-141	tests/stdout/cases/N-141.zor	1	none	E1201	zor: runtime error	unary minus on special value
+N-142	tests/stdout/cases/N-142.zor	1	none	E2301	zor: runtime error	use after unbox

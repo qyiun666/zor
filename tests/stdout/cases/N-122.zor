@@ -1,0 +1,1 @@
+fn main() { let b = box f32::INFINITY; println(*b); }

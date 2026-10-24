@@ -1,0 +1,2 @@
+fn f(b: Box<f32>) { println(*b); }
+fn main() { let b: Box<f32> = box f32::NAN; f(b); }

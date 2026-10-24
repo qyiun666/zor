@@ -1,0 +1,5 @@
+fn main() {
+    let a: Box<f64> = box f64::NAN;
+    let b: Box<f64> = box f64::INFINITY;
+    println(*a, *b);
+}

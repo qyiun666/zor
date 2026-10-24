@@ -1,0 +1,6 @@
+fn main() {
+    let a: Box<f32> = box f32::INFINITY;
+    let b: Box<f32> = box f32::NEG_INFINITY;
+    println(*a, *b);
+    println(*a);
+}

@@ -1,0 +1,5 @@
+fn main() {
+    let a: Box<f64> = box f64::INFINITY;
+    let b = a;
+    println(*b);
+}

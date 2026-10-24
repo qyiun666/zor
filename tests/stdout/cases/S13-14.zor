@@ -1,0 +1,6 @@
+fn main() {
+    let a: Box<f32> = box f32::NAN;
+    let b = a;
+    let c = b;
+    println(*c);
+}
