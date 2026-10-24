@@ -1,0 +1,6 @@
+fn main() {
+    let a = [true, false, true];
+    let b: Box<[bool; 3]> = box [true, false, true];
+    println(a);
+    println(*b);
+}

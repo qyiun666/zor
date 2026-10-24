@@ -1,0 +1,5 @@
+fn main() {
+    let a: Box<f32> = box 1e999;
+    let b: Box<f32> = box 1e-999;
+    println(*a, *b);
+}

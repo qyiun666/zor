@@ -1,0 +1,7 @@
+struct S { f: f32, g: f64, z: f64 }
+fn main() {
+    let s = S { f: 1.5, g: 2.5, z: -0.0 };
+    let b: Box<S> = box S { f: 1.5, g: 2.5, z: -0.0 };
+    println(s);
+    println(*b);
+}

@@ -1,0 +1,5 @@
+fn main() {
+    let a: Box<f64> = box 1.5;
+    let b: Box<f32> = box 2.5;
+    println(*a, *b, 7);
+}

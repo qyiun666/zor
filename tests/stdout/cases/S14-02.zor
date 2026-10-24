@@ -1,0 +1,7 @@
+struct S { a: i8, b: i16, c: i32, d: i64, e: u8, f: u16, g: u32, h: u64, ok: bool }
+fn main() {
+    let s = S { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, ok: true };
+    let b: Box<S> = box S { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8, ok: true };
+    println(s);
+    println(*b);
+}

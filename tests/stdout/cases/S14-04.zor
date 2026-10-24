@@ -1,0 +1,8 @@
+struct P { x: i64, y: i64 }
+struct S { p: P, z: i64 }
+fn main() {
+    let s = S { p: P { x: 1, y: 2 }, z: 3 };
+    let b: Box<S> = box S { p: P { x: 1, y: 2 }, z: 3 };
+    println(s);
+    println(*b);
+}
