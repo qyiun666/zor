@@ -1,0 +1,21 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-166	tests/stdout/cases/N-166.zor	1	none	E1201	zor: runtime error	cross width f32 payload f64 NAN
+N-167	tests/stdout/cases/N-167.zor	1	none	E1201	zor: runtime error	cross width f64 payload f32 NAN
+N-168	tests/stdout/cases/N-168.zor	1	none	E1201	zor: runtime error	cross width f32 payload f64 +Inf
+N-169	tests/stdout/cases/N-169.zor	1	none	E1201	zor: runtime error	cross width f64 payload f32 -Inf
+N-170	tests/stdout/cases/N-170.zor	1	none	E1201	zor: runtime error	unary minus on special value
+N-171	tests/stdout/cases/N-171.zor	1	none	E1201	zor: runtime error	unary minus on enum value
+N-172	tests/stdout/cases/N-172.zor	1	none	E1101	zor: runtime error	path syntax E::V finite
+N-173	tests/stdout/cases/N-173.zor	1	none	E1101	zor: runtime error	path syntax E::V special
+N-174	tests/stdout/cases/N-174.zor	1	none	zorcc: codegen:	zor: runtime error	nested struct direct form
+N-175	tests/stdout/cases/N-175.zor	1	none	zorcc: codegen:	zor: runtime error	nested array direct form
+N-176	tests/stdout/cases/N-176.zor	1	none	E1201	zor: runtime error	arithmetic on enum special
+N-177	tests/stdout/cases/N-177.zor	1	none	E1201	zor: runtime error	comparison on enum special
+N-178	tests/stdout/cases/N-178.zor	1	none	E1101	zor: runtime error	extended constant MAX
+N-179	tests/stdout/cases/N-179.zor	1	none	E1101	zor: runtime error	extended constant EPSILON
+N-180	tests/stdout/cases/N-180.zor	1	none	E1101	zor: runtime error	named payload syntax
+N-181	tests/stdout/cases/N-181.zor	1	none	E1201	zor: runtime error	nested enum payload
+N-182	tests/stdout/cases/N-182.zor	1	none	E1202	zor: runtime error	implicit int to float payload
+N-183	tests/stdout/cases/N-183.zor	1	none	zorcc: codegen:	zor: runtime error	multi-field direct form O-1 strict
+N-184	tests/stdout/cases/N-184.zor	1	none	zorcc: codegen:	zor: runtime error	struct field containing enum direct
+N-185	tests/stdout/cases/N-185.zor	1	none	E1201	zor: runtime error	bool payload

@@ -1,0 +1,5 @@
+struct S { x: i64 }
+enum E { V(S) }
+fn main() {
+    println(V(S { x: 1 }));
+}

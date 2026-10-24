@@ -1,0 +1,5 @@
+enum E { F(f64), G(f64) }
+fn main() {
+    println(F(f64::NAN));
+    println(G(f64::INFINITY));
+}

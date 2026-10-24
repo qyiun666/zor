@@ -1,0 +1,4 @@
+enum E { V(f64) }
+fn main() {
+    println(V(f64::NAN) + 1.0);
+}
