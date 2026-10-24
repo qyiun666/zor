@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S16-01	tests/stdout/cases/S16-01.zor	run	0	expected/S16-01.stdout	-	f64 NAN single-payload direct
+S16-02	tests/stdout/cases/S16-02.zor	run	0	expected/S16-02.stdout	-	f64 +Inf single-payload direct
+S16-03	tests/stdout/cases/S16-03.zor	run	0	expected/S16-03.stdout	-	f64 -Inf single-payload direct
+S16-04	tests/stdout/cases/S16-04.zor	run	0	expected/S16-04.stdout	-	f32 NAN single-payload direct
+S16-05	tests/stdout/cases/S16-05.zor	run	0	expected/S16-05.stdout	-	f32 +Inf single-payload direct
+S16-06	tests/stdout/cases/S16-06.zor	run	0	expected/S16-06.stdout	-	f32 -Inf single-payload direct
+S16-07	tests/stdout/cases/S16-07.zor	run	0	expected/S16-07.stdout	-	multi-variant plus no-payload direct
+S16-08	tests/stdout/cases/S16-08.zor	run	0	expected/S16-08.stdout	-	multi-arg single-payload direct
+S16-09	tests/stdout/cases/S16-09.zor	run	0	expected/S16-09.stdout	-	two specials same enum direct
+S16-10	tests/stdout/cases/S16-10.zor	run	0	expected/S16-10.stdout	-	multi-variant f64/i64 direct
+S16-11	tests/stdout/cases/S16-11.zor	run	0	expected/S16-11.stdout	-	two same-width variants direct
+S16-12	tests/stdout/cases/S16-12.zor	run	0	expected/S16-12.stdout	-	alias of direct special f64
+S16-13	tests/stdout/cases/S16-13.zor	run	0	expected/S16-13.stdout	-	alias of direct special f32
+S16-14	tests/stdout/cases/S16-14.zor	run	0	expected/S16-14.stdout	-	finite f64 payload regression
+S16-15	tests/stdout/cases/S16-15.zor	run	0	expected/S16-15.stdout	-	finite f32 narrowing regression
+S16-16	tests/stdout/cases/S16-16.zor	run	0	expected/S16-16.stdout	-	struct payload regression
+S16-17	tests/stdout/cases/S16-17.zor	run	0	expected/S16-17.stdout	-	array payload regression
+S16-18	tests/stdout/cases/S16-18.zor	run	0	expected/S16-18.stdout	-	no-payload variant regression
+S16-19	tests/stdout/cases/S16-19.zor	run	0	expected/S16-19.stdout	-	binding payload regression existing
+S16-20	tests/stdout/cases/S16-20.zor	run	0	expected/S16-20.stdout	-	binding alias regression existing
+S16-21	tests/stdout/cases/S16-21.zor	run	0	expected/S16-21.stdout	-	overflow underflow literals regression
+S16-22	tests/stdout/cases/S16-22.zor	run	0	expected/S16-22.stdout	-	finite plus special mixed direct
+S17-01	tests/stdout/cases/S17-01.zor	run	0	expected/S17-01.stdout	-	box f64 underflow -0
+S17-02	tests/stdout/cases/S17-02.zor	run	0	expected/S17-02.stdout	-	box f32 underflow -0

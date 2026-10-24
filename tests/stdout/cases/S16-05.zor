@@ -1,0 +1,4 @@
+enum E { V(f32) }
+fn main() {
+    println(V(f32::INFINITY));
+}

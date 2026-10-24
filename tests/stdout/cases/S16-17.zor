@@ -1,0 +1,4 @@
+enum E { V([i64; 2]) }
+fn main() {
+    println(V([1, 2]));
+}

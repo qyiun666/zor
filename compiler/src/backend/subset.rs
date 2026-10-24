@@ -445,7 +445,11 @@ fn let_init_kind(
             let t = types
                 .expr_ty(init)
                 .ok_or_else(|| SubsetError::new(l, c, "let 复合初值缺少 type table 记录"))?;
-            if !printable_ty(t, prog) || !supported_value_expr(init, bindings, types, prog) {
+            // L2l：`let e = V(特殊值)` 与直接打印同源放行（单载荷、根位置）。
+            if !printable_ty(t, prog)
+                || !(supported_value_expr(init, bindings, types, prog)
+                    || enum_direct_special_form(init, types, prog))
+            {
                 return Err(SubsetError::new(l, c, "let 初始化复合值不可打印或形态不支持"));
             }
             let kind = if is_byte_array_ty(t) {
@@ -642,7 +646,7 @@ fn supported_value_expr(
 }
 
 /// `allow_special`：L2i 允许浮点特殊值作复合常量成员；枚举变体载荷固定
-/// 传 `false`（特殊载荷结转 L2j，维持 fail-closed）。
+/// 传 `false`（L2l 仅放开根位置的单载荷直接形式，见 `enum_direct_special_form`）。
 fn supported_value_expr_in(
     e: &Ex,
     bindings: &HashMap<String, BindingKind>,
@@ -724,6 +728,34 @@ fn supported_value_expr_in(
         }
         _ => false,
     }
+}
+
+/// L2l：特殊值字面量直接写入**单载荷变体**实参（表面形式对齐）。
+///
+/// 仅接受根位置的 `V(f64::NAN｜INFINITY｜NEG_INFINITY)` 与 f32 三形态：
+/// 变体恰一个载荷字段、恰一个实参、实参为浮点特殊值且宽度与字段一致。
+/// 不递归、不透传 `allow_special`，因此嵌套复合内的直接形式维持 fail-closed；
+/// 多字段直接形式按冻结口径 fail-closed（结转 L2m）。
+fn enum_direct_special_form(e: &Ex, types: &TypeTable, prog: &Prog) -> bool {
+    let Ex::Call(callee, args, _, _) = e else { return false };
+    let Ex::Path(v, _, _) = callee.as_ref() else { return false };
+    if args.len() != 1 || !matches!(args[0], Ex::FloatSpecial(..)) {
+        return false;
+    }
+    let Some(Ty::Named(en)) = types.expr_ty(e) else { return false };
+    let Some(decl) = prog.enums.iter().find(|x| &x.name == en) else { return false };
+    let Some((_, payload, _, _)) = decl.variants.iter().find(|(n, _, _, _)| n == v) else {
+        return false;
+    };
+    if payload.len() != 1 {
+        return false;
+    }
+    // 宽度严格性已由 check 判定（跨宽 E1201／整型 E1202）；此处再要求双方同为
+    // 浮点宽度，避免把判定顺序当作契约。
+    matches!(
+        (types.expr_ty(&args[0]), &payload[0].0),
+        (Some(Ty::Prim("f32")), Ty::Prim("f32")) | (Some(Ty::Prim("f64")), Ty::Prim("f64"))
+    )
 }
 
 /// Q-3：`[byte;N]`／`[u8;N]` 字面量元素须为编译期常量形态。
@@ -868,10 +900,14 @@ fn is_printable_arg(
     if !printable_ty(t, prog) {
         return false;
     }
-    // L2h／L2i：特殊值可直接作 `println` 实参、`let` 初值或复合常量成员；
-    // 枚举变体载荷仍由 `supported_value_expr_in` 以 allow_special=false 拒绝。
+    // L2h／L2i：特殊值可直接作 `println` 实参、`let` 初值或复合常量成员。
+    // L2l：`V(特殊值)` 直接形式仅在根位置、单载荷变体下放行（表面形式对齐）；
+    // 变体实参的通用形态判定仍由 `supported_value_expr_in` 以 allow_special=false 收口。
     if matches!(e, Ex::FloatSpecial(..)) {
         return matches!(t, Ty::Prim("f32") | Ty::Prim("f64"));
+    }
+    if enum_direct_special_form(e, types, prog) {
+        return true;
     }
     // L2f：直接 `println(*b)` 放开三型 Box 载荷；复合／算术内嵌仍走
     // supported_value_expr 的既有 i64-only 边界（冻结件 §二）。
@@ -1110,5 +1146,31 @@ mod tests {
     #[test]
     fn box_non_int_payload_is_rejected() {
         assert!(err_of("fn main() { let b = box \"x\"; }").contains("box"));
+    }
+
+    // —— L2l：单载荷变体的特殊值字面量直接形式 ——
+
+    #[test]
+    fn enum_single_payload_special_literal_is_supported() {
+        ok("enum E { V(f64) }\nfn main() { println(V(f64::NAN)); }");
+        ok("enum E { V(f32) }\nfn main() { let e = V(f32::INFINITY); println(e); }");
+    }
+
+    #[test]
+    fn enum_multi_field_and_nested_direct_forms_stay_fail_closed() {
+        assert!(err_of("enum E { V(f64, f64) }\nfn main() { println(V(f64::NAN, 1.5)); }")
+            .contains("不可打印"));
+        assert!(err_of(
+            "enum E { V(f64) }\nstruct S { e: E }\nfn main() { println(S { e: V(f64::NAN) }); }"
+        )
+        .contains("不可打印"));
+        assert!(err_of("enum E { V(f64) }\nfn main() { println((V(f64::NAN), 1)); }")
+            .contains("不可打印"));
+    }
+
+    #[test]
+    fn enum_payload_binding_path_is_supported() {
+        ok("enum E { V(f64) }\nfn main() { let x = f64::NAN; println(V(x)); }");
+        ok("enum E { V(f64) }\nfn main() { let e = V(f64::NAN); println(e); }");
     }
 }

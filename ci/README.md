@@ -2,7 +2,14 @@
 
 归属：ZOR工具链与开发工程师。设计与验证记录：shared/ZOR-0.1x-CI基线-设计草案-v1.md；门禁判据单一来源：shared/ZOR-0.1x-质量门禁标准-v1.md（C/T/B 编号）。
 
-## 当前口径（L2k，0.3.10 候选）
+## 当前口径（L2l，0.3.11 候选）
+- 八基线并存于 `--stdout-contract`：`l2e` 162／209、`l2f` 188／246、`l2g` 206／275、`l2h` 247／327、`l2i` 297／398、`l2j` 345／466、`l2k` 417／590（以上均历史冻结）、`l2l` 461／660（当前全矩阵）。
+- stdout 判词 `runtime=199 negative=163`，CLI 17（合计 379；L2l Ret=0，无退休）；`runtime-codes` 39／6／19；`packaging-smoke` 4；`new-cases.tsv` 120 不动。
+- required（ruleset `25633324`）：`stdout-contract`＋`packaging-smoke`；无新 job、无 workflow YAML／ruleset 写入。
+- job：`stdout-contract`／`packaging-smoke` 均为 `ubuntu-24.04`、timeout 20；artifact 分别 `stdout-contract-logs-<run_id>-<attempt>`／`packaging-logs-<run_id>-<attempt>`，保留 90 天。ASAN **K=0**：默认 manifest 48／41／7、`run_asan.sh`、`stage_asan` 零改，不建第二 manifest；L2k 第二 manifest 6 条沿用既有挂接。
+- 下列版本节内计数均为其时点口径（历史），不得读作现态。
+
+## 当前口径（L2k，0.3.10 候选）— 历史
 - 七基线并存于 `--stdout-contract`：`l2e` 162／209（历史冻结）、`l2f` 188／246（历史冻结）、`l2g` 206／275（历史冻结）、`l2h` 247／327（历史冻结）、`l2i` 297／398（历史冻结）、`l2j` 345／466（历史冻结）、`l2k` 417／590（当前全矩阵）。
 - stdout 判词 `runtime=175 negative=143`，CLI 17（合计 335；L2k Ret=12：N-26／N-27／N-31／N-32／N-93／N-95／N-117～120／N-125／N-126 仅在执行面退休）；`runtime-codes` 39／6／19；`packaging-smoke` 4。
 - required（ruleset `25633324`）：`stdout-contract`＋`packaging-smoke`；无新 job、无 workflow YAML／ruleset 写入。
@@ -102,7 +109,7 @@
 - 无新 job、无 workflow YAML／ruleset 写入；`packaging-smoke` 维持 required、4 条不变；runtime-codes 39／6／19 不变
 - 本节只记 CI 覆盖／门禁事实，不构成用户能力表述（不写 Box 泛化完成／全部 Box／浮点运算／全平台；跨平台 N/A；安装／打包不做）
 
-## L2k Box 常量载荷与七基线（0.3.10 候选）
+## L2k Box 常量载荷与七基线（历史，0.3.10）
 - `--stdout-contract` 判词 **runtime 175／negative 143／CLI 17**（合计 335）；CI 校验原文 `PASS|stdout-contract|runtime=175 negative=143 fail=0 ran=175/143` 与 `PASS|cli-contract|cases=17 fail=0 ran=17`
 - 第七条 `l2k-baseline` 与前六条串行：`l2k` **417／590**（全矩阵，files 以捕获实测为唯一值）；判词 `PASS|l2k-baseline|cases=417 files=590 unique=590 fail=0`
 - 用例组新增 S14-01～31（`Box<struct>`／`Box<[T;N]>` 常量载荷、空 struct／`[T;0]`、负整数字面量叶子）与 S15-01～18（有限浮点字面量载荷）＋N-143～165 负控
