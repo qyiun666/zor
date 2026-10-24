@@ -1,0 +1,7 @@
+struct S { a: [u8; 2], b: [f32; 2] }
+fn main() {
+    let s = S { a: [1, 2], b: [1.5, 2.5] };
+    let b: Box<S> = box S { a: [1, 2], b: [1.5, 2.5] };
+    println(s);
+    println(*b);
+}

@@ -142,13 +142,10 @@ fn check_block(
                         Some(BindingKind::Str)
                     }
                     Some(Ty::BoxTy(inner)) => match l2f_payload_ty(inner) {
-                        // L2j：浮点载荷标注仅在初值为特殊值时成立；有限浮点沿用原判词。
+                        // L2k：浮点载荷标注仅在特殊值／有限浮点字面量成立；其余沿用原判词。
                         Some(p)
                             if matches!(p, Ty::Prim("f32") | Ty::Prim("f64"))
-                                && !matches!(
-                                    init,
-                                    Ex::Box(b, _, _) if matches!(b.as_ref(), Ex::FloatSpecial(..))
-                                ) =>
+                                && !float_payload_init(init) =>
                         {
                             return Err(SubsetError::new(
                                 *l,
@@ -157,6 +154,9 @@ fn check_block(
                             ))
                         }
                         Some(p) => Some(BindingKind::Box(p)),
+                        None if is_composite_payload_ty(inner) && l2k_payload_ty(inner, prog) => {
+                            Some(BindingKind::Box((**inner).clone()))
+                        }
                         None => {
                             return Err(SubsetError::new(
                                 *l,
@@ -252,10 +252,7 @@ fn check_block(
                             (Some(BindingKind::Box(t)), Some(Ty::BoxTy(p))) => t == p.as_ref(),
                             _ => false,
                         };
-                        matches!(
-                            inner.as_ref(),
-                            Ex::Lit(Lit::Int(_), _, _) | Ex::FloatSpecial(..)
-                        ) && same_payload
+                        same_payload && box_reinit_ok(inner, types.expr_ty(rhs), types, prog)
                     }
                     _ => false,
                 };
@@ -295,34 +292,65 @@ fn let_init_kind(
             Ok(BindingKind::Str)
         }
         Ex::Box(inner, il, ic) => {
-            // L2j：仅特殊值载荷可进入 Box<f32>／Box<f64>；有限浮点维持 fail-closed。
-            let ok_payload = match inner.as_ref() {
-                Ex::Lit(Lit::Int(_), _, _) => true,
-                Ex::FloatSpecial(w, _, _, _) => matches!(
-                    (w, ann.as_ref()),
-                    (crate::parser::FloatWidth::F32, Some(BindingKind::Box(t)))
-                        if t == &Ty::Prim("f32")
-                ) || matches!(
-                    (w, ann.as_ref()),
-                    (crate::parser::FloatWidth::F64, Some(BindingKind::Box(t)))
-                        if t == &Ty::Prim("f64")
-                ),
-                _ => false,
+            let ann_payload = match ann {
+                Some(BindingKind::Box(p)) => Some(p.clone()),
+                _ => None,
             };
-            if !ok_payload {
-                return Err(SubsetError::new(*il, *ic, "box 载荷非整型字面量"));
+            // 整型字面量载荷（既有通道，判词不变）。
+            if matches!(inner.as_ref(), Ex::Lit(Lit::Int(_), _, _)) {
+                let payload = match ann {
+                    None => Ty::Prim("i64"),
+                    Some(BindingKind::Box(p)) => p.clone(),
+                    Some(_) => return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符")),
+                };
+                // 与 check 的 C1 期望下推结果对齐：字面量载荷宽度由标注决定。
+                match types.expr_ty(init) {
+                    Some(Ty::BoxTy(t)) if **t == payload => {}
+                    _ => return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符")),
+                }
+                return Ok(BindingKind::Box(payload));
             }
-            let payload = match ann {
-                None => Ty::Prim("i64"),
-                Some(BindingKind::Box(p)) => p.clone(),
-                Some(_) => return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符")),
-            };
-            // 与 check 的 C1 期望下推结果对齐：字面量载荷宽度由标注决定。
-            match types.expr_ty(init) {
-                Some(Ty::BoxTy(t)) if **t == payload => {}
-                _ => return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符")),
+            // L2k：有限浮点字面量载荷（宽度由标注收窄；无注解仍 fail-closed）。
+            if let Some(p) = &ann_payload {
+                if matches!(p, Ty::Prim("f32") | Ty::Prim("f64")) && float_payload_init(init) {
+                    match types.expr_ty(init) {
+                        Some(Ty::BoxTy(t)) if **t == *p => {}
+                        _ => return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符")),
+                    }
+                    return Ok(BindingKind::Box(p.clone()));
+                }
             }
-            Ok(BindingKind::Box(payload))
+            // L2j：特殊值载荷（宽度随源形态；跨宽已由 check 报 E1201）。
+            if let Ex::FloatSpecial(..) = inner.as_ref() {
+                let payload = match ann {
+                    // 无注解特殊值维持 fail-closed（N-121／N-122 既有负控）。
+                    None => {
+                        return Err(SubsetError::new(*il, *ic, "box 载荷非整型字面量"));
+                    }
+                    Some(BindingKind::Box(p)) => p.clone(),
+                    Some(_) => return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符")),
+                };
+                match types.expr_ty(init) {
+                    Some(Ty::BoxTy(t)) if **t == payload => {}
+                    _ => return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符")),
+                }
+                return Ok(BindingKind::Box(payload));
+            }
+            // L2k：复合字面量载荷（常量树；变量即 fail-closed）。
+            if let Some(p) = &ann_payload {
+                if is_composite_payload_ty(p) && l2k_payload_ty(p, prog) {
+                    let literal = matches!(inner.as_ref(), Ex::Record(..) | Ex::ArrLit(..));
+                    if !literal || !payload_init_ok(inner, types, prog) {
+                        return Err(SubsetError::new(*il, *ic, "box 载荷须为字面量常量"));
+                    }
+                    match types.expr_ty(init) {
+                        Some(Ty::BoxTy(t)) if **t == *p => {}
+                        _ => return Err(SubsetError::new(l, c, "let 类型标注与 Box 初值不符")),
+                    }
+                    return Ok(BindingKind::Box(p.clone()));
+                }
+            }
+            Err(SubsetError::new(*il, *ic, "box 载荷非整型字面量"))
         }
         Ex::Lit(Lit::Int(_), _, _) => match ann {
             None => Ok(BindingKind::I64),
@@ -471,6 +499,101 @@ fn l2f_payload_binding(t: &Ty) -> Option<BindingKind> {
 
 fn is_box_i64(k: &BindingKind) -> bool {
     matches!(k, BindingKind::Box(t) if t == &Ty::Prim("i64"))
+}
+
+/// L2k：`box <float literal>`／`box -<float literal>`／`box <特殊值>` 形态。
+fn float_payload_init(init: &Ex) -> bool {
+    match init {
+        Ex::Box(b, _, _) => match b.as_ref() {
+            Ex::FloatSpecial(..) | Ex::Lit(Lit::Float(_), _, _) => true,
+            Ex::Un(op, x, _, _) if op == "-" => matches!(
+                x.as_ref(),
+                Ex::Lit(Lit::Float(_), _, _) | Ex::FloatSpecial(..)
+            ),
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+/// L2k：Box 重初始化形态（`b = box <payload>`）——整型字面量／特殊值／
+/// 有限浮点字面量／复合常量字面量；变量与负数整型仍 fail-closed。
+fn box_reinit_ok(
+    inner: &Ex,
+    payload: Option<&Ty>,
+    types: &TypeTable,
+    prog: &Prog,
+) -> bool {
+    let Some(Ty::BoxTy(p)) = payload else {
+        return false;
+    };
+    match inner {
+        Ex::Lit(Lit::Int(_), _, _) | Ex::FloatSpecial(..) => true,
+        Ex::Lit(Lit::Float(_), _, _) => matches!(p.as_ref(), Ty::Prim("f32") | Ty::Prim("f64")),
+        Ex::Un(op, x, _, _) if op == "-" => {
+            matches!(x.as_ref(), Ex::Lit(Lit::Float(_), _, _))
+                && matches!(p.as_ref(), Ty::Prim("f32") | Ty::Prim("f64"))
+        }
+        Ex::Record(..) | Ex::ArrLit(..) => {
+            is_composite_payload_ty(p) && l2k_payload_ty(p, prog) && payload_init_ok(inner, types, prog)
+        }
+        _ => false,
+    }
+}
+
+/// L2k：复合载荷类型（struct／定长数组）——标量顶层面不扩。
+fn is_composite_payload_ty(t: &Ty) -> bool {
+    matches!(t, Ty::Named(_) | Ty::Arr(..))
+}
+
+/// L2k Box 复合载荷白名单（深递归）：8 整型宽度／bool／f32／f64／struct／定长数组；
+/// 排除 `[byte; N]`（含嵌套）、enum、unit、tuple、Box、引用。
+fn l2k_payload_ty(t: &Ty, prog: &Prog) -> bool {
+    let mut seen = HashSet::new();
+    l2k_payload_ty_in(t, prog, &mut seen)
+}
+
+fn l2k_payload_ty_in(t: &Ty, prog: &Prog, seen: &mut HashSet<String>) -> bool {
+    match t {
+        Ty::Prim(p) => matches!(
+            *p,
+            "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" | "bool"
+        ),
+        Ty::Arr(elem, _) => {
+            !matches!(elem.as_ref(), Ty::Prim("byte")) && l2k_payload_ty_in(elem, prog, seen)
+        }
+        Ty::Named(n) => {
+            if !seen.insert(n.clone()) {
+                return false;
+            }
+            match prog.structs.iter().find(|s| &s.name == n) {
+                Some(s) => s
+                    .fields
+                    .iter()
+                    .all(|(_, ft, _, _)| l2k_payload_ty_in(ft, prog, seen)),
+                None => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+/// L2k：载荷初值必须是常量字面量形态（变量／投影／算术一律 fail-closed）。
+fn payload_init_ok(e: &Ex, types: &TypeTable, prog: &Prog) -> bool {
+    let Some(t) = types.expr_ty(e) else {
+        return false;
+    };
+    if !l2k_payload_ty(t, prog) {
+        return false;
+    }
+    match e {
+        Ex::Lit(Lit::Int(_) | Lit::Float(_) | Lit::Bool(_), _, _) => true,
+        Ex::FloatSpecial(..) => true,
+        Ex::Un(op, x, _, _) if op == "-" || op == "!" => payload_init_ok(x, types, prog),
+        Ex::Record(_, fields, _, _) => fields.iter().all(|(_, v)| payload_init_ok(v, types, prog)),
+        Ex::ArrLit(es, _, _) => es.iter().all(|x| payload_init_ok(x, types, prog)),
+        _ => false,
+    }
 }
 
 /// 可打印类型：类型级递归；enum 任一变体载荷不可打印则整类型不可打印（Q-2）。

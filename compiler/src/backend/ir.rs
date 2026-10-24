@@ -25,6 +25,102 @@ pub enum Ty {
     F64,
     Box(Box<Ty>),
     Unit,
+    /// L2k：仅作 Box 载荷槽位的复合类型，不产生复合临时量。
+    Struct(String),
+    /// L2k：仅作 Box 载荷槽位的定长数组（元素为载荷允许叶子／复合）。
+    Array(Box<Ty>, u64),
+}
+
+fn sanitize_ident(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+    }
+    out
+}
+
+/// 载荷 C 类型拼写：标量用 `<stdint.h>` 类型；复合用首次使用序发射的 typedef 名。
+/// `bool` 叶子落 `uint8_t`（载荷不可观测，避免新增 `<stdbool.h>` 依赖）。
+pub fn payload_c_ty(t: &Ty) -> Option<String> {
+    Some(match t {
+        Ty::I8 => "int8_t".to_string(),
+        Ty::I16 => "int16_t".to_string(),
+        Ty::I32 => "int32_t".to_string(),
+        Ty::I64 => "int64_t".to_string(),
+        Ty::U8 => "uint8_t".to_string(),
+        Ty::U16 => "uint16_t".to_string(),
+        Ty::U32 => "uint32_t".to_string(),
+        Ty::U64 => "uint64_t".to_string(),
+        Ty::Bool => "uint8_t".to_string(),
+        Ty::F32 => "float".to_string(),
+        Ty::F64 => "double".to_string(),
+        Ty::Struct(name) => format!("zor_struct_{}", sanitize_ident(name)),
+        Ty::Array(elem, n) => format!("zor_arr_{}_{}", type_key(elem)?, n),
+        _ => return None,
+    })
+}
+
+/// 载荷类型键：用于数组 typedef 名与去重。
+pub fn type_key(t: &Ty) -> Option<String> {
+    Some(match t {
+        Ty::I8 => "i8".to_string(),
+        Ty::I16 => "i16".to_string(),
+        Ty::I32 => "i32".to_string(),
+        Ty::I64 => "i64".to_string(),
+        Ty::U8 => "u8".to_string(),
+        Ty::U16 => "u16".to_string(),
+        Ty::U32 => "u32".to_string(),
+        Ty::U64 => "u64".to_string(),
+        Ty::Bool => "bool".to_string(),
+        Ty::F32 => "f32".to_string(),
+        Ty::F64 => "f64".to_string(),
+        Ty::Struct(name) => sanitize_ident(name),
+        Ty::Array(elem, n) => format!("{}_a{}", type_key(elem)?, n),
+        _ => return None,
+    })
+}
+
+/// L2k 复合载荷的编译期常量树：叶子是标量位型，节点自带成员类型
+/// （C 初始化与打印投影都无需回查声明表）。
+#[derive(Clone, Debug, PartialEq)]
+pub enum ConstValue {
+    Int(i128),
+    Bool(bool),
+    F32Bits(u32),
+    F64Bits(u64),
+    Struct {
+        name: String,
+        fields: Vec<(String, Ty, ConstValue)>,
+    },
+    Array {
+        elem: Ty,
+        values: Vec<ConstValue>,
+    },
+}
+
+/// Box 载荷常量：标量保留既有 i128 位型通道（C 文本零漂移），复合走常量树。
+#[derive(Clone, Debug, PartialEq)]
+pub enum BoxConst {
+    Bits(i128),
+    Composite(ConstValue),
+}
+
+/// 载荷 typedef 定义（lower 按首次使用序登记，emit 在 main 之前发射）。
+#[derive(Clone, Debug, PartialEq)]
+pub enum PayloadDef {
+    Struct {
+        name: String,
+        fields: Vec<(String, String)>,
+    },
+    Array {
+        name: String,
+        elem: String,
+        len: u64,
+    },
 }
 
 /// L2b codegen 的整型宽度（其余在册宽度由 lower fail-closed）。
@@ -237,19 +333,20 @@ pub enum Stmt {
         line: usize,
         col: usize,
     },
-    /// `let x = box <int>;`：新建 Box 载荷（emit：malloc；`ty` 为载荷宽度）。
+    /// `let x = box <int>;`：新建 Box 载荷（emit：malloc；`ty` 为载荷类型）。
+    /// L2k：`ty` 可为复合载荷类型，`value` 为结构化常量树。
     BindBox {
         local: LocalId,
-        ty: BoxIntTy,
-        value: i128,
+        ty: Ty,
+        value: BoxConst,
         line: usize,
         col: usize,
     },
     /// `x = box <int>;`：重初始化；`drop_dst` 由 lower 静态判定（emit：必要时先 free）。
     BindBoxAssign {
         local: LocalId,
-        ty: BoxIntTy,
-        value: i128,
+        ty: Ty,
+        value: BoxConst,
         drop_dst: bool,
         line: usize,
         col: usize,
@@ -315,4 +412,6 @@ pub struct Func {
 #[derive(Clone, Debug)]
 pub struct Program {
     pub funcs: Vec<Func>,
+    /// L2k：复合载荷 typedef（首次使用序，确定性输出）。
+    pub payload_defs: Vec<PayloadDef>,
 }

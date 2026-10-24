@@ -1,0 +1,2 @@
+struct S { b: [byte; 2] }
+fn main() { let x: Box<S> = box S { b: "ab" }; println(*x); }

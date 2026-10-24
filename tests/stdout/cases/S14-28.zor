@@ -1,0 +1,4 @@
+fn main() {
+    let b: Box<[[u8; 2]; 2]> = box [[1, 2], [3, 4]];
+    println(*b);
+}

@@ -431,7 +431,7 @@ fn zero_expansion_matrix_is_rc1() {
         (
             "x14c",
             "struct S { x: i8 }\nfn main() { let s = S { x: 1 }; let b: Box<S> = box s; println(*b); }",
-            "let 类型标注",
+            "box 载荷须为字面量常量",
         ),
         (
             "x15a",

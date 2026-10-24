@@ -236,7 +236,6 @@ impl<'a> Ck<'a> {
             Ty::Prim(p) if matches!(*p, "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64")
         )
     }
-
     /// R1 §5 Copy 集结构判定：prim/unit Copy；数组/元组/struct/enum 成员全 Copy 才 Copy；
     /// Box 非 Copy；&T Copy、&mut T unique-move 非 Copy。Bad 宽松放行。
     fn is_copy(&self, t: &Ty) -> bool {
@@ -711,10 +710,22 @@ impl<'a> Ck<'a> {
                 }
             }
             Ex::Box(inner, _, _) => {
-                // L2f C1：标注 Box<T>（T 三型）时把载荷期望下推给字面量，
-                // 仅影响字面量宽度推断；其余 Box 载荷维持原推断（None）。
+                // L2f C1：标注 Box<T>（T 三型）时把载荷期望下推给字面量。
+                // L2k：有限浮点字面量（含一元负号）按标注收窄；复合载荷把标注下推给
+                // 数组字面量元素／record 字段。整型字面量等维持 None，保证
+                // `Box<f32> = box 1` 仍为 E1201（N-115／N-116 红线）。
                 let payload_expect = match expect {
-                    Some(Ty::BoxTy(p)) if Self::l2f_box_payload(p) => Some((**p).clone()),
+                    Some(Ty::BoxTy(p)) => match p.as_ref() {
+                        Ty::Prim("f32") | Ty::Prim("f64") if float_literal_form(inner) => {
+                            Some((**p).clone())
+                        }
+                        Ty::Named(n) if self.structs.contains_key(n) => Some((**p).clone()),
+                        Ty::Arr(elem, _) if !matches!(elem.as_ref(), Ty::Prim("byte")) => {
+                            Some((**p).clone())
+                        }
+                        _ if Self::l2f_box_payload(p) => Some((**p).clone()),
+                        _ => None,
+                    },
                     _ => None,
                 };
                 let t = self.check_expr(inner, payload_expect.as_ref(), env);
@@ -1082,8 +1093,16 @@ impl<'a> Ck<'a> {
     }
 }
 
-fn elem_of(t: &Ty) -> Ty {
-    if let Ty::Arr(x, _) = t { (**x).clone() } else { Ty::Bad }
+/// L2k：有限浮点字面量形态（含一元负号）。特殊值仍走既有宽度严格 E1201 路径。
+fn float_literal_form(e: &Ex) -> bool {
+    match e {
+        Ex::Lit(Lit::Float(_), _, _) => true,
+        Ex::Un(op, x, _, _) if op == "-" => matches!(x.as_ref(), Ex::Lit(Lit::Float(_), _, _)),
+        _ => false,
+    }
+}
+
+fn elem_of(t: &Ty) -> Ty {    if let Ty::Arr(x, _) = t { (**x).clone() } else { Ty::Bad }
 }
 
 fn elem_ref_of(x: &Ty) -> Option<Ty> {

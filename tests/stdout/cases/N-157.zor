@@ -1,0 +1,1 @@
+fn main() { let b = box [1, 2, 3]; println(*b); }

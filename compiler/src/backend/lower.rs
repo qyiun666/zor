@@ -12,8 +12,8 @@
 
 use super::float_fmt;
 use super::ir::{
-    ArithOp, BoxIntTy, Func, IntExpr, IntTy, Local, LocalId, PrintArg, Program, Stmt, StrArg, Ty,
-    Value,
+    payload_c_ty, ArithOp, BoxConst, BoxIntTy, ConstValue, Func, IntExpr, IntTy, Local, LocalId,
+    PayloadDef, PrintArg, Program, Stmt, StrArg, Ty, Value,
 };
 use super::subset::{self, SubsetError};
 use crate::parser::{Ex, FloatSpecialKind, FloatWidth, Lit, Prog, St, Ty as AstTy};
@@ -32,6 +32,8 @@ enum ConstVal {
     /// 使绑定后的一元负号 `-x` 可按裁定 3 fail-closed。
     F32Special(FloatSpecialKind),
     F64Special(FloatSpecialKind),
+    /// L2k：Box 复合载荷的编译期常量树（仅 Box 槽位使用）。
+    Composite(ConstValue),
 }
 
 /// L2a 局部槽位状态：`live` 是静态可判的 owner 活跃位。
@@ -57,6 +59,7 @@ struct Build<'a> {
 pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
     subset::check(prog, types)?;
     let mut funcs = Vec::new();
+    let mut payload_defs: Vec<PayloadDef> = Vec::new();
     for f in &prog.fns {
         if f.name != "main" {
             continue;
@@ -158,6 +161,33 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 Ty::Box(p) => (**p).clone(),
                                 _ => return Err(SubsetError::new(*l, *c, "lower：box 绑定类型非 Box<T>")),
                             };
+                            if is_composite_payload(&payload) {
+                                // L2k：复合常量载荷——一棵常量树同时承载存储初始化与打印投影。
+                                let payload_ast = match types.let_ty(*l, *c) {
+                                    Some(AstTy::BoxTy(p)) => (**p).clone(),
+                                    _ => return Err(SubsetError::new(*l, *c, "lower：box 复合载荷缺少标注")),
+                                };
+                                let cv = const_value(inner, &payload_ast, types, prog)?;
+                                register_payload(&payload, prog, &mut payload_defs)?;
+                                body.push(Stmt::BindBox {
+                                    local: id,
+                                    ty: payload.clone(),
+                                    value: BoxConst::Composite(cv.clone()),
+                                    line: *l,
+                                    col: *c,
+                                });
+                                slots.push(Slot {
+                                    ty: local_ty,
+                                    live: true,
+                                    konst: Some(ConstVal::Composite(cv)),
+                                    bytes: None,
+                                });
+                                let slot = slots.last().expect("slot pushed").clone();
+                                locals.push(Local { id, name: name.clone(), ty: slot.ty });
+                                scope.insert(name.clone(), id);
+                                values.remove(name);
+                                continue;
+                            }
                             let ty = box_int_ty(&payload).ok_or_else(|| {
                                 SubsetError::new(*l, *c, "lower：box 载荷类型非 8 个整型宽度之一")
                             })?;
@@ -167,7 +197,13 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             } else {
                                 (box_lit(inner, ty)?, None)
                             };
-                            body.push(Stmt::BindBox { local: id, ty, value, line: *l, col: *c });
+                            body.push(Stmt::BindBox {
+                                local: id,
+                                ty: payload,
+                                value: BoxConst::Bits(value),
+                                line: *l,
+                                col: *c,
+                            });
                             slots.push(Slot { ty: local_ty, live: true, konst, bytes: None });
                         }
                         Ex::Lit(Lit::Int(v), il, ic) => match &local_ty {
@@ -220,19 +256,8 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 if slots.get(src.0 as usize).map(|s| &s.ty) != Some(&local_ty) {
                                     return Err(SubsetError::new(*nl, *nc, "lower：移动源类型与目标不符"));
                                 }
-                                let is_float = matches!(&local_ty, Ty::Box(p) if matches!(**p, Ty::F32 | Ty::F64));
-                                let konst = if is_float {
-                                    Some(
-                                        slots
-                                            .get(src.0 as usize)
-                                            .and_then(|s| s.konst.clone())
-                                            .ok_or_else(|| {
-                                                SubsetError::new(*nl, *nc, "lower：Box 浮点移动源缺少编译期值")
-                                            })?,
-                                    )
-                                } else {
-                                    None
-                                };
+                                // L2j／L2k：浮点与复合载荷带编译期值；其余载荷槽位恒为 `None`。
+                                let konst = slots.get(src.0 as usize).and_then(|s| s.konst.clone());
                                 body.push(Stmt::MoveAssign { dst: id, src, line: *nl, col: *nc });
                                 set_live(&mut slots, src, false);
                                 slots.push(Slot { ty: local_ty, live: true, konst, bytes: None });
@@ -410,6 +435,29 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 Some(Ty::Box(p)) => (**p).clone(),
                                 _ => return Err(SubsetError::new(*al, *ac, "lower：目标非 Box 绑定")),
                             };
+                            let drop_dst = is_live(&slots, ia);
+                            if is_composite_payload(&payload) {
+                                // L2k：复合载荷重初始化（旧值按 drop_dst 释放一次）。
+                                let payload_ast = match types.expr_ty(rhs) {
+                                    Some(AstTy::BoxTy(p)) => (**p).clone(),
+                                    _ => return Err(SubsetError::new(*al, *ac, "lower：box 复合载荷缺少标注")),
+                                };
+                                let cv = const_value(inner, &payload_ast, types, prog)?;
+                                register_payload(&payload, prog, &mut payload_defs)?;
+                                body.push(Stmt::BindBoxAssign {
+                                    local: ia,
+                                    ty: payload,
+                                    value: BoxConst::Composite(cv.clone()),
+                                    drop_dst,
+                                    line: *al,
+                                    col: *ac,
+                                });
+                                set_live(&mut slots, ia, true);
+                                if let Some(slot) = slots.get_mut(ia.0 as usize) {
+                                    slot.konst = Some(ConstVal::Composite(cv));
+                                }
+                                continue;
+                            }
                             let ty = box_int_ty(&payload).ok_or_else(|| {
                                 SubsetError::new(*al, *ac, "lower：box 载荷类型非 8 个整型宽度之一")
                             })?;
@@ -419,11 +467,10 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             } else {
                                 (box_lit(inner, ty)?, None)
                             };
-                            let drop_dst = is_live(&slots, ia);
                             body.push(Stmt::BindBoxAssign {
                                 local: ia,
-                                ty,
-                                value,
+                                ty: payload,
+                                value: BoxConst::Bits(value),
                                 drop_dst,
                                 line: *al,
                                 col: *ac,
@@ -460,7 +507,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
             body,
         });
     }
-    Ok(Program { funcs })
+    Ok(Program { funcs, payload_defs })
 }
 
 /// println 实参降级：字符串／字节串／运行期整型／编译期格式化标量／复合值树。
@@ -554,9 +601,25 @@ fn print_arg(
                 Ex::Path(n, _, _) => lookup(scope, n, *dl, *dc)?,
                 _ => return Err(SubsetError::new(*dl, *dc, "lower：解引用源形态")),
             };
+            let src_ty = b
+                .slots
+                .get(src.0 as usize)
+                .map(|s| s.ty.clone())
+                .ok_or_else(|| SubsetError::new(*dl, *dc, "lower：解引用源槽位缺失"))?;
+            let payload = match &src_ty {
+                Ty::Box(p) => (**p).clone(),
+                _ => return Err(SubsetError::new(*dl, *dc, "lower：解引用源类型与实参不符")),
+            };
+            // L2k：复合载荷的打印投影（常量树，不读堆）。
+            if is_composite_payload(&payload) {
+                let cv = match b.slots.get(src.0 as usize).and_then(|s| s.konst.clone()) {
+                    Some(ConstVal::Composite(cv)) => cv,
+                    _ => return Err(SubsetError::new(*dl, *dc, "lower：Box 复合载荷缺少编译期值")),
+                };
+                return Ok(PrintArg::Composite(value_of_const(&cv, &payload)?));
+            }
             let irt = ir_ty_of(b.types, e, "println 实参")?;
-            let src_ty = b.slots.get(src.0 as usize).map(|s| s.ty.clone());
-            if src_ty != Some(Ty::Box(Box::new(irt.clone()))) {
+            if src_ty != Ty::Box(Box::new(irt.clone())) {
                 return Err(SubsetError::new(*dl, *dc, "lower：解引用源类型与实参不符"));
             }
             if ir_int_ty(&irt).is_none() && box_int_ty(&irt).is_none() {
@@ -673,7 +736,20 @@ fn lower_value(
                     return Err(SubsetError::new(el, ec, "lower：解引用源形态"));
                 }
             };
-            if b.slots.get(src.0 as usize).map(|s| &s.ty) != Some(&Ty::Box(Box::new(Ty::I64))) {
+            let src_ty = b.slots.get(src.0 as usize).map(|s| s.ty.clone());
+            // L2k：复合载荷投影（常量树；不读堆，不建复合临时量）。
+            if let Some(Ty::Box(p)) = &src_ty {
+                if is_composite_payload(p) {
+                    let cv = match b.slots.get(src.0 as usize).and_then(|s| s.konst.clone()) {
+                        Some(ConstVal::Composite(cv)) => cv,
+                        _ => {
+                            return Err(SubsetError::new(*dl, *dc, "lower：Box 复合载荷缺少编译期值"))
+                        }
+                    };
+                    return value_of_const(&cv, p);
+                }
+            }
+            if src_ty != Some(Ty::Box(Box::new(Ty::I64))) {
                 return Err(SubsetError::new(*dl, *dc, "lower：解引用源非 Box<i64>"));
             }
             if t != AstTy::Prim("i64") {
@@ -1108,11 +1184,22 @@ fn let_type(types: &TypeTable, init: &Ex, l: usize, c: usize) -> Result<Ty, Subs
     let t = types
         .let_ty(l, c)
         .ok_or_else(|| SubsetError::new(l, c, "lower：let 缺少 type table 记录"))?;
-    let ir = ast_to_ir(t)
-        .ok_or_else(|| SubsetError::new(l, c, format!("lower：let 类型 '{}' 不在 L2c codegen 子集", t.display())))?;
     let init_t = types
         .expr_ty(init)
         .ok_or_else(|| SubsetError::new(l, c, "lower：let 初值缺少 type table 记录"))?;
+    if let AstTy::BoxTy(p) = t {
+        if let Some(payload) = box_payload_ir_ty(p) {
+            if is_composite_payload(&payload) {
+                // L2k：复合载荷标注无 `ast_to_ir` 映射，按 AST 精确相等核对。
+                if init_t != t {
+                    return Err(SubsetError::new(l, c, "lower：let 初值类型与绑定类型不符"));
+                }
+                return Ok(Ty::Box(Box::new(payload)));
+            }
+        }
+    }
+    let ir = ast_to_ir(t)
+        .ok_or_else(|| SubsetError::new(l, c, format!("lower：let 类型 '{}' 不在 L2c codegen 子集", t.display())))?;
     if ast_to_ir(init_t) != Some(ir.clone()) {
         return Err(SubsetError::new(l, c, "lower：let 初值类型与绑定类型不符"));
     }
@@ -1168,6 +1255,272 @@ fn ast_to_ir(t: &AstTy) -> Option<Ty> {
             Some(Ty::Box(Box::new(payload)))
         }
         _ => None,
+    }
+}
+
+/// L2k：仅 struct／定长数组载荷进入复合常量树通道。
+fn is_composite_payload(t: &Ty) -> bool {
+    matches!(t, Ty::Struct(_) | Ty::Array(..))
+}
+
+/// L2k：Box 载荷的 IR 类型（标量沿用 `ast_to_ir`，复合在此展开）。
+fn box_payload_ir_ty(t: &AstTy) -> Option<Ty> {
+    match t {
+        AstTy::Prim(p) => match *p {
+            "i8" => Some(Ty::I8),
+            "i16" => Some(Ty::I16),
+            "i32" => Some(Ty::I32),
+            "i64" => Some(Ty::I64),
+            "u8" => Some(Ty::U8),
+            "u16" => Some(Ty::U16),
+            "u32" => Some(Ty::U32),
+            "u64" => Some(Ty::U64),
+            "f32" => Some(Ty::F32),
+            "f64" => Some(Ty::F64),
+            "bool" => Some(Ty::Bool),
+            _ => None,
+        },
+        AstTy::Named(n) => Some(Ty::Struct(n.clone())),
+        AstTy::Arr(elem, n) if !matches!(elem.as_ref(), AstTy::Prim("byte")) => {
+            Some(Ty::Array(Box::new(box_payload_ir_ty(elem)?), *n))
+        }
+        _ => None,
+    }
+}
+
+fn struct_decl<'a>(prog: &'a Prog, name: &str) -> Result<&'a crate::parser::StructDecl, SubsetError> {
+    prog.structs
+        .iter()
+        .find(|s| s.name == name)
+        .ok_or_else(|| SubsetError::new(0, 0, format!("lower：未知结构体 '{}'", name)))
+}
+
+/// L2k：复合载荷的编译期常量树。只接受字面量／常量叶子；变量即 fail-closed。
+fn const_value(
+    e: &Ex,
+    want: &AstTy,
+    types: &TypeTable,
+    prog: &Prog,
+) -> Result<ConstValue, SubsetError> {
+    let (l, c) = subset::expr_span(e);
+    let recorded = types
+        .expr_ty(e)
+        .ok_or_else(|| SubsetError::new(l, c, "lower：box 复合载荷缺少 type table 记录"))?;
+    if recorded != want {
+        return Err(SubsetError::new(l, c, "lower：box 复合载荷节点类型与标注不符"));
+    }
+    match e {
+        Ex::Lit(Lit::Int(v), il, ic) => {
+            let n = i128::try_from(*v)
+                .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i128"))?;
+            let irt = ast_to_ir(want)
+                .ok_or_else(|| SubsetError::new(l, c, "lower：box 载荷叶子类型不在 codegen 子集"))?;
+            if !int_in_range(&irt, n) {
+                return Err(SubsetError::new(*il, *ic, "lower：整型字面量超出声明宽度"));
+            }
+            Ok(ConstValue::Int(n))
+        }
+        Ex::Lit(Lit::Float(v), fl, fc) => match want {
+            AstTy::Prim("f32") => Ok(ConstValue::F32Bits((*v as f32).to_bits())),
+            AstTy::Prim("f64") => Ok(ConstValue::F64Bits(v.to_bits())),
+            _ => Err(SubsetError::new(*fl, *fc, "lower：浮点初值类型与标注不符")),
+        },
+        Ex::FloatSpecial(w, kind, fl, fc) => match (want, w) {
+            (AstTy::Prim("f32"), FloatWidth::F32) => {
+                Ok(ConstValue::F32Bits(special_f32(*kind).to_bits()))
+            }
+            (AstTy::Prim("f64"), FloatWidth::F64) => {
+                Ok(ConstValue::F64Bits(special_f64(*kind).to_bits()))
+            }
+            _ => Err(SubsetError::new(*fl, *fc, "lower：特殊值宽度与标注不符")),
+        },
+        Ex::Lit(Lit::Bool(v), _, _) => match want {
+            AstTy::Prim("bool") => Ok(ConstValue::Bool(*v)),
+            _ => Err(SubsetError::new(l, c, "lower：bool 初值类型与标注不符")),
+        },
+        Ex::Un(op, inner, ul, uc) if op == "-" => {
+            let inner_ty = types
+                .expr_ty(inner)
+                .ok_or_else(|| SubsetError::new(*ul, *uc, "lower：一元 '-' 缺少 type table 记录"))?;
+            if inner_ty != want {
+                return Err(SubsetError::new(*ul, *uc, "lower：一元 '-' 类型与标注不符"));
+            }
+            // 负整数字面量按幅值求值：正幅值本身可超出正数范围（i8 的 128／i64 的 2^63），
+            // 必须先把幅值取负再按声明宽度判定（与 const_scalar 既有口径一致）。
+            if let Ex::Lit(Lit::Int(v), il, ic) = inner.as_ref() {
+                let irt = ast_to_ir(want)
+                    .ok_or_else(|| SubsetError::new(*ul, *uc, "lower：box 载荷叶子类型不在 codegen 子集"))?;
+                if !matches!(
+                    irt,
+                    Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::U8 | Ty::U16 | Ty::U32 | Ty::U64 | Ty::Byte
+                ) {
+                    return Err(SubsetError::new(*ul, *uc, "lower：一元 '-' 要求数值类型"));
+                }
+                let n = i128::try_from(*v)
+                    .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i128"))?;
+                let n = n
+                    .checked_neg()
+                    .ok_or_else(|| SubsetError::new(*ul, *uc, "lower：整型常量取负溢出"))?;
+                if !int_in_range(&irt, n) {
+                    return Err(SubsetError::new(*ul, *uc, "lower：整型字面量超出声明宽度"));
+                }
+                return Ok(ConstValue::Int(n));
+            }
+            match const_value(inner, want, types, prog)? {
+                ConstValue::Int(n) => {
+                    if !matches!(
+                        want,
+                        AstTy::Prim("i8")
+                            | AstTy::Prim("i16")
+                            | AstTy::Prim("i32")
+                            | AstTy::Prim("i64")
+                    ) {
+                        return Err(SubsetError::new(*ul, *uc, "lower：无符号一元 '-' 不接受"));
+                    }
+                    let n = n
+                        .checked_neg()
+                        .ok_or_else(|| SubsetError::new(*ul, *uc, "lower：整型常量取负溢出"))?;
+                    let irt = ast_to_ir(want)
+                        .ok_or_else(|| SubsetError::new(*ul, *uc, "lower：box 载荷叶子类型不在 codegen 子集"))?;
+                    if !int_in_range(&irt, n) {
+                        return Err(SubsetError::new(*ul, *uc, "lower：整型字面量超出声明宽度"));
+                    }
+                    Ok(ConstValue::Int(n))
+                }
+                ConstValue::F32Bits(bits) => Ok(ConstValue::F32Bits((-f32::from_bits(bits)).to_bits())),
+                ConstValue::F64Bits(bits) => Ok(ConstValue::F64Bits((-f64::from_bits(bits)).to_bits())),
+                _ => Err(SubsetError::new(*ul, *uc, "lower：一元 '-' 不接受该载荷叶子")),
+            }
+        }
+        Ex::Record(name, fields, rl, rc) => {
+            let AstTy::Named(want_name) = want else {
+                return Err(SubsetError::new(*rl, *rc, "lower：record 类型与标注不符"));
+            };
+            if name != want_name {
+                return Err(SubsetError::new(*rl, *rc, "lower：record 名称与标注不符"));
+            }
+            let decl = struct_decl(prog, name)?;
+            let mut out = Vec::with_capacity(decl.fields.len());
+            for (fname, fty, _, _) in &decl.fields {
+                let v = fields
+                    .iter()
+                    .find(|(n, _)| n == fname)
+                    .ok_or_else(|| SubsetError::new(*rl, *rc, format!("lower：结构体字段 '{}' 未初始化", fname)))?;
+                let f_ir = box_payload_ir_ty(fty)
+                    .ok_or_else(|| SubsetError::new(*rl, *rc, format!("lower：字段 '{}' 类型不在载荷白名单", fname)))?;
+                let cv = const_value(&v.1, fty, types, prog)?;
+                out.push((fname.clone(), f_ir, cv));
+            }
+            if out.len() != fields.len() {
+                return Err(SubsetError::new(*rl, *rc, "lower：record 字段集合不符"));
+            }
+            Ok(ConstValue::Struct { name: name.clone(), fields: out })
+        }
+        Ex::ArrLit(es, al, ac) => {
+            let AstTy::Arr(elem, n) = want else {
+                return Err(SubsetError::new(*al, *ac, "lower：数组初值类型与标注不符"));
+            };
+            if *n != es.len() as u64 {
+                return Err(SubsetError::new(*al, *ac, "lower：数组元素数量与标注不符"));
+            }
+            let elem_ir = box_payload_ir_ty(elem)
+                .ok_or_else(|| SubsetError::new(*al, *ac, "lower：数组元素类型不在载荷白名单"))?;
+            let mut out = Vec::with_capacity(es.len());
+            for x in es {
+                out.push(const_value(x, elem, types, prog)?);
+            }
+            Ok(ConstValue::Array { elem: elem_ir, values: out })
+        }
+        other => {
+            let (ol, oc) = subset::expr_span(other);
+            Err(SubsetError::new(ol, oc, "box 载荷须为字面量常量"))
+        }
+    }
+}
+
+/// L2k：按首次使用序登记复合载荷 typedef（子类型先于父类型）。
+fn register_payload(
+    t: &Ty,
+    prog: &Prog,
+    defs: &mut Vec<PayloadDef>,
+) -> Result<(), SubsetError> {
+    match t {
+        Ty::Struct(name) => {
+            let decl = struct_decl(prog, name)?;
+            let mut fields = Vec::with_capacity(decl.fields.len());
+            for (fname, fty, _, _) in &decl.fields {
+                let ir = box_payload_ir_ty(fty)
+                    .ok_or_else(|| SubsetError::new(0, 0, format!("lower：字段 '{}' 类型不在载荷白名单", fname)))?;
+                register_payload(&ir, prog, defs)?;
+                let cty = payload_c_ty(&ir)
+                    .ok_or_else(|| SubsetError::new(0, 0, format!("lower：字段 '{}' 缺少 C 类型", fname)))?;
+                fields.push((fname.clone(), cty));
+            }
+            let def_name = payload_c_ty(t).expect("struct payload c type");
+            if !defs.iter().any(|d| match d {
+                PayloadDef::Struct { name, .. } | PayloadDef::Array { name, .. } => name == &def_name,
+            }) {
+                defs.push(PayloadDef::Struct { name: def_name, fields });
+            }
+        }
+        Ty::Array(elem, n) => {
+            register_payload(elem, prog, defs)?;
+            let def_name = payload_c_ty(t).expect("array payload c type");
+            let elem_cty = payload_c_ty(elem)
+                .ok_or_else(|| SubsetError::new(0, 0, "lower：数组元素缺少 C 类型"))?;
+            if !defs.iter().any(|d| match d {
+                PayloadDef::Struct { name, .. } | PayloadDef::Array { name, .. } => name == &def_name,
+            }) {
+                defs.push(PayloadDef::Array {
+                    name: def_name,
+                    elem: elem_cty,
+                    len: *n,
+                });
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// L2k：常量树 → 既有打印 `Value` 树。叶子投影与普通复合打印同规：
+/// i64／u8／u32 保留运行期 printf 通道，其余叶子在编译期格式化为字节。
+fn value_of_const(v: &ConstValue, t: &Ty) -> Result<Value, SubsetError> {
+    match (v, t) {
+        (ConstValue::Int(n), ty) if ir_int_ty(ty).is_some() => Ok(Value::Int {
+            ty: ir_int_ty(ty).expect("int ty"),
+            expr: IntExpr::Const(*n),
+        }),
+        (
+            ConstValue::Int(n),
+            Ty::I8 | Ty::I16 | Ty::I32 | Ty::U16 | Ty::U64 | Ty::Byte,
+        ) => Ok(Value::Bytes(n.to_string().into_bytes())),
+        (ConstValue::Bool(b), Ty::Bool) => {
+            Ok(Value::Bytes(if *b { b"true".to_vec() } else { b"false".to_vec() }))
+        }
+        (ConstValue::F32Bits(bits), Ty::F32) => Ok(Value::Bytes(
+            float_fmt::format_f32(f32::from_bits(*bits)).into_bytes(),
+        )),
+        (ConstValue::F64Bits(bits), Ty::F64) => Ok(Value::Bytes(
+            float_fmt::format_f64(f64::from_bits(*bits)).into_bytes(),
+        )),
+        (ConstValue::Struct { name, fields }, Ty::Struct(want)) if name == want => {
+            let mut out = Vec::with_capacity(fields.len());
+            for (fname, fty, fv) in fields {
+                out.push((fname.clone(), value_of_const(fv, fty)?));
+            }
+            Ok(Value::Struct { name: name.clone(), fields: out })
+        }
+        (ConstValue::Array { elem, values }, Ty::Array(want_elem, n))
+            if elem == want_elem.as_ref() && values.len() as u64 == *n =>
+        {
+            let mut out = Vec::with_capacity(values.len());
+            for x in values {
+                out.push(value_of_const(x, elem)?);
+            }
+            Ok(Value::Array(out))
+        }
+        _ => Err(SubsetError::new(0, 0, "lower：复合载荷常量与类型不符")),
     }
 }
 
@@ -1291,12 +1644,15 @@ fn lower_int_expr(
 }
 
 /// L2j：特殊值载荷的存储位型（float／double 的 IEEE754 位模式）。
+/// L2k：有限字面量同走此通道（`to_bits` 保留单／双精度位型）。
 /// 打印仍走编译期 `float_fmt` 字节；此处仅保证载荷按真实位型落堆。
 fn box_float_bits(val: &ConstVal, ty: BoxIntTy) -> Result<i128, SubsetError> {
     match (val, ty) {
         (ConstVal::F32Special(k), BoxIntTy::F32) => Ok(special_f32(*k).to_bits() as i128),
         (ConstVal::F64Special(k), BoxIntTy::F64) => Ok(special_f64(*k).to_bits() as i128),
-        _ => Err(SubsetError::new(0, 0, "lower：Box 浮点载荷非特殊值")),
+        (ConstVal::F32(v), BoxIntTy::F32) => Ok(v.to_bits() as i128),
+        (ConstVal::F64(v), BoxIntTy::F64) => Ok(v.to_bits() as i128),
+        _ => Err(SubsetError::new(0, 0, "lower：Box 浮点载荷位型不符")),
     }
 }
 
@@ -1336,7 +1692,7 @@ fn box_lit(e: &Ex, ty: BoxIntTy) -> Result<i128, SubsetError> {
 #[cfg(test)]
 mod tests {
     use super::lower;
-    use crate::backend::ir::{ArithOp, IntExpr, IntTy, LocalId, PrintArg, Stmt, StrArg, Ty};
+    use crate::backend::ir::{ArithOp, BoxConst, ConstValue, IntExpr, IntTy, LocalId, PrintArg, Stmt, StrArg, Ty};
     use crate::type_table::TypeTable;
     use crate::compile_typed;
 
@@ -1491,7 +1847,7 @@ mod tests {
     fn box_create_read_unbox_has_no_scope_drop() {
         let b = body("fn main() {\n    let b = box 1;\n    let v = *b;\n    unbox b;\n}\n");
         assert_eq!(b.len(), 3, "{b:?}");
-        assert!(matches!(b[0], Stmt::BindBox { value: 1, .. }));
+        assert!(matches!(b[0], Stmt::BindBox { value: BoxConst::Bits(1), .. }));
         assert!(matches!(b[1], Stmt::BindDeref { .. }));
         assert!(matches!(b[2], Stmt::Unbox { .. }));
     }
@@ -1502,7 +1858,7 @@ mod tests {
     fn deref_print_uses_i64_temp_not_box_slot() {
         let b = body("fn main() {\n    let b = box 42;\n    println(*b);\n}\n");
         assert_eq!(b.len(), 4, "{b:?}");
-        assert!(matches!(b[0], Stmt::BindBox { local: LocalId(0), value: 42, .. }));
+        assert!(matches!(b[0], Stmt::BindBox { local: LocalId(0), value: BoxConst::Bits(42), .. }));
         let temp = match &b[1] {
             Stmt::BindDeref { local, src, .. } => {
                 assert_eq!(src.0, 0, "解引用源必须是 Box 槽位");
@@ -1578,7 +1934,7 @@ mod tests {
         assert!(matches!(b[1], Stmt::Unbox { .. }));
         match &b[2] {
             Stmt::BindBoxAssign { drop_dst, value, .. } => {
-                assert_eq!((*drop_dst, *value), (false, 2));
+                assert_eq!((*drop_dst, value.clone()), (false, BoxConst::Bits(2)));
             }
             other => panic!("expected BindBoxAssign, got {other:?}"),
         }
@@ -1662,5 +2018,97 @@ mod tests {
             Stmt::BindInt { expr: IntExpr::Const(v), .. } => assert_eq!(*v, i64::MIN as i128),
             other => panic!("expected BindInt(Const), got {other:?}"),
         }
+    }
+
+    // —— L2k：复合常量载荷 ——
+
+    #[test]
+    fn composite_print_projects_same_tree_as_plain_print() {
+        let boxed = printed(
+            "struct S { x: i64, y: f32, f: bool }\nfn main() { let b: Box<S> = box S { x: 1, y: -0.0, f: true }; println(*b); }",
+        );
+        let plain = printed(
+            "struct S { x: i64, y: f32, f: bool }\nfn main() { let s = S { x: 1, y: -0.0, f: true }; println(s); }",
+        );
+        assert_eq!(format!("{boxed:?}"), format!("{plain:?}"));
+    }
+
+    #[test]
+    fn finite_float_box_payload_bits_are_exact() {
+        for (src, want) in [
+            ("fn main() { let b: Box<f64> = box -1.5; println(*b); }", (-1.5f64).to_bits() as i128),
+            ("fn main() { let b: Box<f64> = box -0.0; println(*b); }", (-0.0f64).to_bits() as i128),
+            ("fn main() { let b: Box<f32> = box 1.5; println(*b); }", (1.5f32).to_bits() as i128),
+        ] {
+            let b = body(src);
+            match &b[0] {
+                Stmt::BindBox { value: BoxConst::Bits(v), .. } => assert_eq!(*v, want, "{src}"),
+                other => panic!("{src}: expected BindBox(Bits), got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn composite_payload_tree_and_element_pushdown() {
+        let b = body("fn main() { let b: Box<[u8;3]> = box [1, 2, 3]; println(*b); }");
+        match &b[0] {
+            Stmt::BindBox {
+                ty: Ty::Array(elem, 3),
+                value: BoxConst::Composite(ConstValue::Array { elem: ce, values }),
+                ..
+            } => {
+                assert_eq!(**elem, Ty::U8);
+                assert_eq!(*ce, Ty::U8);
+                assert_eq!(values.len(), 3);
+            }
+            other => panic!("expected composite array BindBox, got {other:?}"),
+        }
+        let s = body(
+            "struct P { x: i8 }\nstruct S { p: P, a: [u8;2] }\nfn main() { let b: Box<S> = box S { p: P { x: -1 }, a: [7, 8] }; println(*b); }",
+        );
+        match &s[0] {
+            Stmt::BindBox { ty: Ty::Struct(n), value: BoxConst::Composite(ConstValue::Struct { fields, .. }), .. } => {
+                assert_eq!(n, "S");
+                assert_eq!(fields.len(), 2);
+                assert_eq!(fields[0].0, "p");
+                assert_eq!(fields[1].0, "a");
+            }
+            other => panic!("expected composite struct BindBox, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn width_min_negative_leaves_are_accepted() {
+        let b = body(
+            "struct S { a: i64, b: i8 }\nfn main() { let b: Box<S> = box S { a: -9223372036854775808, b: -128 }; println(*b); }",
+        );
+        match &b[0] {
+            Stmt::BindBox { value: BoxConst::Composite(ConstValue::Struct { fields, .. }), .. } => {
+                assert_eq!(fields[0].2, ConstValue::Int(i64::MIN as i128));
+                assert_eq!(fields[1].2, ConstValue::Int(i8::MIN as i128));
+            }
+            other => panic!("expected composite struct BindBox, got {other:?}"),
+        }
+        let a = body("fn main() { let b: Box<[i8;2]> = box [-1, -128]; println(*b); }");
+        match &a[0] {
+            Stmt::BindBox { value: BoxConst::Composite(ConstValue::Array { values, .. }), .. } => {
+                assert_eq!(values[0], ConstValue::Int(-1));
+                assert_eq!(values[1], ConstValue::Int(i8::MIN as i128));
+            }
+            other => panic!("expected composite array BindBox, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn composite_reassign_and_move_carry_payload() {
+        let b = body("fn main() { let b: Box<[i64;2]> = box [1, 2]; b = box [3, 4]; println(*b); }");
+        match b.iter().find(|s| matches!(s, Stmt::BindBoxAssign { .. })) {
+            Some(Stmt::BindBoxAssign { drop_dst, value: BoxConst::Composite(_), .. }) => {
+                assert!(*drop_dst, "活跃目标重赋值须释放旧值")
+            }
+            other => panic!("expected BindBoxAssign(Composite), got {other:?}"),
+        }
+        let m = body("struct P { x: i64 }\nfn main() { let a: Box<P> = box P { x: 1 }; let c = a; println(*c); }");
+        assert!(m.iter().any(|s| matches!(s, Stmt::MoveAssign { .. })));
     }
 }

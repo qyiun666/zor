@@ -1,0 +1,50 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S14-01	tests/stdout/cases/S14-01.zor	run	0	expected/S14-01.stdout	-	Box<S> dual i64 direct+deref isomorphism
+S14-02	tests/stdout/cases/S14-02.zor	run	0	expected/S14-02.stdout	-	Box<S> eight int widths plus bool field
+S14-03	tests/stdout/cases/S14-03.zor	run	0	expected/S14-03.stdout	-	Box<S> f32 f64 finite and -0.0 fields
+S14-04	tests/stdout/cases/S14-04.zor	run	0	expected/S14-04.stdout	-	Box<S> nested struct field
+S14-05	tests/stdout/cases/S14-05.zor	run	0	expected/S14-05.stdout	-	Box<S> i64 array field
+S14-06	tests/stdout/cases/S14-06.zor	run	0	expected/S14-06.stdout	-	Box<S> u8 and f32 array fields
+S14-07	tests/stdout/cases/S14-07.zor	run	0	expected/S14-07.stdout	-	Box<[i64;3]> direct+deref isomorphism
+S14-08	tests/stdout/cases/S14-08.zor	run	0	expected/S14-08.stdout	-	Box<[f64;3]> finite and -0.0
+S14-09	tests/stdout/cases/S14-09.zor	run	0	expected/S14-09.stdout	-	Box<[bool;3]>
+S14-10	tests/stdout/cases/S14-10.zor	run	0	expected/S14-10.stdout	-	Box<[P;2]> array of structs (ASAN)
+S14-11	tests/stdout/cases/S14-11.zor	run	0	expected/S14-11.stdout	-	Box<[[i64;2];2]> nested array
+S14-12	tests/stdout/cases/S14-12.zor	run	0	expected/S14-12.stdout	-	Box<S> special value fields
+S14-13	tests/stdout/cases/S14-13.zor	run	0	expected/S14-13.stdout	-	multi-arg two boxes plus integer
+S14-14	tests/stdout/cases/S14-14.zor	run	0	expected/S14-14.stdout	-	same box deref read twice
+S14-15	tests/stdout/cases/S14-15.zor	run	0	expected/S14-15.stdout	-	local move then deref read (ASAN)
+S14-16	tests/stdout/cases/S14-16.zor	run	0	expected/S14-16.stdout	-	local reassign same type (ASAN)
+S14-17	tests/stdout/cases/S14-17.zor	run	0	expected/S14-17.stdout	-	unbox only no stdout (ASAN)
+S14-18	tests/stdout/cases/S14-18.zor	run	0	expected/S14-18.stdout	-	unbox then reinit (ASAN)
+S14-19	tests/stdout/cases/S14-19.zor	run	0	expected/S14-19.stdout	-	scope drop two composite boxes (ASAN)
+S14-20	tests/stdout/cases/S14-20.zor	run	0	expected/S14-20.stdout	-	Box<[i8;3]> element pushdown 0/127/1
+S14-21	tests/stdout/cases/S14-21.zor	run	0	expected/S14-21.stdout	-	Box<[i16;3]> element pushdown 0/32767/1
+S14-22	tests/stdout/cases/S14-22.zor	run	0	expected/S14-22.stdout	-	Box<[i32;3]> element pushdown 0/2147483647/1
+S14-23	tests/stdout/cases/S14-23.zor	run	0	expected/S14-23.stdout	-	Box<[u8;3]> element pushdown 0/255/1
+S14-24	tests/stdout/cases/S14-24.zor	run	0	expected/S14-24.stdout	-	Box<[u16;3]> element pushdown 0/65535/1
+S14-25	tests/stdout/cases/S14-25.zor	run	0	expected/S14-25.stdout	-	Box<[u32;3]> element pushdown 0/4294967295/1
+S14-26	tests/stdout/cases/S14-26.zor	run	0	expected/S14-26.stdout	-	Box<[u64;3]> element pushdown 0/18446744073709551615/1
+S14-27	tests/stdout/cases/S14-27.zor	run	0	expected/S14-27.stdout	-	Box<[f32;3]> element pushdown 1.5/0.0/-0.0
+S14-28	tests/stdout/cases/S14-28.zor	run	0	expected/S14-28.stdout	-	Box<[[u8;2];2]> nested narrow array
+S14-29	tests/stdout/cases/S14-29.zor	run	0	expected/S14-29.stdout	-	Box<S> empty struct placeholder
+S14-30	tests/stdout/cases/S14-30.zor	run	0	expected/S14-30.stdout	-	Box<[i64;0]> zero-length array placeholder
+S14-31	tests/stdout/cases/S14-31.zor	run	0	expected/S14-31.stdout	-	Box<S> negative integer literal leaves
+S15-01	tests/stdout/cases/S15-01.zor	run	0	expected/S15-01.stdout	-	Box<f64> finite 1.5
+S15-02	tests/stdout/cases/S15-02.zor	run	0	expected/S15-02.stdout	-	Box<f64> finite -1.5
+S15-03	tests/stdout/cases/S15-03.zor	run	0	expected/S15-03.stdout	-	Box<f64> positive zero
+S15-04	tests/stdout/cases/S15-04.zor	run	0	expected/S15-04.stdout	-	Box<f64> negative zero
+S15-05	tests/stdout/cases/S15-05.zor	run	0	expected/S15-05.stdout	-	Box<f32> finite 1.5 narrowing
+S15-06	tests/stdout/cases/S15-06.zor	run	0	expected/S15-06.stdout	-	Box<f32> finite -1.5 narrowing
+S15-07	tests/stdout/cases/S15-07.zor	run	0	expected/S15-07.stdout	-	Box<f32> positive zero narrowing
+S15-08	tests/stdout/cases/S15-08.zor	run	0	expected/S15-08.stdout	-	Box<f32> negative zero narrowing
+S15-09	tests/stdout/cases/S15-09.zor	run	0	expected/S15-09.stdout	-	Box<f64> shortest round-trip 0.1
+S15-10	tests/stdout/cases/S15-10.zor	run	0	expected/S15-10.stdout	-	Box<f64> sci lower threshold 1e-5
+S15-11	tests/stdout/cases/S15-11.zor	run	0	expected/S15-11.stdout	-	Box<f64> sci upper threshold 1e16
+S15-12	tests/stdout/cases/S15-12.zor	run	0	expected/S15-12.stdout	-	Box<f32> sci upper threshold 1e7
+S15-13	tests/stdout/cases/S15-13.zor	run	0	expected/S15-13.stdout	-	multi-arg f64 f32 and integer (ASAN)
+S15-14	tests/stdout/cases/S15-14.zor	run	0	expected/S15-14.stdout	-	same box repeated read
+S15-15	tests/stdout/cases/S15-15.zor	run	0	expected/S15-15.stdout	-	reassign finite to special
+S15-16	tests/stdout/cases/S15-16.zor	run	0	expected/S15-16.stdout	-	Box<f64> overflow literal 1e999
+S15-17	tests/stdout/cases/S15-17.zor	run	0	expected/S15-17.stdout	-	Box<f64> underflow literal 1e-999
+S15-18	tests/stdout/cases/S15-18.zor	run	0	expected/S15-18.stdout	-	Box<f32> overflow and underflow literals

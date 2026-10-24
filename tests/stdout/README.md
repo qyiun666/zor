@@ -61,3 +61,15 @@ bash tests/stdout/run_stdout_contract.sh --strict
 - **Stage-1.1 判词订正（L2g）**：N-45／N-46 为 `额外函数 'f'（首片只支持 main）`；N-47 为 `let 初始化复合值不可打印或形态不支持`；其余 11 条同 Stage-1（N-41／N-42 `box 载荷非整型字面量`；N-48 `println 实参不可打印`；E1201 8 条）。仅判词订正，9／14 与活跃 L2g 138 不变。
 
 - **Stage-1 v1.1 订正（N-97）**：别名绑定特殊值作 array 元素在实现后为正例（与 S12-19 同义），原“非恒定数组元素”负控前提失效；N-97 同 ID 改为“含特殊值数组的非字面量下标”（`let a: [f64;2] = [f64::NAN, 1.5]; let i = 0; println(a[i]);`），head `6bacb3a` 实测 codegen rc=1、零产物；31 条与 token 分布 E1201 7／E1202 3／E1101 4／codegen 17 不变。
+---
+
+## L2k Stage-1（0.3.10 候选；冻结锚点 QA v1.2）
+
+- 计数：P=**49**（S14-01～31／S15-01～18）、Q=**23**（N-143～165）、Ret=**12**；活跃 runtime **175**／负控 **143**／CLI 17／stdout **335**／packaging 4／合计 **339**。
+- 矩阵：`l2k-cases.tsv`（**50 行**）、`l2k-negative.tsv`（**24 行**）；`l2k-baseline` cases **417**（tsv 418 行）、`.sha256` **590 行**（δ=1，含 `tests/runtime/l2k-asan-manifest.tsv`）。
+- 正例：S14 复合载荷（struct／嵌套／数组／数组嵌结构体／窄宽数组／空 struct／`[T;0]`／负整数字面量叶子／move／重赋值／unbox／drop）；S15 有限浮点（两宽度、0／-0、负值、阈值、上溢／下溢）。**expected 在 Stage-2 捕获，Stage-1 不预写**；`--validate-only` 因恰 **49** 条 expected 缺件而红是预期。
+- 负控：N-143～165；token 以 Stage-1 实现 head 实测锁定。N-163／N-164 为变量整值载荷，**新 token 待 PMO 批准后加入固定集合**；N-165 为嵌套 `[byte;N]`。禁止通配放宽。
+- 退休 Ret=12（仅执行面）：N-26／N-27／N-31／N-32／N-93／N-95／N-117～120／N-125／N-126；`l2f`／`l2i`／`l2j` TSV 与旧六基线字节零改，退休项仍在 `l2k-baseline.tsv` 作历史行。
+- 执行维度：两轮；六档 `-O*` **294**（QA Stage-2，不进 CI）；locale **23**（S14-03／06／08／12／27＋S15-01～18）；ASAN K=**6**（S14-19／16／15／17／10／S15-13），第二 manifest 6 行，Stage-1 `expect_stdout_sha256` 留空、S2 判 `FAIL reason=expected_pending`。
+- 首要验证点：S14-30 `Box<[i64;0]> = box []` 在 0.3.9 为 E1201（`[?;0]`），实现须让元素标注下推覆盖 N=0。
+- 旧六基线 162/209、188/246、206/275、247/327、297/398、345/466；`new-cases.tsv` 120、runtime-codes 39／6／19、CLI 17 零改。

@@ -8,7 +8,8 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 
 use super::super::ir::{
-    ArithOp, BoxIntTy, Func, IntExpr, IntTy, LocalId, PrintArg, Program, Stmt, StrArg, Ty, Value,
+    payload_c_ty, ArithOp, BoxConst, BoxIntTy, ConstValue, Func, IntExpr, IntTy, LocalId,
+    PayloadDef, PrintArg, Program, Stmt, StrArg, Ty, Value,
 };
 use crate::backend::OverflowMode;
 
@@ -28,6 +29,7 @@ pub fn emit(prog: &Program, source_path: &str, overflow: OverflowMode) -> String
         out.push_str("#include <string.h>\n#include \"zor_rt.h\"\n");
     }
     out.push('\n');
+    emit_payload_defs(&mut out, prog);
     if prog_uses_alloc(prog) {
         emit_alloc_helper(&mut out);
     }
@@ -70,6 +72,34 @@ fn emit_alloc_helper(out: &mut String) {
     out.push_str("    }\n");
     out.push_str("    return p;\n");
     out.push_str("}\n\n");
+}
+
+/// L2k：复合载荷 typedef（首次使用序；无复合载荷时零输出，既有 C 文本零漂移）。
+fn emit_payload_defs(out: &mut String, prog: &Program) {
+    for def in &prog.payload_defs {
+        match def {
+            PayloadDef::Struct { name, fields } => {
+                out.push_str("typedef struct {\n");
+                if fields.is_empty() {
+                    // C11 不允许零成员 struct；占位成员不可观测，仅影响分配量。
+                    out.push_str("    uint8_t _zor_pad;\n");
+                } else {
+                    for (fname, fty) in fields {
+                        let _ = writeln!(out, "    {fty} {fname};");
+                    }
+                }
+                let _ = writeln!(out, "}} {name};");
+            }
+            PayloadDef::Array { name, elem, len } => {
+                // C11 不允许零长数组；占位 1 元素，逻辑长度仍为 0（不初始化）。
+                let n = (*len).max(1);
+                let _ = writeln!(out, "typedef {elem} {name}[{n}];");
+            }
+        }
+    }
+    if !prog.payload_defs.is_empty() {
+        out.push('\n');
+    }
 }
 
 /// C 标识符 mangle：`zor_<kind>_<index>[_<sanitized>]`。
@@ -225,8 +255,9 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
     // 每枚 Box owner 槽位：载荷指针 + 运行期 drop flag（静态 drop_dst 的运行时载体）。
     let box_locals = box_locals(f);
     for id in &box_locals {
-        let ty = box_payload_ty(f, *id).expect("box local payload width");
-        let _ = writeln!(out, "    {} *zor_box_{} = NULL;", ty.c_ty(), id.0);
+        let ty = box_payload_ty(f, *id).expect("box local payload type");
+        let cty = payload_c_ty(&ty).expect("box payload c type");
+        let _ = writeln!(out, "    {} *zor_box_{} = NULL;", cty, id.0);
         let _ = writeln!(out, "    uint8_t zor_live_{} = 0;", id.0);
     }
     if !box_locals.is_empty() {
@@ -330,14 +361,14 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
             }
             Stmt::BindBox { local, ty, value, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
-                emit_alloc_box(out, local, *ty, *value);
+                emit_alloc_payload(out, local, ty, value);
             }
             Stmt::BindBoxAssign { local, ty, value, drop_dst, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
                 if *drop_dst {
                     emit_free_live(out, local);
                 }
-                emit_alloc_box(out, local, *ty, *value);
+                emit_alloc_payload(out, local, ty, value);
             }
             Stmt::BindDeref { local, src: boxed, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
@@ -444,15 +475,24 @@ fn box_int_const(v: i128, ty: BoxIntTy) -> String {
         BoxIntTy::U32 => format!("UINT32_C({v})"),
         BoxIntTy::U64 => format!("UINT64_C({v})"),
         // L2j：特殊值载荷按 IEEE754 位模式落堆（联合体常量为 C11，无需 libm／运行期格式化）。
-        BoxIntTy::F32 => format!(
-            "((union {{ float f; uint32_t u; }}){{ .u = UINT32_C({:#010x}) }}).f",
-            v as u32
-        ),
-        BoxIntTy::F64 => format!(
-            "((union {{ double d; uint64_t u; }}){{ .u = UINT64_C({:#018x}) }}).d",
-            v as u64
-        ),
+        BoxIntTy::F32 => float_bits_const_f32(v as u32),
+        BoxIntTy::F64 => float_bits_const_f64(v as u64),
     }
+}
+
+/// IEEE754 位型 → C11 联合体常量（位精确；不引入 libm）。
+fn float_bits_const_f32(bits: u32) -> String {
+    format!(
+        "((union {{ float f; uint32_t u; }}){{ .u = UINT32_C({:#010x}) }}).f",
+        bits
+    )
+}
+
+fn float_bits_const_f64(bits: u64) -> String {
+    format!(
+        "((union {{ double d; uint64_t u; }}){{ .u = UINT64_C({:#018x}) }}).d",
+        bits
+    )
 }
 
 /// 递归生成算术表达式：每个节点落到独立临时变量，保证检查顺序与源序一致。
@@ -609,25 +649,132 @@ fn emit_alloc_box(out: &mut String, id: &LocalId, ty: BoxIntTy, value: i128) {
     let _ = writeln!(out, "    zor_live_{} = 1;", id.0);
 }
 
-/// Box 本地槽位的载荷宽度（来自 lower 写入的 `Func.locals`）。
-fn box_payload_ty(f: &Func, id: LocalId) -> Option<BoxIntTy> {
+/// L2k：按载荷常量分派——标量保持既有 C 文本，复合走 typedef + 复合初始化。
+fn emit_alloc_payload(out: &mut String, id: &LocalId, ty: &Ty, value: &BoxConst) {
+    match value {
+        BoxConst::Bits(v) => {
+            let bty = box_ty_of(ty).expect("scalar box payload width");
+            emit_alloc_box(out, id, bty, *v);
+        }
+        BoxConst::Composite(cv) => emit_alloc_composite(out, id, ty, cv),
+    }
+}
+
+/// L2k：复合载荷落堆。struct 整体复合字面量赋值；数组逐元素赋值（C 不允许数组整体赋值）。
+fn emit_alloc_composite(out: &mut String, id: &LocalId, ty: &Ty, cv: &ConstValue) {
+    let cty = payload_c_ty(ty).expect("composite payload c type");
+    let _ = writeln!(
+        out,
+        "    zor_box_{} = ({} *)zor_alloc(sizeof({}));",
+        id.0, cty, cty
+    );
+    match (ty, cv) {
+        (Ty::Struct(_), ConstValue::Struct { .. }) => {
+            let _ = writeln!(out, "    *zor_box_{} = ({}){};", id.0, cty, init_braced(ty, cv));
+        }
+        (Ty::Array(_, n), ConstValue::Array { values, .. }) => {
+            debug_assert_eq!(*n, values.len() as u64);
+            emit_array_init(out, id, &format!("(*zor_box_{})", id.0), ty, values);
+        }
+        _ => unreachable!("composite payload shape"),
+    }
+    let _ = writeln!(out, "    zor_live_{} = 1;", id.0);
+}
+
+/// 数组逐元素初始化：元素为数组时继续下钻（数组不可整体赋值）。
+fn emit_array_init(out: &mut String, id: &LocalId, prefix: &str, ty: &Ty, vs: &[ConstValue]) {
+    let _ = id;
+    let Ty::Array(elem, _) = ty else {
+        return;
+    };
+    for (i, v) in vs.iter().enumerate() {
+        let lvalue = format!("{prefix}[{i}]");
+        match (elem.as_ref(), v) {
+            (Ty::Array(..), ConstValue::Array { values, .. }) => {
+                emit_array_init(out, id, &lvalue, elem, values)
+            }
+            _ => {
+                let _ = writeln!(out, "    {lvalue} = {};", init_expr(elem, v));
+            }
+        }
+    }
+}
+
+/// 初始化上下文（`=` 右侧／花括号内）合法写法；struct 返回 `{ .f = ... }`。
+fn init_braced(ty: &Ty, cv: &ConstValue) -> String {
+    match (ty, cv) {
+        (Ty::Struct(_), ConstValue::Struct { fields, .. }) => {
+            let mut parts = Vec::with_capacity(fields.len());
+            for (fname, fty, fv) in fields {
+                parts.push(format!(".{} = {}", fname, init_braced(fty, fv)));
+            }
+            format!("{{ {} }}", parts.join(", "))
+        }
+        (Ty::Array(_, 0), _) => "{ 0 }".to_string(),
+        (Ty::Array(elem, _), ConstValue::Array { values, .. }) => {
+            let mut parts = Vec::with_capacity(values.len());
+            for v in values {
+                parts.push(init_braced(elem, v));
+            }
+            format!("{{ {} }}", parts.join(", "))
+        }
+        _ => leaf_literal(ty, cv),
+    }
+}
+
+/// 赋值表达式右值；struct 用复合字面量，数组不可赋值（调用方下钻）。
+fn init_expr(ty: &Ty, cv: &ConstValue) -> String {
+    match ty {
+        Ty::Struct(_) => {
+            let cty = payload_c_ty(ty).expect("struct payload c type");
+            format!("({}){}", cty, init_braced(ty, cv))
+        }
+        Ty::Array(..) => unreachable!("array init must descend element-wise"),
+        _ => leaf_literal(ty, cv),
+    }
+}
+
+fn leaf_literal(ty: &Ty, cv: &ConstValue) -> String {
+    match (ty, cv) {
+        (Ty::Bool, ConstValue::Bool(b)) => {
+            if *b {
+                "1".to_string()
+            } else {
+                "0".to_string()
+            }
+        }
+        (Ty::F32, ConstValue::F32Bits(bits)) => float_bits_const_f32(*bits),
+        (Ty::F64, ConstValue::F64Bits(bits)) => float_bits_const_f64(*bits),
+        (_, ConstValue::Int(v)) => {
+            let bty = box_ty_of(ty).expect("integer payload leaf");
+            box_int_const(*v, bty)
+        }
+        _ => unreachable!("payload leaf shape"),
+    }
+}
+
+/// Box 本地槽位的载荷类型（来自 lower 写入的 `Func.locals`）。
+fn box_payload_ty(f: &Func, id: LocalId) -> Option<Ty> {
     f.locals.iter().find(|l| l.id == id).and_then(|l| match &l.ty {
-        Ty::Box(p) => match p.as_ref() {
-            Ty::I8 => Some(BoxIntTy::I8),
-            Ty::I16 => Some(BoxIntTy::I16),
-            Ty::I32 => Some(BoxIntTy::I32),
-            Ty::I64 => Some(BoxIntTy::I64),
-            Ty::U8 => Some(BoxIntTy::U8),
-            Ty::U16 => Some(BoxIntTy::U16),
-            Ty::U32 => Some(BoxIntTy::U32),
-            Ty::U64 => Some(BoxIntTy::U64),
-            // L2j：特殊值载荷（打印走编译期字节）。
-            Ty::F32 => Some(BoxIntTy::F32),
-            Ty::F64 => Some(BoxIntTy::F64),
-            _ => None,
-        },
+        Ty::Box(p) => Some((**p).clone()),
         _ => None,
     })
+}
+
+fn box_ty_of(ty: &Ty) -> Option<BoxIntTy> {
+    match ty {
+        Ty::I8 => Some(BoxIntTy::I8),
+        Ty::I16 => Some(BoxIntTy::I16),
+        Ty::I32 => Some(BoxIntTy::I32),
+        Ty::I64 => Some(BoxIntTy::I64),
+        Ty::U8 => Some(BoxIntTy::U8),
+        Ty::U16 => Some(BoxIntTy::U16),
+        Ty::U32 => Some(BoxIntTy::U32),
+        Ty::U64 => Some(BoxIntTy::U64),
+        Ty::F32 => Some(BoxIntTy::F32),
+        Ty::F64 => Some(BoxIntTy::F64),
+        _ => None,
+    }
 }
 
 /// 整型本地槽位宽度（`let v = *b` 的目标类型）。
@@ -1100,5 +1247,57 @@ mod tests {
         let c = emit(&p, "t.zor");
         assert!(c.contains("zor_rt_div_i64_wrap("), "{c}");
         assert!(!c.contains("zor_rt_div_i64_checked("), "{c}");
+    }
+
+    // —— L2k：复合载荷 C 文本 ——
+
+    #[test]
+    fn composite_struct_payload_emits_typedef_init_and_single_free() {
+        let p = ir(
+            "struct S { x: i64, y: f32 }\nfn main() { let b: Box<S> = box S { x: 1, y: 1.5 }; println(*b); }",
+        );
+        let c = emit(&p, "t.zor");
+        assert!(c.contains("typedef struct {"), "{c}");
+        assert!(c.contains("zor_struct_S;"), "{c}");
+        assert!(c.contains("zor_box_0 = (zor_struct_S *)zor_alloc(sizeof(zor_struct_S));"), "{c}");
+        assert!(c.contains("*zor_box_0 = (zor_struct_S){ .x = INT64_C(1), .y = "), "{c}");
+        assert_eq!(c.matches("free(zor_box_0)").count(), 1, "{c}");
+        assert!(!c.contains("%f") && !c.contains("%g") && !c.contains("%e"), "{c}");
+    }
+
+    #[test]
+    fn composite_array_payload_emits_elementwise_init() {
+        let p = ir("fn main() { let b: Box<[i64;2]> = box [1, 2]; println(*b); }");
+        let c = emit(&p, "t.zor");
+        assert!(c.contains("typedef int64_t zor_arr_i64_2[2];"), "{c}");
+        assert!(c.contains("(*zor_box_0)[0] = INT64_C(1);"), "{c}");
+        assert!(c.contains("(*zor_box_0)[1] = INT64_C(2);"), "{c}");
+        // 数组不得整体赋值。
+        assert!(!c.contains("*zor_box_0 = (zor_arr"), "{c}");
+    }
+
+    #[test]
+    fn nested_array_payload_descends_elementwise() {
+        let p = ir("fn main() { let b: Box<[[u8;2];2]> = box [[1, 2], [3, 4]]; println(*b); }");
+        let c = emit(&p, "t.zor");
+        assert!(c.contains("(*zor_box_0)[0][0] = UINT8_C(1);"), "{c}");
+        assert!(c.contains("(*zor_box_0)[1][1] = UINT8_C(4);"), "{c}");
+    }
+
+    #[test]
+    fn zero_length_array_payload_uses_placeholder_capacity() {
+        let p = ir("fn main() { let b: Box<[i64;0]> = box []; println(*b); }");
+        let c = emit(&p, "t.zor");
+        assert!(c.contains("typedef int64_t zor_arr_i64_0[1];"), "{c}");
+        assert!(!c.contains("(*zor_box_0)[0] ="), "{c}");
+    }
+
+    #[test]
+    fn scalar_box_c_text_stays_unchanged() {
+        let p = ir("fn main() { let b: Box<u8> = box 7; println(*b); }");
+        let c = emit(&p, "t.zor");
+        assert!(c.contains("zor_box_0 = (uint8_t *)zor_alloc(sizeof(uint8_t));"), "{c}");
+        assert!(c.contains("*zor_box_0 = UINT8_C(7);"), "{c}");
+        assert!(!c.contains("typedef struct"), "{c}");
     }
 }

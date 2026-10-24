@@ -1,0 +1,7 @@
+struct S { f: f64, g: f32 }
+fn main() {
+    let s = S { f: f64::NAN, g: f32::INFINITY };
+    let b: Box<S> = box S { f: f64::NAN, g: f32::INFINITY };
+    println(s);
+    println(*b);
+}

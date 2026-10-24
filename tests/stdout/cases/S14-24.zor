@@ -1,0 +1,4 @@
+fn main() {
+    let b: Box<[u16; 3]> = box [0, 65535, 1];
+    println(*b);
+}

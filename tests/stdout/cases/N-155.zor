@@ -1,0 +1,2 @@
+struct S { x: i8 }
+fn main() { let b: Box<S> = box S { x: 300 }; println(*b); }

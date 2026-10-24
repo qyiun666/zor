@@ -1,0 +1,24 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-143	tests/stdout/cases/N-143.zor	1	none	zorcc: codegen:	zor: runtime error	Box<tuple> payload
+N-144	tests/stdout/cases/N-144.zor	1	none	zorcc: codegen:	zor: runtime error	Box<S> with Box field
+N-145	tests/stdout/cases/N-145.zor	1	none	zorcc: codegen:	zor: runtime error	Box<S> with enum field
+N-146	tests/stdout/cases/N-146.zor	1	none	zorcc: codegen:	zor: runtime error	Box<enum> payload
+N-147	tests/stdout/cases/N-147.zor	1	none	zorcc: codegen:	zor: runtime error	Box<[byte;3]> top-level payload
+N-148	tests/stdout/cases/N-148.zor	1	none	zorcc: codegen:	zor: runtime error	Box array containing Box
+N-149	tests/stdout/cases/N-149.zor	1	none	zorcc: codegen:	zor: runtime error	variable struct field payload
+N-150	tests/stdout/cases/N-150.zor	1	none	zorcc: codegen:	zor: runtime error	variable array element payload
+N-151	tests/stdout/cases/N-151.zor	1	none	zorcc: codegen:	zor: runtime error	let s = *b composite deref binding
+N-152	tests/stdout/cases/N-152.zor	1	none	zorcc: codegen:	zor: runtime error	projection read through Box
+N-153	tests/stdout/cases/N-153.zor	1	none	zorcc: codegen:	zor: runtime error	write through Box
+N-154	tests/stdout/cases/N-154.zor	1	none	E1201	zor: runtime error	array length mismatch
+N-155	tests/stdout/cases/N-155.zor	1	none	E1201	zor: runtime error	struct field width overflow
+N-156	tests/stdout/cases/N-156.zor	1	none	zorcc: codegen:	zor: runtime error	unannotated struct box
+N-157	tests/stdout/cases/N-157.zor	1	none	zorcc: codegen:	zor: runtime error	unannotated array box
+N-158	tests/stdout/cases/N-158.zor	1	none	zorcc: codegen:	zor: runtime error	finite deref arithmetic
+N-159	tests/stdout/cases/N-159.zor	1	none	zorcc: codegen:	zor: runtime error	finite deref comparison
+N-160	tests/stdout/cases/N-160.zor	1	none	E1201	zor: runtime error	finite deref to i64 binding
+N-161	tests/stdout/cases/N-161.zor	1	none	E2301	zor: runtime error	composite read after unbox
+N-162	tests/stdout/cases/N-162.zor	1	none	zorcc: codegen:	zor: runtime error	multi-arg print whole box
+N-163	tests/stdout/cases/N-163.zor	1	none	zorcc: codegen:	zor: runtime error	variable whole struct payload (new token pending PMO)
+N-164	tests/stdout/cases/N-164.zor	1	none	zorcc: codegen:	zor: runtime error	variable whole array payload (new token pending PMO)
+N-165	tests/stdout/cases/N-165.zor	1	none	zorcc: codegen:	zor: runtime error	nested [byte;N] struct field
