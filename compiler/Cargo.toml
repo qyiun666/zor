@@ -1,8 +1,8 @@
 [package]
 name = "zorcc"
-version = "0.3.8"
+version = "0.3.9"
 edition = "2021"
-description = "ZOR 0.3.8 reference compiler (transitional Rust impl + C11 backend, OQ-1 Plan B); R1/R2 checks; typed IR + L2a Box/drop runtime subset; full language/runtime guarantees pending."
+description = "ZOR 0.3.9 reference compiler (transitional Rust impl + C11 backend, OQ-1 Plan B); R1/R2 checks; typed IR + L2a Box/drop runtime subset; full language/runtime guarantees pending."
 
 [dependencies]
 

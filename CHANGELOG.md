@@ -4,6 +4,48 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.9] - 2026-10-24
+
+内部验证里程碑，非可用语言版本：本版为 L2j「Box<f32>／Box<f64> 浮点特殊值载荷」——在 0.3.8 的浮点特殊值复合承载与打印之上，新增 `Box<f32>`／`Box<f64>` 承载六个特殊值源形态（`f64::NAN`／`f64::INFINITY`／`f64::NEG_INFINITY`、`f32::NAN`／`f32::INFINITY`／`f32::NEG_INFINITY`）：注解构造（`let b: Box<f64> = box f64::NAN;`）、`println(*b)` 输出 `nan`／`inf`／`-inf`、多 Box／重复读取、局部移动／重赋值、`unbox`／作用域 drop 一次；并把 `l2j-baseline` 接入 `stdout-contract`，形成 `l2e`／`l2f`／`l2g`／`l2h`／`l2i`／`l2j` 六基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：新增仅为特殊值载荷进入 `Box<f32>`／`Box<f64>` 及其解引用打印；`Box` 的 8 个整型宽度与 L2i 复合特殊值打印为既有能力、L2j 零回退。载荷按 IEEE754 位型以 C11 联合体常量落堆（当前不被读取）；打印复用既有编译期 `float_fmt` 字节路径，无运行期浮点库、无 locale 依赖；六档 `-O*` 输出一致。仍 fail-closed：有限浮点载荷（`box 1.5`／`-0.0`／`0.0`）、无注解 `box <float>`、`Box<Box<T>>`／`Box<struct>`／`Box<[T;N]>`／含 Box 复合值、函数参数／返回值／struct 字段、`println(b)`／`println((*b, 1))`／`let v = *b`、浮点算术／比较／条件／隐式转换、枚举载荷、扩展常量、特殊值一元负号。计数：L2j 活跃 stdout **275**（runtime 126＋负控 132＋CLI 17）＋packaging **4**＝**279**；全量 **297 → 345**；`l2j-baseline` **345** 条（sha256 清单 466 行）；0.3.8 历史 stdout **228**（108／103／17）＋packaging 4＝**232**／全量 **297** 冻结不漂移；`l2e-baseline` **162** 条（209 行）、`l2f-baseline` **188** 条（246 行）、`l2g-baseline` **206** 条（275 行）、`l2h-baseline` **247** 条（327 行）、`l2i-baseline` **297** 条（398 行）、`l2c-baseline` **68** 条（105 行）、`legacy-snapshot` **226** 条、runtime-codes **39＋6＋19**、`new-cases.tsv` **120** 均零改。① 本切片按上；② 扩展常量结转 L2k；③ 浮点算术／比较不做；④ 安装／打包不做；⑤ 跨平台证据 N/A（Linux x86_64 唯一终证，macOS 仅辅助）；⑥ 诊断增强结转 L2k；⑦ 文档债 doc-only（独立 2-file docs PR，不进本账本）。
+
+### Added
+
+- **Box 特殊值载荷**：`Box<f32>`／`Box<f64>` 可承载六个特殊值源形态；注解构造；`println(*b)` 输出 `nan`／`inf`／`-inf`；支持多 Box、重复读取、局部移动／重赋值、`unbox`／作用域 drop 一次。
+- **特殊值解引用打印**：复用既有编译期 `float_fmt` 字节路径，无运行期浮点库、无新增运行期依赖；载荷按 IEEE754 位型以 C11 联合体常量落堆（当前不被读取）。
+- **`l2j-baseline` 第六基线**：`ci/run_ci.sh` 的 `stdout-contract` 阶段在 `l2e`／`l2f`／`l2g`／`l2h`／`l2i` 之后校验 `l2j-baseline`（345／466／466），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿。
+
+### Changed
+
+- **计数与资产**：活跃 stdout 由 **228**（108／103／17）扩至 **275**（126／132／17）＋packaging 4＝**279**；全量 **297 → 345**；`l2j-baseline` 新建 345 条（sha256 清单 466 行）；`l2e` 162／209、`l2f` 188／246、`l2g` 206／275、`l2h` 247／327、`l2i` 297／398、`l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 零改；0.3.8 历史 232／297 冻结不漂移。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.8` 落至 `0.3.9`；`compiler/Cargo.toml:5` description 版本串同步；`compiler/Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.9`（以账本实测为准）。
+- **CI**：六基线并存；不新建 job、不改 workflow YAML、不改 ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2j-01：**PASS**——main `0e4f158d71d97b9ba6e3f9fb96d675488d3bb3c5`；run `40073205983`；`baseline`／`asan-linux`／`runtime-codes`／`stdout-contract`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2e-baseline|cases=162 files=209 unique=209 fail=0`；`PASS|l2f-baseline|cases=188 files=246 unique=246 fail=0`；`PASS|l2g-baseline|cases=206 files=275 unique=275 fail=0`；`PASS|l2h-baseline|cases=247 files=327 unique=327 fail=0`；`PASS|l2i-baseline|cases=297 files=398 unique=398 fail=0`；`PASS|l2j-baseline|cases=345 files=466 unique=466 fail=0`；`PASS|stdout-contract|runtime=126 negative=132 fail=0 ran=126/132`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：六基线判词全 PASS；asan-linux **success**（`PASS|asan|exit=0`，`R=7` ASAN／LSAN 零报告）；S13-01～18 **18/18**、N-113～142 **30/30**；六档 `-O*` **108/108**、locale **18/18 SAME**；`baseline` job 七段全 `exit=0`（含 `cargo`／`unit-test`），`l2j_core` **15** 条新增单测；`l2j-baseline` **466/466**、`l2i-baseline` **398/398**、`l2h-baseline` **327/327**、`l2g-baseline` **275/275**、`l2f-baseline` **246/246**、`l2e-baseline` **209/209**、`l2c-baseline` **105/105**、legacy **226/226**；全 job `SKIP|`／`FAIL|` 0 行。
+- 证据：GATE 报告 `shared/ZOR-L2j-GATE-01-20261024/REPORT.md`（sha256 `fa33c252d40867f6101e3678d019d597dd7105c9473968236d44be08813c02b3`）；GATE 证据包 `SHA256SUMS`（15 文件）`45353121d95d44fd045547b58f7de3bcc119cb3333bd3b4579e2b054c75006b7`；PR #134 **78 files +1536／−36**；Stage-2 十八条 expected 与产品会签 `9b88e239b95985e2788229c2e2afb66384259f17ec3c1e7ad0c9b959f230cd2b` 逐字节一致；Stage-2 证据包 `eca851b62d61e57ae4d5b50318f890a0d7e1a7c2e30024f14100944812f68e6b`；QA 终审 `b7392a825cc4b432c3b506478c1f3fc7fe6440c3f00ebefcda5e372f23150c44`。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **N-94 退休**：`let b: Box<f64> = box f64::NAN; println(*b);` 由 L2i 负控转为 L2j 正例；仅 runner 执行面排除，`l2i-negative.tsv` 32 行与 `l2i-baseline` 297／398 字节零改；L2i 活跃负控 103→102、活跃 codegen 17→16。
+- **有限浮点载荷不在本版**：`box 1.5`／`box -0.0`／`box 0.0` 仍 fail-closed，判词逐字保留；不提供有限浮点 Box 的构造或读取。
+- **Box 能力面结转 L2k**：`Box<Box<T>>`／`Box<struct>`／`Box<[T;N]>`、含 Box 复合值、函数参数／返回值／struct 字段均 fail-closed，不在本版。
+- **联合体位型常量**：仅承载、当前不被读取，不构成有限浮点或算术能力；以 C11 联合体常量表达位型，无新增 include。
+- **诊断文案债**：`N-140` 第二行仍写 `0.3.7`（`compiler/src/parser.rs:687`），属既有文案，本版不改。
+- **交叉披露**：`compiler/tests/l2j_core.rs` 新增 **15** 条集成测试；C11 联合体无 include；实现 4 files（`ir.rs`／`subset.rs`／`lower.rs`／`emit.rs`）与可行性结论一致。
+- **浮点算术／比较**：算术／比较／条件／隐式数值转换不做，维持 fail-closed；扩展常量、其他 `Type::member`、裸 `nan`／`inf`、`f64::NAN()` 维持 E1101；不新增关键字。
+- **枚举载荷**：枚举变体特殊载荷继续 fail-closed，结转 L2k。
+- **E 码**：无新增码位；E1101 发射点 30（lexer 3／parser 20／check 7，与 base 一致）；E1201／E1202 语义未扩宽。
+- **NaN 载荷／signaling**：N/A，不提供载荷／符号语法。
+- **平台**：Linux x86_64 为唯一终证；macOS 仅辅助，不作判据；Windows／其他发行版不在本版（⑤ N/A）。
+- **PA-L2j**：PA-L2j-01～07 待 0.3.9 账本合并后执行。
+- **性能**：`-O*` 只承诺接受与 C 编译器映射，不出性能数字、不作性能承诺。
+- 零 tag／Release；不构成安装或环境可用性承诺。
+
 ## [0.3.8] - 2026-10-24
 
 内部验证里程碑，非可用语言版本：本版为 L2i「浮点特殊值复合承载与打印」——在 0.3.7 的六个特殊值源形态与标量打印之上，把 `f64::NAN`／`f64::INFINITY`／`f64::NEG_INFINITY`／`f32::NAN`／`f32::INFINITY`／`f32::NEG_INFINITY` 扩展到 tuple／array／struct 的常量成员，支持既有嵌套、整体打印、投影（`p.x`／`a[0]`／`t[0]`，仅作 `println` 实参）、混合 f32／f64、struct 定义序、多实参与重复读取、绑定别名；并把 `l2i-baseline` 接入 `stdout-contract`，形成 `l2e`／`l2f`／`l2g`／`l2h`／`l2i` 五基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
