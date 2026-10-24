@@ -1,0 +1,4 @@
+enum E { V(f64, f64) }
+fn main() {
+    println(V(true, 1.5));
+}

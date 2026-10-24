@@ -1,0 +1,28 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S18-01	tests/stdout/cases/S18-01.zor	run	0	expected/S18-01.stdout	-	2-field first-position f64 NAN direct
+S18-02	tests/stdout/cases/S18-02.zor	run	0	expected/S18-02.stdout	-	2-field last-position f64 NAN direct
+S18-03	tests/stdout/cases/S18-03.zor	run	0	expected/S18-03.stdout	-	3-field middle f64 +Inf direct
+S18-04	tests/stdout/cases/S18-04.zor	run	0	expected/S18-04.stdout	-	3-field all f64 specials direct
+S18-05	tests/stdout/cases/S18-05.zor	run	0	expected/S18-05.stdout	-	2-field f32 NAN first direct
+S18-06	tests/stdout/cases/S18-06.zor	run	0	expected/S18-06.stdout	-	2-field f32 +Inf last direct
+S18-07	tests/stdout/cases/S18-07.zor	run	0	expected/S18-07.stdout	-	2-field f32 -Inf first direct
+S18-08	tests/stdout/cases/S18-08.zor	run	0	expected/S18-08.stdout	-	f64+f32 fields f64 NAN first direct
+S18-09	tests/stdout/cases/S18-09.zor	run	0	expected/S18-09.stdout	-	f64+f32 fields f32 +Inf last direct
+S18-10	tests/stdout/cases/S18-10.zor	run	0	expected/S18-10.stdout	-	3-field mixed widths middle f32 NAN direct
+S18-11	tests/stdout/cases/S18-11.zor	run	0	expected/S18-11.stdout	-	O-1 tuple finite field + direct special
+S18-12	tests/stdout/cases/S18-12.zor	run	0	expected/S18-12.stdout	-	O-1 struct finite field + direct special
+S18-13	tests/stdout/cases/S18-13.zor	run	0	expected/S18-13.stdout	-	multi-arg multi-field direct
+S18-14	tests/stdout/cases/S18-14.zor	run	0	expected/S18-14.stdout	-	O-1 enum finite field + direct special
+S18-15	tests/stdout/cases/S18-15.zor	run	0	expected/S18-15.stdout	-	finite special -0.0 mixed direct
+S18-16	tests/stdout/cases/S18-16.zor	run	0	expected/S18-16.stdout	-	alias of 2-field direct special
+S18-17	tests/stdout/cases/S18-17.zor	run	0	expected/S18-17.stdout	-	alias of 3-field direct special
+S18-18	tests/stdout/cases/S18-18.zor	run	0	expected/S18-18.stdout	-	finite 2-field regression
+S18-19	tests/stdout/cases/S18-19.zor	run	0	expected/S18-19.stdout	-	finite 3-field mixed widths regression
+S18-20	tests/stdout/cases/S18-20.zor	run	0	expected/S18-20.stdout	-	binding 2-field regression existing
+S18-21	tests/stdout/cases/S18-21.zor	run	0	expected/S18-21.stdout	-	binding 3-field regression existing
+S18-22	tests/stdout/cases/S18-22.zor	run	0	expected/S18-22.stdout	-	finite alias regression
+S18-23	tests/stdout/cases/S18-23.zor	run	0	expected/S18-23.stdout	-	finite multi-arg regression
+S18-24	tests/stdout/cases/S18-24.zor	run	0	expected/S18-24.stdout	-	single-field special regression existing
+S18-25	tests/stdout/cases/S18-25.zor	run	0	expected/S18-25.stdout	-	single-field alias regression existing
+S18-26	tests/stdout/cases/S18-26.zor	run	0	expected/S18-26.stdout	-	multi-variant finite regression
+S18-27	tests/stdout/cases/S18-27.zor	run	0	expected/S18-27.stdout	-	4-field special mixed direct

@@ -1,0 +1,4 @@
+enum E { V(f64, f64, f64) }
+fn main() {
+    println(V(f64::NAN, f64::INFINITY, f64::NEG_INFINITY));
+}

@@ -1,0 +1,5 @@
+enum E { F(f64, f64), G(f64, f64) }
+fn main() {
+    println(F(1.5, 2.5));
+    println(G(3.5, 4.5));
+}

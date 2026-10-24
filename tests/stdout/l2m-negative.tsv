@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-186	tests/stdout/cases/N-186.zor	1	none	E1201	zor: runtime error	cross width f64 special into f32 field
+N-187	tests/stdout/cases/N-187.zor	1	none	E1201	zor: runtime error	cross width f32 special into f64 field
+N-188	tests/stdout/cases/N-188.zor	1	none	E1201	zor: runtime error	3-field cross width
+N-189	tests/stdout/cases/N-189.zor	1	none	E1202	zor: runtime error	int into float field
+N-190	tests/stdout/cases/N-190.zor	1	none	E1201	zor: runtime error	bool payload
+N-191	tests/stdout/cases/N-191.zor	1	none	E1201	zor: runtime error	unary minus special value
+N-192	tests/stdout/cases/N-192.zor	1	none	zorcc: codegen:	zor: runtime error	composite field containing special stays closed
+N-193	tests/stdout/cases/N-193.zor	1	none	zorcc: codegen:	zor: runtime error	array field containing special stays closed
+N-194	tests/stdout/cases/N-194.zor	1	none	E1601	zor: runtime error	nested enum payload arity
+N-195	tests/stdout/cases/N-195.zor	1	none	E1101	zor: runtime error	path syntax E::V
+N-196	tests/stdout/cases/N-196.zor	1	none	E1201	zor: runtime error	arithmetic on multi-field enum
+N-197	tests/stdout/cases/N-197.zor	1	none	E1201	zor: runtime error	comparison on multi-field enum
+N-198	tests/stdout/cases/N-198.zor	1	none	E1101	zor: runtime error	extended constant MAX
+N-199	tests/stdout/cases/N-199.zor	1	none	E1101	zor: runtime error	named payload syntax
+N-200	tests/stdout/cases/N-200.zor	1	none	zorcc: codegen:	zor: runtime error	struct field containing multi-field enum direct
+N-201	tests/stdout/cases/N-201.zor	1	none	E1601	zor: runtime error	wrong arity for 2-field variant
+N-202	tests/stdout/cases/N-202.zor	1	none	E1202	zor: runtime error	alias with int payload
+N-203	tests/stdout/cases/N-203.zor	1	none	zorcc: codegen:	zor: runtime error	Box of multi-field enum
