@@ -17,8 +17,8 @@ git clone ssh://git@ssh.github.com:443/qyiun666/zor.git
 
 - 各版本发布说明：仓库 [Releases](https://github.com/qyiun666/zor/releases)（逐版更新）
 - 变更日志：根目录 [`CHANGELOG.md`](CHANGELOG.md)
-- 版本节奏：版本号 `0.1.0 → … → 0.1.99 → 0.2.0 …` 顺序递进；0.1.x 语言核心验证 → 0.2.x 首个可执行闭环（hello 首片起）与后续切片 → 0.3.x 运行期安全、stdout／CLI 契约与复合类型输出（L2a–L2l）→ 0.5.x+ Developer Preview（外部可安装、可试用）。暂不规划 1.0.0。
-- 0.3.x 状态：按 L2a–L2l 切片推进，各版均为内部验证里程碑，零 tag／零 Release；不构成安装或生产可用承诺。
+- 版本节奏：版本号 `0.1.0 → … → 0.1.99 → 0.2.0 …` 顺序递进；0.1.x 语言核心验证 → 0.2.x 首个可执行闭环（hello 首片起）与后续切片 → 0.3.x 运行期安全、stdout／CLI 契约与复合类型输出（L2a–L2m）→ 0.5.x+ Developer Preview（外部可安装、可试用）。暂不规划 1.0.0。
+- 0.3.x 状态：按 L2a–L2m 切片推进，各版均为内部验证里程碑，零 tag／零 Release；不构成安装或生产可用承诺。
 
 近期里程碑与演示安排以官方发布通报为准，本 README 不维护里程碑看板（避免两处口径漂移）。
 
