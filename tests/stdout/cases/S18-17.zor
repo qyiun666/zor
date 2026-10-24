@@ -1,0 +1,5 @@
+enum E { V(f64, f64, f64) }
+fn main() {
+    let e = V(1.5, f64::NAN, 2.5);
+    println(e);
+}
