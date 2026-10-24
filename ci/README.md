@@ -2,7 +2,14 @@
 
 归属：ZOR工具链与开发工程师。设计与验证记录：shared/ZOR-0.1x-CI基线-设计草案-v1.md；门禁判据单一来源：shared/ZOR-0.1x-质量门禁标准-v1.md（C/T/B 编号）。
 
-## 当前口径（L2l，0.3.11 候选）
+## 当前口径（L2m，0.3.12 候选）
+- 九基线并存于 `--stdout-contract`：`l2e` 162／209、`l2f` 188／246、`l2g` 206／275、`l2h` 247／327、`l2i` 297／398、`l2j` 345／466、`l2k` 417／590、`l2l` 461／660（以上均历史冻结）、`l2m` 506／734（当前全矩阵）。
+- stdout 判词 `runtime=226 negative=180`，CLI 17（合计 423；L2m Ret=1：N-183 仅执行面退休，l2l 资产仍 20 行、活跃 19）；`runtime-codes` 39／6／19；`packaging-smoke` 4；`new-cases.tsv` 120 不动。
+- required（ruleset `25633324`）：`stdout-contract`＋`packaging-smoke`；无新 job、无 workflow YAML／ruleset 写入。
+- job：`stdout-contract`／`packaging-smoke` 均为 `ubuntu-24.04`、timeout 20；artifact 分别 `stdout-contract-logs-<run_id>-<attempt>`／`packaging-logs-<run_id>-<attempt>`，保留 90 天。ASAN **K=0**：默认 manifest 48／41／7、`run_asan.sh`、`stage_asan` 零改，不建第二 manifest；L2k 第二 manifest 6 条沿用既有挂接。
+- 下列版本节内计数均为其时点口径（历史），不得读作现态。
+
+## L2l 时点（历史，0.3.11）
 - 八基线并存于 `--stdout-contract`：`l2e` 162／209、`l2f` 188／246、`l2g` 206／275、`l2h` 247／327、`l2i` 297／398、`l2j` 345／466、`l2k` 417／590（以上均历史冻结）、`l2l` 461／660（当前全矩阵）。
 - stdout 判词 `runtime=199 negative=163`，CLI 17（合计 379；L2l Ret=0，无退休）；`runtime-codes` 39／6／19；`packaging-smoke` 4；`new-cases.tsv` 120 不动。
 - required（ruleset `25633324`）：`stdout-contract`＋`packaging-smoke`；无新 job、无 workflow YAML／ruleset 写入。
