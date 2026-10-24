@@ -1,8 +1,9 @@
 //! L2l 核心集成测试：特殊值字面量直接写入**单载荷变体**实参（表面形式对齐）。
 //!
 //! 覆盖：f64／f32 六形态直接形式、别名绑定（含标注）、多变体／无载荷变体／多实参、
-//! 直接↔绑定↔别名逐行同构、绑定路径零回退；以及多字段直接／嵌套直接／跨宽／
-//! 一元负号／`E::V`／`Box<enum>`／扩展常量／算术比较的 fail-closed 红线。
+//! 直接↔绑定↔别名逐行同构、绑定路径零回退；以及嵌套直接／跨宽／一元负号／`E::V`／
+//! `Box<enum>`／扩展常量／算术比较的 fail-closed 红线（多字段直接形式自 L2m 起放行，
+//! 边界见 l2m_core）。
 //! 只依赖宿主 `cc`；不访问网络。
 
 use std::fs;
@@ -186,16 +187,12 @@ fn binding_path_zero_regression() {
 }
 
 #[test]
-fn multi_field_direct_form_stays_fail_closed() {
-    assert_rc1(
+fn multi_field_direct_form_prints_after_l2m() {
+    // L2m（PMO 批准）：多字段直接特殊值形式转正；边界见 l2m_core。
+    assert_runs(
+        "enum E { V(f64, f64) }\nfn main() {\n    println(V(f64::NAN, 1.5));\n    println(V(1.5, f64::INFINITY));\n}\n",
         "pair",
-        "enum E { V(f64, f64) }\nfn main() {\n    println(V(f64::NAN, 1.5));\n}\n",
-        "println 实参不可打印",
-    );
-    assert_rc1(
-        "pair-int",
-        "enum E { V(f64, i64) }\nfn main() {\n    println(V(f64::NAN, 7));\n}\n",
-        "println 实参不可打印",
+        b"V(nan, 1.5)\nV(1.5, inf)\n",
     );
 }
 
