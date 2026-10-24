@@ -1345,6 +1345,27 @@ fn const_value(
             if inner_ty != want {
                 return Err(SubsetError::new(*ul, *uc, "lower：一元 '-' 类型与标注不符"));
             }
+            // 负整数字面量按幅值求值：正幅值本身可超出正数范围（i8 的 128／i64 的 2^63），
+            // 必须先把幅值取负再按声明宽度判定（与 const_scalar 既有口径一致）。
+            if let Ex::Lit(Lit::Int(v), il, ic) = inner.as_ref() {
+                let irt = ast_to_ir(want)
+                    .ok_or_else(|| SubsetError::new(*ul, *uc, "lower：box 载荷叶子类型不在 codegen 子集"))?;
+                if !matches!(
+                    irt,
+                    Ty::I8 | Ty::I16 | Ty::I32 | Ty::I64 | Ty::U8 | Ty::U16 | Ty::U32 | Ty::U64 | Ty::Byte
+                ) {
+                    return Err(SubsetError::new(*ul, *uc, "lower：一元 '-' 要求数值类型"));
+                }
+                let n = i128::try_from(*v)
+                    .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i128"))?;
+                let n = n
+                    .checked_neg()
+                    .ok_or_else(|| SubsetError::new(*ul, *uc, "lower：整型常量取负溢出"))?;
+                if !int_in_range(&irt, n) {
+                    return Err(SubsetError::new(*ul, *uc, "lower：整型字面量超出声明宽度"));
+                }
+                return Ok(ConstValue::Int(n));
+            }
             match const_value(inner, want, types, prog)? {
                 ConstValue::Int(n) => {
                     if !matches!(
@@ -2053,6 +2074,28 @@ mod tests {
                 assert_eq!(fields[1].0, "a");
             }
             other => panic!("expected composite struct BindBox, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn width_min_negative_leaves_are_accepted() {
+        let b = body(
+            "struct S { a: i64, b: i8 }\nfn main() { let b: Box<S> = box S { a: -9223372036854775808, b: -128 }; println(*b); }",
+        );
+        match &b[0] {
+            Stmt::BindBox { value: BoxConst::Composite(ConstValue::Struct { fields, .. }), .. } => {
+                assert_eq!(fields[0].2, ConstValue::Int(i64::MIN as i128));
+                assert_eq!(fields[1].2, ConstValue::Int(i8::MIN as i128));
+            }
+            other => panic!("expected composite struct BindBox, got {other:?}"),
+        }
+        let a = body("fn main() { let b: Box<[i8;2]> = box [-1, -128]; println(*b); }");
+        match &a[0] {
+            Stmt::BindBox { value: BoxConst::Composite(ConstValue::Array { values, .. }), .. } => {
+                assert_eq!(values[0], ConstValue::Int(-1));
+                assert_eq!(values[1], ConstValue::Int(i8::MIN as i128));
+            }
+            other => panic!("expected composite array BindBox, got {other:?}"),
         }
     }
 

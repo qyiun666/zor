@@ -144,6 +144,11 @@ fn struct_payload_prints_like_plain_struct() {
         "struct-float-fields",
         "struct P { x: f32, y: f64 }\nfn main() {\n    let b: Box<P> = box P { x: 1.5, y: -0.0 };\n    println(P { x: 1.5, y: -0.0 });\n    println(*b);\n}\n",
     );
+    // S14-31：声明宽度最小值的负字面量叶子（i8::MIN／i64::MIN）。
+    assert_isomorphic(
+        "struct-width-min",
+        "struct S { a: i64, b: i8 }\nfn main() {\n    let b: Box<S> = box S { a: -9223372036854775808, b: -128 };\n    println(S { a: -9223372036854775808, b: -128 });\n    println(*b);\n}\n",
+    );
     assert_isomorphic(
         "struct-nested",
         "struct P { x: i64 }\nstruct Q { p: P, flag: bool, a: [u8;2] }\nfn main() {\n    let b: Box<Q> = box Q { p: P { x: 7 }, flag: true, a: [3, 4] };\n    println(Q { p: P { x: 7 }, flag: true, a: [3, 4] });\n    println(*b);\n}\n",
@@ -166,6 +171,10 @@ fn array_payloads_cover_all_allowed_element_kinds() {
         );
         assert_isomorphic(tag, &src);
     }
+    assert_isomorphic(
+        "arr-width-min",
+        "fn main() {\n    let b: Box<[i8;2]> = box [-1, -128];\n    let a: [i8;2] = [-1, -128];\n    println(a);\n    println(*b);\n}\n",
+    );
     assert_isomorphic(
         "arr-nested",
         "fn main() {\n    let b: Box<[[u8;2];2]> = box [[1, 2], [3, 4]];\n    let a: [[u8;2];2] = [[1, 2], [3, 4]];\n    println(a);\n    println(*b);\n}\n",
@@ -410,6 +419,12 @@ fn width_and_length_strictness_reuses_existing_codes() {
     assert_rc1(
         "array-length-mismatch",
         "fn main() {\n    let b: Box<[i64;3]> = box [1, 2];\n    println(*b);\n}\n",
+        "E1201",
+    );
+    // 越界负值仍由既有宽度判定拦截（E1201），不得放宽。
+    assert_rc1(
+        "i8-negative-out-of-range",
+        "fn main() {\n    let b: Box<[i8;2]> = box [-129, 1];\n    println(*b);\n}\n",
         "E1201",
     );
     assert_rc1(
