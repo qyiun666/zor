@@ -1,7 +1,7 @@
 case_id	source_path	expect_rc	mode	expect_stdout_sha256	kind	notes
-S14-19	tests/stdout/cases/S14-19.zor	0	build-run		positive	Box<S> 作用域 drop（两枚复合 Box）；stdout sha 由 Stage-2 捕获后落定
-S14-16	tests/stdout/cases/S14-16.zor	0	build-run		positive	局部重赋值（旧值释放一次）；stdout sha 由 Stage-2 捕获后落定
-S14-15	tests/stdout/cases/S14-15.zor	0	build-run		positive	局部 move（仅新 owner 释放）；stdout sha 由 Stage-2 捕获后落定
-S14-17	tests/stdout/cases/S14-17.zor	0	build-run		positive	unbox（仅释放一次）；stdout sha 由 Stage-2 捕获后落定
-S14-10	tests/stdout/cases/S14-10.zor	0	build-run		positive	数组／数组嵌结构体载荷；stdout sha 由 Stage-2 捕获后落定
-S15-13	tests/stdout/cases/S15-13.zor	0	build-run		positive	有限浮点 f64＋f32 两宽度；stdout sha 由 Stage-2 捕获后落定
+S14-19	tests/stdout/cases/S14-19.zor	0	build-run	d235d478bbd42c2f22160165f1d8925519848420e734031a4837d9b19c684c5d	positive	Box<S> 作用域 drop（两枚复合 Box）；stdout sha 由 Stage-2 捕获后落定
+S14-16	tests/stdout/cases/S14-16.zor	0	build-run	65409bd0a8d16e21712bac88c8cdcfa89588e098758d88ab97bdd451d325dcda	positive	局部重赋值（旧值释放一次）；stdout sha 由 Stage-2 捕获后落定
+S14-15	tests/stdout/cases/S14-15.zor	0	build-run	6193c60ef5445f281f77219430c3c1a1e6607235c7bdcbac8fc94bd0faf8f9a8	positive	局部 move（仅新 owner 释放）；stdout sha 由 Stage-2 捕获后落定
+S14-17	tests/stdout/cases/S14-17.zor	0	build-run	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	positive	unbox（仅释放一次）；stdout sha 由 Stage-2 捕获后落定
+S14-10	tests/stdout/cases/S14-10.zor	0	build-run	54bb133069f982dcbc62d084310b829fa12de0c72fb3404d1d465fdb560c7c65	positive	数组／数组嵌结构体载荷；stdout sha 由 Stage-2 捕获后落定
+S15-13	tests/stdout/cases/S15-13.zor	0	build-run	3c90a1f1773a3a40c0fd9b3fb0825583b4d429beba28cca47ef4e7cf64f83ceb	positive	有限浮点 f64＋f32 两宽度；stdout sha 由 Stage-2 捕获后落定
