@@ -4,6 +4,44 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.15] - 2026-10-25
+
+内部验证里程碑，非可用语言版本：本版为 L2p「MIN_POSITIVE」——在 0.3.14 的六个命名有限常量之上，新增 `f64::MIN_POSITIVE`／`f32::MIN_POSITIVE`（最小正**正规**有限值，不是最小正次正规数、不是零、不是 `MIN`）；可在既有有限浮点字面量可用的位置使用：标量 `println`、绑定、`Box` 载荷、枚举载荷、复合字段与多实参（A 档）；`println(<常量>)` 与同值有限字面量**逐字节一致**；宽度按类型严格匹配，跨宽沿用既有诊断；其他 `::` 成员（`MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` 等）维持 E1101；`0.3.7` 文案债仅 `MIN_POSITIVE` 消解；六个特殊值集合不放宽；反方向（特殊值／常量位于枚举自身复合载荷内）维持 fail-closed；无算术／比较／条件／运行期浮点库，无堆（无新增堆路径）、不改 drop。并把 `l2p-baseline` 接入 `stdout-contract`，形成 `l2e`～`l2p` 十二基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：新增仅为 `MIN_POSITIVE` 两常量及其在既有有限位置的使用；`MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` 等整数型成员、通用 `E::V`、变量载荷、`Box<enum>`／含 Box 枚举载荷、嵌套 Box、反方向 N-217／218、跨宽、算术／比较维持 fail-closed；support-list 仅 `parser.rs` 一句补入 `MIN_POSITIVE`（七个命名有限常量），E1101 桶不变、0 迁移、无新 E 码；不新增关键字／AC。token 仅 **E1101 10／E1201 6／codegen 6**，0 迁移。常量打印复用既有编译期 `float_fmt` 字节，不读堆、不引入运行期浮点库、不读 locale。① `E::V` 结转 L2q；② `Box<enum>` 结转 L2q；③A 本切片；③b 整数成员结转 L2q；④ 诊断增强结转 L2q；⑤ Box 常量性边界结转 L2q；⑥ 反方向不纳入；⑦ 六档维持 OA-1；⑧ 安装／打包／性能不纳入；⑨ 跨代 `_ACTIVE` 工程红线。计数：L2p 活跃 stdout **548**（runtime **310**＋负控 **221**＋CLI **17**）＋packaging **4**＝**552**；`l2p-baseline` **645** 条（sha256 清单 **963** 行）；0.3.14 历史 stdout **505**（286／202／17）＋packaging 4＝**509**／全量 **599** 冻结不漂移；`l2e-baseline` 162（209 行）、`l2f` 188（246）、`l2g` 206（275）、`l2h` 247（327）、`l2i` 297（398）、`l2j` 345（466）、`l2k` 417（590）、`l2l` 461（660）、`l2m` 506（734）、`l2n` 554（816）、`l2o` 599（891）、`l2c` 68（105）、legacy 226、runtime-codes 39＋6＋19、`new-cases.tsv` 120 均零改；L2p 新增正例 **24**、新负控 **22**、退休 **3**（N-220／N-233／N-235，仅执行面）；`L2O_ACTIVE=14`，六代 125、全代 185，`185＋14＋22＝221`。
+
+### Added
+
+- **`MIN_POSITIVE` 两常量**：`f64::MIN_POSITIVE`／`f32::MIN_POSITIVE`；A 档位置（标量／绑定／Box／枚举／复合字段／多实参）；`println(<常量>)` 与同值有限字面量逐字节一致；最小正正规有限值；宽度严格；其他 `::` 成员 E1101；`0.3.7` 文案债仅 MIN_POSITIVE 消解；无算术／比较／运行期浮点库；无堆（无新增堆路径）、不改 drop。
+- **`l2p-baseline` 第十二基线**：`stdout-contract` 在 `l2o` 之后校验 `l2p-baseline`（645／963／963），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿；ASAN 补充判据继续走既有 `l2k` manifest（6 条），默认 manifest 48／41／7 零改，K=0。
+
+### Changed
+
+- **计数与资产**：活跃 stdout 由 505（286／202／17）扩至 **548**（310／221／17）＋packaging 4＝**552**；`l2p-baseline` 新建 645 条（sha256 清单 963 行）；旧十一基线 162／209、188／246、206／275、247／327、297／398、345／466、417／590、461／660、506／734、554／816、599／891 与 `l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 零改；0.3.14 历史 505／509／599 冻结不漂移。
+- **既有负控退休**：A 档退休 3 条：N-220／N-233／N-235，仅执行面；源／`l2o-negative.tsv`／旧十一基线字节零改、ID 不复用、N／M 不减；`L2O_ACTIVE=14`；六代 125、全代 185；`185＋14＋22＝221`。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 0.3.14→0.3.15；`compiler/Cargo.toml:5` description 同步；`Cargo.lock:3` 的 `version = 4` 零触；账本恰 3 files。
+- **CI**：十二基线并存；无新 job／YAML／ruleset；`stdout-contract`／`packaging-smoke` 维持 required。
+
+### 门禁与回归读数
+
+- GATE-L2p-01：**PASS**——main `f24c4c7c99ec37e208dd4e58276b3ae5df764206`；run `40224748156`；`baseline`／`stdout-contract`／`runtime-codes`／`asan-linux`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2p-baseline|cases=645 files=963 unique=963 fail=0`；`PASS|stdout-contract|runtime=310 negative=221 fail=0 ran=310/221`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；`PASS|asan-l2k|cases=6 fail=0 ran=6/6`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：十二基线判词全 PASS；ASAN 第二 manifest **6/6**、默认 manifest **48／41／7** 零改；S21-01～24 **24/24**、N-237～258 **22/22**、三例退休源 **3/3**；六档 `-O*` **144/144**、locale **24/24 SAME**（Stage-2 证据，不进 CI，OA-1）；`cargo test --release --locked` **427 passed／0 failed**；全 job `SKIP|`／`FAIL|` 0 行。
+- 计数口径：P=**24**／Q=**22**／Ret=**3**／R=**310**／G=**221**／T=**548**／A=**552**／N=**645**／M=**963**。
+- 证据：GATE 报告 `shared/ZOR-L2p-GATE-01-20261025/REPORT.md`（sha256 `0edfded5…feaa7`，92 行／7911 B）；QA 终审 `shared/ZOR-L2p-QA-终审-20261025/REPORT.md`（sha256 `ec66aa23…db07`，100 行／10410 B）；产品会签 `shared/ZOR-L2p-Stage2-S21会签-产品-v1.md`（sha256 `3553fc89…65ba`，109 行／8627 B）；QA 计数 `shared/ZOR-L2p-QA-计数-20261025-v1.md`（sha256 `408fab15…8f9e`，173 行／14256 B）；`l2p-baseline.tsv` `22751ee3…39a9`；`l2p-baseline.sha256` `6d58c104…6461`；PR #158 **81 files +2153／−30**。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **版本语境**：0.3.14 及更早节的 fail-closed／结转表述按版本语境保留、**不回改**；历史节逐字节零改。
+- **`MIN_POSITIVE` 语义**：最小正**正规**有限值，不是最小正次正规数、不是零、不是 `MIN`；文档不得混写。
+- **其他成员 `0.3.7` 债**：仅 `MIN_POSITIVE` 转正；`MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` 等仍 E1101；support-list 更新仅一句、0 迁移，不写「文案债清零」。
+- **三例退休仅执行面**：N-220／N-233／N-235 源／TSV／旧十一基线零改、ID 不复用、N／M 不减；`L2O_ACTIVE=14`。
+- **反方向与 Box 边界**：反方向 N-217／218、`Box<enum>`／含 Box 枚举载荷、嵌套 Box、变量载荷、`E::V` 维持 fail-closed；不做递归析构。
+- **ASAN**：K=0（无新增 ASAN 用例、默认 manifest 48／41／7 零改）不等于「已证无泄漏」；若引入堆或改 drop 须重冻结。
+- **平台／发布／性能**：Linux x86_64 唯一终证，macOS 仅辅助；零 tag／Release，不构成安装或环境可用性承诺；不出性能数字、不作性能承诺。
+- **③b 整数成员**：`MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` 结转 L2q；本版不得暗示已支持。
+- **PA-L2p**：PA-L2p-01～07 待 0.3.15 账本合并后执行。
+
 ## [0.3.14] - 2026-10-25
 
 内部验证里程碑，非可用语言版本：本版为 L2o「扩展有限常量」——在 0.3.13 的六个命名特殊值之上，新增六个命名有限浮点常量（`f64::MAX`／`f64::MIN`／`f64::EPSILON`、`f32::MAX`／`f32::MIN`／`f32::EPSILON`）；可在既有有限浮点字面量可用的位置使用：标量 `println`、绑定、`Box` 载荷、枚举载荷、复合字段与多实参（A 档）；`println(<常量>)` 与同值有限字面量**逐字节一致**；宽度按类型严格匹配，跨宽沿用既有诊断；`MIN` 为**负的最大有限值**；其他 `::` 成员（`MIN_POSITIVE`／`MAX_EXP`／`DIG` 等）维持 fail-closed；六个特殊值集合不放宽；反方向（特殊值位于枚举自身复合载荷内）维持 fail-closed；无算术／比较／条件／运行期浮点库，无堆（无新增堆路径）、不改 drop。并把 `l2o-baseline` 接入 `stdout-contract`，形成 `l2e`～`l2o` 十一基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
