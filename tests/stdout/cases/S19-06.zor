@@ -1,0 +1,5 @@
+struct S { e: E }
+struct T { s: S }
+struct U { t: T }
+enum E { V(f64) }
+fn main() { println(U { t: T { s: S { e: V(f64::NAN) } } }); }

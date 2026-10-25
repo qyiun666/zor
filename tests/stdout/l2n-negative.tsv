@@ -1,0 +1,17 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-204	tests/stdout/cases/N-204.zor	1	none	E1201	zor: runtime error	nested cross width f32 special into f64
+N-205	tests/stdout/cases/N-205.zor	1	none	E1202	zor: runtime error	nested int into float
+N-206	tests/stdout/cases/N-206.zor	1	none	E1201	zor: runtime error	nested bool payload
+N-207	tests/stdout/cases/N-207.zor	1	none	E1201	zor: runtime error	nested unary minus special
+N-208	tests/stdout/cases/N-208.zor	1	none	E1201	zor: runtime error	multi-payload nested cross width
+N-209	tests/stdout/cases/N-209.zor	1	none	E1201	zor: runtime error	array element cross width
+N-210	tests/stdout/cases/N-210.zor	1	none	E1201	zor: runtime error	tuple element cross width
+N-211	tests/stdout/cases/N-211.zor	1	none	E1101	zor: runtime error	nested path syntax E::V
+N-212	tests/stdout/cases/N-212.zor	1	none	E1101	zor: runtime error	nested extended constant MAX
+N-213	tests/stdout/cases/N-213.zor	1	none	E1201	zor: runtime error	nested arithmetic
+N-214	tests/stdout/cases/N-214.zor	1	none	E1201	zor: runtime error	nested comparison
+N-215	tests/stdout/cases/N-215.zor	1	none	E1101	zor: runtime error	nested named payload syntax
+N-216	tests/stdout/cases/N-216.zor	1	none	E1601	zor: runtime error	nested wrong arity
+N-217	tests/stdout/cases/N-217.zor	1	none	zorcc: codegen:	zor: runtime error	reverse direction struct in enum payload stays closed
+N-218	tests/stdout/cases/N-218.zor	1	none	zorcc: codegen:	zor: runtime error	reverse direction array in enum payload stays closed
+N-219	tests/stdout/cases/N-219.zor	1	none	E1202	zor: runtime error	nested alias int payload

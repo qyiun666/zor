@@ -1,0 +1,3 @@
+struct T { p: (E, i64) }
+enum E { V(f64) }
+fn main() { println(T { p: (V(1.5), 1) }); }
