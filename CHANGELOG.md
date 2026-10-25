@@ -4,6 +4,44 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.13] - 2026-10-25
+
+内部验证里程碑，非可用语言版本：本版为 L2n「嵌套复合中的枚举值直接特殊值形式（表面形式对齐）」——枚举值作为可打印 `struct` 字段／数组元素／元组元素时，允许其变体实参**直接写入六个命名特殊值字面量**（`f64::NAN`／`f64::INFINITY`／`f64::NEG_INFINITY`、`f32::NAN`／`f32::INFINITY`／`f32::NEG_INFINITY`）；`println(S { e: V(NAN) })` → `S { e: V(nan) }`，`[V(NAN), V(INF)]`、`(V(NAN), 1)` 同理；任意深度、附加成员、三种外层别名、多实参、单／多字段枚举；宽度严格；**绑定路径（含嵌套）为既有能力、零回退**；**反方向（特殊值进入枚举自身复合载荷）维持 fail-closed**。本版**不是新增嵌套复合承载能力、不是新增运行期能力**；无堆、无递归析构、无运行期浮点格式化、无浮点算术。并把 `l2n-baseline` 接入 `stdout-contract`，形成 `l2e`／`l2f`／`l2g`／`l2h`／`l2i`／`l2j`／`l2k`／`l2l`／`l2m`／`l2n` 十基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：新增仅为嵌套复合中的枚举值变体实参可直接写特殊值字面量这一表面形式；顶层单／多字段直接形式、嵌套有限值、绑定路径、三种外层别名、多实参零回退；反方向（`V(S { f: NAN }, 1.5)`／`V([NAN, 1.0], 1.5)`）、`Box<enum>`／含 Box 复合、嵌套 Box、`E::V` 路径语法继续 fail-closed；跨宽 E1201、一元负号 E1201、整型 E1202、bool E1201、错元数 E1601、扩展常量 E1101、算术／比较 E1201 维持；不新增 E 码／关键字／AC；token 仅 E1201 8／E1202 2／E1101 3／E1601 1／codegen 2，0 迁移。打印复用既有编译期字节路径，不读堆、不引入运行期浮点库、不读 locale；枚举与复合均为栈上值，无堆、无 drop 变化。计数：L2n 活跃 stdout **469**（runtime 258＋负控 194＋CLI 17）＋packaging **4**＝**473**；`l2n-baseline` **554** 条（sha256 清单 **816** 行）；0.3.12 历史 stdout **423**（226／180／17）＋packaging 4＝**427**／全量 **506** 冻结不漂移；`l2e-baseline` 162（209 行）、`l2f` 188（246）、`l2g` 206（275）、`l2h` 247（327）、`l2i` 297（398）、`l2j` 345（466）、`l2k` 417（590）、`l2l` 461（660）、`l2m` 506（734）、`l2c` 68（105）、legacy 226、runtime-codes 39＋6＋19、`new-cases.tsv` 120 均零改；L2n 新增正例 **32**、新负控 **16**、退休 **2**（N-184／N-200，仅执行面）。① 本切片；②～⑥ 结转 L2o；⑦ 随 ⑤（本版不做）；⑧ 六档维持 OA-1；⑨ 安装／打包／性能不纳入；⑩ 跨代 `_ACTIVE` 工程红线。
+
+### Added
+
+- **嵌套复合枚举直接特殊值形式**：`struct` 字段／数组元素／元组元素中的枚举值可直接写六命名特殊值；任意深度、附加成员、三种外层别名、多实参、单／多字段枚举；`println` 输出既有复合形态；宽度逐字段严格匹配。
+- **表面形式同构**：直接形式与绑定路径（`S { e: V(x) }`、`[V(x), …]`、`(V(x), 1)`）逐字节一致；打印复用既有 `float_fmt` 字节，无运行期浮点库、无 locale 依赖。
+- **`l2n-baseline` 第十基线**：`ci/run_ci.sh` 的 `stdout-contract` 阶段在 `l2e`…`l2m` 之后校验 `l2n-baseline`（554／816／816），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿。
+
+### Changed
+
+- **计数与资产**：活跃 stdout 由 **423**（226／180／17）扩至 **469**（258／194／17）＋packaging 4＝**473**；全量 **506 → 554**；`l2n-baseline` 新建 554 条（sha256 清单 816 行）；旧九基线 162／209、188／246、206／275、247／327、297／398、345／466、417／590、461／660、506／734 与 `l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 零改；0.3.12 历史 427／506 冻结不漂移；**N-184／N-200 仅执行面退休**（源／TSV／旧九基线字节零改、ID 不复用、N／M 不减；跨代 ACTIVE L2l=18／L2m=17）。
+- **版本锚**：本账本恰 3 files：`CHANGELOG.md`／`compiler/Cargo.toml`／`compiler/Cargo.lock`；`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.12` 落至 `0.3.13`；`compiler/Cargo.toml:5` description 版本串同步；`compiler/Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.13`（**13 B**，含换行，以账本实测为准）。
+- **CI**：十基线并存；不新建 job、不改 workflow YAML、不改 ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2n-01：**PASS**——main `03c0a7b4f50efacb043002374ff525c40205f564`；run `40148176247`；`baseline`／`stdout-contract`／`runtime-codes`／`asan-linux`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2e-baseline|cases=162 files=209 unique=209 fail=0`；`PASS|l2f-baseline|cases=188 files=246 unique=246 fail=0`；`PASS|l2g-baseline|cases=206 files=275 unique=275 fail=0`；`PASS|l2h-baseline|cases=247 files=327 unique=327 fail=0`；`PASS|l2i-baseline|cases=297 files=398 unique=398 fail=0`；`PASS|l2j-baseline|cases=345 files=466 unique=466 fail=0`；`PASS|l2k-baseline|cases=417 files=590 unique=590 fail=0`；`PASS|l2l-baseline|cases=461 files=660 unique=660 fail=0`；`PASS|l2m-baseline|cases=506 files=734 unique=734 fail=0`；`PASS|l2n-baseline|cases=554 files=816 unique=816 fail=0`；`PASS|stdout-contract|runtime=258 negative=194 fail=0 ran=258/194`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；`PASS|asan-l2k|cases=6 fail=0 ran=6/6`。
+- 读数：十基线判词全 PASS；ASAN 默认 **48／41／7** 零改、`l2n` 无第二 manifest（K=0）；S19-01～32 **32/32**、N-204～219 **16/16**；六档 `-O*` **192/192**、locale **32/32 SAME**（Stage-2 证据，不进 CI，OA-1）；`cargo test --release --locked` **403 passed／0 failed**；`l2n-baseline` **816/816**、`l2m` 734/734、`l2l` 660/660、`l2k` 590/590、`l2j` 466/466、`l2i` 398/398、`l2h` 327/327、`l2g` 275/275、`l2f` 246/246、`l2e` 209/209、`l2c` 105/105、legacy 226/226；全 job `SKIP|`／`FAIL|` 0 行。
+- 计数口径：P=**32**／Q=**16**／Ret=**2**／R=**258**／G=**194**／T=**469**／A=**473**／N=**554**／M=**816**。
+- 证据：GATE 报告 `shared/ZOR-L2n-GATE-01-20261025/REPORT.md`（sha256 `6f71c9f699c964587103ecbaa77db775fd7b3efb7a938910b9f0347550a5c559`）；GATE 证据包 `SHA256SUMS`（20 行）`sha256sum -c` rc=0；PR #150 **91 files +2042／−126**；QA 终审 `shared/ZOR-L2n-QA-终审-20261024/REPORT.md`（sha256 `ff0c18acd2b6bd163363052b836b745d98ebd687b4f2ad8b0809f9ad47cacb9a`，pre-merge PASS）；产品 Stage-2 会签 `shared/ZOR-L2n-Stage2-S19会签-产品-v1.md`（sha256 `c95e538d1fe768c3d9fb38462a9805dc71558bb09b60ac78e7ab02f6609b9eb9`，32/32）；`l2n-baseline.tsv` `c580d21337bd2cbe11490e82916c3ec404c18744756b9e341530f30edff2c04f`；`l2n-baseline.sha256` `89b7e8743c75a5766a71d38e96669634059b6e61a535c27317742c406678a3a6`；QA Stage-2 `b1aaa3bb3f7ee971f8729ab4baa274f787854142816410b672e76fe50e6ecb4b`。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **版本语境**：0.3.12 及更早节的 fail-closed 表述（含「结转 L2n」）按版本语境保留、**不回改**；历史节逐字节零改；本版 ②～⑥ 写「结转 L2o」。
+- **表面形式对齐边界**：仅放行「嵌套复合中的枚举值直接特殊值」；**不是新增嵌套复合承载能力、不是新增运行期能力**。
+- **绑定既有可用**：`S { e: V(x) }`／`[V(x), …]`／`(V(x), 1)`／深层／三种外层别名绑定为既有能力、零回退；不得作负控。
+- **反方向与 Box 边界**：特殊值位于枚举自身复合载荷内（N-217／218）、`Box<enum>`／含 Box 复合、嵌套 Box 维持 fail-closed；结转 L2o。
+- **`E::V`／扩展常量**：路径语法 E1101、扩展常量 E1101，均不做；结转 L2o。
+- **ASAN**：K=0（无新增用例、默认 manifest 48／41／7 零改）**不等于「已证无泄漏」**；若引入堆或改 drop 须重冻结。
+- **诊断文案债**：`N-140` 第二行仍写 `0.3.7`，属既有文案，本版不改（⑤／⑦ 结转 L2o）。
+- **平台／发布／性能**：Linux x86_64 唯一终证，macOS 仅辅助；零 tag／Release，不构成安装或环境可用性承诺；不出性能数字、不作性能承诺。
+- **PA-L2n**：PA-L2n-01～07 待 0.3.13 账本合并后执行。
+
 ## [0.3.12] - 2026-10-24
 
 内部验证里程碑，非可用语言版本：本版为 L2m「多字段变体·特殊值字面量直接形式（表面形式对齐）」——允许六个命名特殊值字面量（`f64::NAN`／`f64::INFINITY`／`f64::NEG_INFINITY`、`f32::NAN`／`f32::INFINITY`／`f32::NEG_INFINITY`）**直接写入 ≥2 字段变体的任意字段位置**；`println(V(...))` 输出既有复合形态（如 `V(nan, 1.5)`）；宽度按各字段严格匹配（跨宽 E1201）；`let e = V(<特殊值>, <常量>)` 别名与直接打印同字节；**绑定路径（`V(x, 1.5)`）为既有能力、零回退**。本版**不是新增多字段承载能力、不是新增运行期能力**；无堆、无递归析构、无运行期浮点格式化、无浮点算术。并把 `l2m-baseline` 接入 `stdout-contract`，形成 `l2e`／`l2f`／`l2g`／`l2h`／`l2i`／`l2j`／`l2k`／`l2l`／`l2m` 九基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
