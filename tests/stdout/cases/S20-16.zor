@@ -1,0 +1,1 @@
+fn main() { let a: [f64; 2] = [f64::MAX, f64::MIN]; println(a); }

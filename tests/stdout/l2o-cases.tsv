@@ -1,0 +1,29 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S20-01	tests/stdout/cases/S20-01.zor	run	0	expected/S20-01.stdout	-	scalar f64 MAX
+S20-02	tests/stdout/cases/S20-02.zor	run	0	expected/S20-02.stdout	-	scalar f64 MIN rust semantics
+S20-03	tests/stdout/cases/S20-03.zor	run	0	expected/S20-03.stdout	-	scalar f64 EPSILON
+S20-04	tests/stdout/cases/S20-04.zor	run	0	expected/S20-04.stdout	-	scalar f32 MAX
+S20-05	tests/stdout/cases/S20-05.zor	run	0	expected/S20-05.stdout	-	scalar f32 MIN rust semantics
+S20-06	tests/stdout/cases/S20-06.zor	run	0	expected/S20-06.stdout	-	scalar f32 EPSILON
+S20-07	tests/stdout/cases/S20-07.zor	run	0	expected/S20-07.stdout	-	binding f64 MAX
+S20-08	tests/stdout/cases/S20-08.zor	run	0	expected/S20-08.stdout	-	binding f32 EPSILON
+S20-09	tests/stdout/cases/S20-09.zor	run	0	expected/S20-09.stdout	-	annotated binding f64 MIN
+S20-10	tests/stdout/cases/S20-10.zor	run	0	expected/S20-10.stdout	-	Box f64 MAX
+S20-11	tests/stdout/cases/S20-11.zor	run	0	expected/S20-11.stdout	-	Box f32 MIN
+S20-12	tests/stdout/cases/S20-12.zor	run	0	expected/S20-12.stdout	-	enum payload f64 MAX
+S20-13	tests/stdout/cases/S20-13.zor	run	0	expected/S20-13.stdout	-	enum payload f32 EPSILON
+S20-14	tests/stdout/cases/S20-14.zor	run	0	expected/S20-14.stdout	-	multi-payload enum f64 MAX MIN
+S20-15	tests/stdout/cases/S20-15.zor	run	0	expected/S20-15.stdout	-	struct field f64 MAX
+S20-16	tests/stdout/cases/S20-16.zor	run	0	expected/S20-16.stdout	-	array f64 constants
+S20-17	tests/stdout/cases/S20-17.zor	run	0	expected/S20-17.stdout	-	tuple f64 constant
+S20-18	tests/stdout/cases/S20-18.zor	run	0	expected/S20-18.stdout	-	struct array field constants
+S20-19	tests/stdout/cases/S20-19.zor	run	0	expected/S20-19.stdout	-	nested enum in struct MAX
+S20-20	tests/stdout/cases/S20-20.zor	run	0	expected/S20-20.stdout	-	array of enum constants
+S20-21	tests/stdout/cases/S20-21.zor	run	0	expected/S20-21.stdout	-	multi-arg scalar constants
+S20-22	tests/stdout/cases/S20-22.zor	run	0	expected/S20-22.stdout	-	composite plus enum multi-arg
+S20-23	tests/stdout/cases/S20-23.zor	run	0	expected/S20-23.stdout	-	Box f64 EPSILON
+S20-24	tests/stdout/cases/S20-24.zor	run	0	expected/S20-24.stdout	-	struct field f32 MAX
+S20-25	tests/stdout/cases/S20-25.zor	run	0	expected/S20-25.stdout	-	multi-payload enum f32 MAX MIN
+S20-26	tests/stdout/cases/S20-26.zor	run	0	expected/S20-26.stdout	-	struct field f32 MIN
+S20-27	tests/stdout/cases/S20-27.zor	run	0	expected/S20-27.stdout	-	composite finite plus constant
+S20-28	tests/stdout/cases/S20-28.zor	run	0	expected/S20-28.stdout	-	string plus constant multi-arg

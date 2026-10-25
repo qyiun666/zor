@@ -1,0 +1,1 @@
+fn main() { let b: Box<f32> = box f32::MIN; println(*b); }
