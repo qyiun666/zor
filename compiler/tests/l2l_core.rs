@@ -197,26 +197,12 @@ fn multi_field_direct_form_prints_after_l2m() {
 }
 
 #[test]
-fn nested_direct_forms_stay_fail_closed() {
-    assert_rc1(
-        "field",
-        "enum E { V(f64) }\nstruct S { e: E }\nfn main() {\n    println(S { e: V(f64::NAN) });\n}\n",
-        "println 实参不可打印",
-    );
-    assert_rc1(
-        "tuple",
-        "enum E { V(f64) }\nfn main() {\n    println((V(f64::NAN), 1));\n}\n",
-        "println 实参不可打印",
-    );
-    assert_rc1(
-        "array",
-        "enum E { V(f64) }\nfn main() {\n    println([V(f64::NAN)]);\n}\n",
-        "println 实参不可打印",
-    );
-    assert_rc1(
-        "alias-nested",
-        "enum E { V(f64) }\nstruct S { e: E }\nfn main() {\n    let s = S { e: V(f64::NAN) };\n    println(s);\n}\n",
-        "let 初始化复合值不可打印或形态不支持",
+fn nested_direct_forms_print_after_l2n() {
+    // L2n（PMO 批准）：嵌套 struct／tuple／array 与外层别名的直接形式转正。
+    assert_runs(
+        "enum E { V(f64) }\nstruct S { e: E }\nfn main() {\n    println(S { e: V(f64::NAN) });\n    println((V(f64::NAN), 1));\n    println([V(f64::NAN)]);\n    let s = S { e: V(f64::NAN) };\n    println(s);\n}\n",
+        "nested",
+        b"S { e: V(nan) }\n(V(nan), 1)\n[V(nan)]\nS { e: V(nan) }\n",
     );
 }
 

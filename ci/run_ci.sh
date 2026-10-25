@@ -16,6 +16,7 @@
 # L2k：stdout 判词 175／143／17；stdout-contract 内加第七基线 l2k（417／590），Ret=12 仅执行面退休；ASAN 第二 manifest 6 条（同 asan 段）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 # L2l：stdout 判词 199／163／17；stdout-contract 内加第八基线 l2l（461／660），Ret=0；ASAN K=0（默认 manifest 48／41／7 与 stage_asan 零改）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 # L2m：stdout 判词 226／180／17；stdout-contract 内加第九基线 l2m（506／734），Ret=1（N-183 仅执行面）；ASAN K=0；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
+# L2n：stdout 判词 258／194／17；stdout-contract 内加第十基线 l2n（554／816），Ret=2（N-184／N-200 仅执行面）；ASAN K=0；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 set -uo pipefail
 shopt -s nullglob  # S-1：未命中 glob 展开为空数组，杜绝字面 glob 进循环的旁路
 
@@ -741,7 +742,7 @@ stdout_section_verdict() { # 显式 FAIL 判词优先（即使脚本 rc=0）；�
   printf 'FAIL'
 }
 
-verify_baseline() { # L2f CI-01：verify_baseline <l2e|l2f|l2g|l2h|l2i|l2j|l2k|l2l|l2m> <outdir> <cases> <files>
+verify_baseline() { # L2f CI-01：verify_baseline <l2e|l2f|l2g|l2h|l2i|l2j|l2k|l2l|l2m|l2n> <outdir> <cases> <files>
   local name="$1" out="$2" cases_expected="$3" files_expected="$4"
   local base="tests/stdout/${name}-baseline.sha256"
   local tsv="tests/stdout/${name}-baseline.tsv"
@@ -814,7 +815,7 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
     record cli-contract FAIL 1 "$log"
     return
   fi
-  # L2m CI-01：九基线 gate（先于两轮用例）。l2e 162／209；l2f 188／246；l2g 206／275；l2h 247／327；l2i 297／398；l2j 345／466；l2k 417／590；l2l 461／660；l2m 全矩阵 506／734。
+  # L2n CI-01：十基线 gate（先于两轮用例）。l2e 162／209；l2f 188／246；l2g 206／275；l2h 247／327；l2i 297／398；l2j 345／466；l2k 417／590；l2l 461／660；l2m 506／734；l2n 全矩阵 554／816。
   # 任一失败即两段 FAIL 并返回；缺件／路径不安全／重复／hash 不符／计数不符一律 FAIL，不可 SKIP。
   if ! verify_baseline l2e "$out" 162 209; then
     grep -hE '^(PASS|FAIL)\|l2e-baseline' "$out/l2e-baseline.log" >> "$log" 2>/dev/null || true
@@ -888,6 +889,14 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
     return
   fi
   grep -hE '^(PASS|FAIL)\|l2m-baseline' "$out/l2m-baseline.log" >> "$log" 2>/dev/null || true
+  if ! verify_baseline l2n "$out" 554 816; then
+    grep -hE '^(PASS|FAIL)\|l2n-baseline' "$out/l2n-baseline.log" >> "$log" 2>/dev/null || true
+    echo "[l2n-baseline] 校验失败（见 l2n-baseline.log）；stdout-contract／cli-contract 判 FAIL" >> "$log"
+    record stdout-contract FAIL 1 "$log"
+    record cli-contract FAIL 1 "$log"
+    return
+  fi
+  grep -hE '^(PASS|FAIL)\|l2n-baseline' "$out/l2n-baseline.log" >> "$log" 2>/dev/null || true
   local rc=0
   CC="${CC:-cc}" ZORC_BIN="$ZORC" OUT_DIR="$out" \
     bash tests/stdout/run_stdout_contract.sh --strict >>"$log" 2>&1 || rc=$?
@@ -896,16 +905,16 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   local so_v cli_v so_rc=0 cli_rc=0
   so_v="$(stdout_section_verdict stdout-contract "$log" "$rc")"
   cli_v="$(stdout_section_verdict cli-contract "$log" "$rc")"
-  # L2m CI-01：冻结计数 226／180／17（N-183 退休后活跃负控）；判定 PASS 但判词计数不符（如旧资产 199／163／17）同样 FAIL，防静默洗绿。
-  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=226 negative=180 fail=0 ran=226/180' "$log"; then
-    echo "[stdout-contract] 计数不符：期望 runtime=226 negative=180 ran=226/180（L2m 冻结）" >> "$log"
+  # L2n CI-01：冻结计数 258／194／17（N-184／N-200 退休后活跃负控）；判定 PASS 但判词计数不符（如旧资产 226／180／17）同样 FAIL，防静默洗绿。
+  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=258 negative=194 fail=0 ran=258/194' "$log"; then
+    echo "[stdout-contract] 计数不符：期望 runtime=258 negative=194 ran=258/194（L2n 冻结）" >> "$log"
     so_v=FAIL
   fi
   if [ "$cli_v" = PASS ] && ! grep -Fq 'PASS|cli-contract|cases=17 fail=0 ran=17' "$log"; then
-    echo "[cli-contract] 计数不符：期望 cases=17 ran=17（L2m 冻结，CLI 不变）" >> "$log"
+    echo "[cli-contract] 计数不符：期望 cases=17 ran=17（L2n 冻结，CLI 不变）" >> "$log"
     cli_v=FAIL
   fi
-  # L2m CI-01：九基线精确判词（含 fail=0）；计数不符同样 FAIL。
+  # L2n CI-01：十基线精确判词（含 fail=0）；计数不符同样 FAIL。
   if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l2e-baseline|cases=162 files=209 unique=209 fail=0' "$out/l2e-baseline.log"; then
     echo "[l2e-baseline] 计数不符：期望 cases=162 files=209 unique=209（历史冻结）" >> "$log"
     so_v=FAIL
@@ -940,6 +949,10 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   fi
   if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l2m-baseline|cases=506 files=734 unique=734 fail=0' "$out/l2m-baseline.log"; then
     echo "[l2m-baseline] 计数不符：期望 cases=506 files=734 unique=734（L2m 冻结）" >> "$log"
+    so_v=FAIL
+  fi
+  if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l2n-baseline|cases=554 files=816 unique=816 fail=0' "$out/l2n-baseline.log"; then
+    echo "[l2n-baseline] 计数不符：期望 cases=554 files=816 unique=816（L2n 冻结）" >> "$log"
     so_v=FAIL
   fi
   [ "$so_v" = FAIL ] && so_rc=1

@@ -445,11 +445,8 @@ fn let_init_kind(
             let t = types
                 .expr_ty(init)
                 .ok_or_else(|| SubsetError::new(l, c, "let 复合初值缺少 type table 记录"))?;
-            // L2m：`let e = V(…特殊值…)` 与直接打印同源放行（多字段、根位置）。
-            if !printable_ty(t, prog)
-                || !(supported_value_expr(init, bindings, types, prog)
-                    || enum_direct_special_form(init, bindings, types, prog))
-            {
+            // L2n：嵌套复合（及根位置）的特殊值枚举直接形式与绑定形式同源放行。
+            if !printable_ty(t, prog) || !supported_value_expr(init, bindings, types, prog) {
                 return Err(SubsetError::new(l, c, "let 初始化复合值不可打印或形态不支持"));
             }
             let kind = if is_byte_array_ty(t) {
@@ -645,8 +642,8 @@ fn supported_value_expr(
     supported_value_expr_in(e, bindings, types, prog, true)
 }
 
-/// `allow_special`：L2i 允许浮点特殊值作复合常量成员；枚举变体载荷固定
-/// 传 `false`（L2m 仅放开根位置的多字段直接形式，见 `enum_direct_special_form`）。
+/// `allow_special`：L2i 允许浮点特殊值作复合常量成员；Record／Tup／ArrLit 原样
+/// 下传，枚举变体载荷实参固定传 `false`（L2n：直接特殊值只在「可打印容器脊」上放行）。
 fn supported_value_expr_in(
     e: &Ex,
     bindings: &HashMap<String, BindingKind>,
@@ -708,10 +705,25 @@ fn supported_value_expr_in(
             let Some((_, payload, _, _)) = e.variants.iter().find(|(n, _, _, _)| n == v) else {
                 return false;
             };
-            payload.len() == args.len()
-                && args
-                    .iter()
-                    .all(|a| supported_value_expr_in(a, bindings, types, prog, false))
+            if payload.len() != args.len() {
+                return false;
+            }
+            // L2n：枚举值处于「可打印容器脊」（根／struct 字段／数组元素／元组元素，
+            // 任意深度）时，变体实参允许直接写特殊值；`allow_special` 经
+            // Record／Tup／ArrLit 原样下传，遇变体载荷实参固定传 `false`（见下），
+            // 因此「特殊值进入枚举自身复合载荷」结构上无法继承许可。
+            args.iter().zip(payload.iter()).all(|(a, (field_ty, _, _))| {
+                if matches!(a, Ex::FloatSpecial(..)) {
+                    allow_special
+                        && matches!(
+                            (types.expr_ty(a), field_ty),
+                            (Some(Ty::Prim("f32")), Ty::Prim("f32"))
+                                | (Some(Ty::Prim("f64")), Ty::Prim("f64"))
+                        )
+                } else {
+                    supported_value_expr_in(a, bindings, types, prog, false)
+                }
+            })
         }
         // check 不为纯 place root 写表项（Field 的 Path 基座）：按绑定种类判定。
         Ex::Field(base, _, _, _) => match base.as_ref() {
@@ -728,50 +740,6 @@ fn supported_value_expr_in(
         }
         _ => false,
     }
-}
-
-/// L2m：特殊值字面量直接写入**多字段变体**任意字段位置（表面形式对齐）。
-///
-/// 根位置、载荷数须与实参数一致（E1601 兜底）；逐字段判定：
-/// - 直接 `FloatSpecial` → 宽度须与对应字段同为 f32／f64（check 已判 E1201／E1202）；
-/// - 其余字段 → 必须是既有可打印常量形态（`supported_value_expr_in(..., false)`），
-///   因此 O-1 的有限复合字段放行，而**含特殊值的复合字段仍 fail-closed**。
-/// 至少一个直接特殊值；不递归、不透传 `allow_special`，嵌套复合内的直接形式维持
-/// fail-closed。
-fn enum_direct_special_form(
-    e: &Ex,
-    bindings: &HashMap<String, BindingKind>,
-    types: &TypeTable,
-    prog: &Prog,
-) -> bool {
-    let Ex::Call(callee, args, _, _) = e else { return false };
-    let Ex::Path(v, _, _) = callee.as_ref() else { return false };
-    let Some(Ty::Named(en)) = types.expr_ty(e) else { return false };
-    let Some(decl) = prog.enums.iter().find(|x| &x.name == en) else { return false };
-    let Some((_, payload, _, _)) = decl.variants.iter().find(|(n, _, _, _)| n == v) else {
-        return false;
-    };
-    if payload.len() != args.len() {
-        return false;
-    }
-    let mut saw_special = false;
-    for (a, (field_ty, _, _)) in args.iter().zip(payload.iter()) {
-        if matches!(a, Ex::FloatSpecial(..)) {
-            saw_special = true;
-            // 宽度严格性已由 check 判定；此处再要求双方同为浮点宽度，
-            // 避免把判定顺序当作契约。
-            let same_width = matches!(
-                (types.expr_ty(a), field_ty),
-                (Some(Ty::Prim("f32")), Ty::Prim("f32")) | (Some(Ty::Prim("f64")), Ty::Prim("f64"))
-            );
-            if !same_width {
-                return false;
-            }
-        } else if !supported_value_expr_in(a, bindings, types, prog, false) {
-            return false;
-        }
-    }
-    saw_special
 }
 
 /// Q-3：`[byte;N]`／`[u8;N]` 字面量元素须为编译期常量形态。
@@ -917,13 +885,11 @@ fn is_printable_arg(
         return false;
     }
     // L2h／L2i：特殊值可直接作 `println` 实参、`let` 初值或复合常量成员。
-    // L2m：`V(…特殊值…)` 直接形式仅在根位置、逐字段判定下放行（表面形式对齐）；
-    // 变体实参的通用形态判定仍由 `supported_value_expr_in` 以 allow_special=false 收口。
+    // L2n：枚举值处于可打印容器脊（根／struct 字段／数组元素／元组元素）时，
+    // 变体实参可直接写特殊值；载荷实参仍由 `supported_value_expr_in` 以
+    // allow_special=false 截断。
     if matches!(e, Ex::FloatSpecial(..)) {
         return matches!(t, Ty::Prim("f32") | Ty::Prim("f64"));
-    }
-    if enum_direct_special_form(e, bindings, types, prog) {
-        return true;
     }
     // L2f：直接 `println(*b)` 放开三型 Box 载荷；复合／算术内嵌仍走
     // supported_value_expr 的既有 i64-only 边界（冻结件 §二）。
@@ -1183,15 +1149,16 @@ mod tests {
     }
 
     #[test]
-    fn enum_nested_direct_and_composite_special_stay_fail_closed() {
-        assert!(err_of(
-            "enum E { V(f64) }\nstruct S { e: E }\nfn main() { println(S { e: V(f64::NAN) }); }"
-        )
-        .contains("不可打印"));
-        assert!(err_of("enum E { V(f64, f64) }\nfn main() { println((V(f64::NAN, 1.5), 1)); }")
-            .contains("不可打印"));
+    fn enum_nested_direct_opens_but_composite_special_stays_fail_closed() {
+        ok("enum E { V(f64) }\nstruct S { e: E }\nfn main() { println(S { e: V(f64::NAN) }); }");
+        ok("enum E { V(f64, f64) }\nfn main() { println((V(f64::NAN, 1.5), 1)); }");
+        ok("enum E { V(f64) }\nstruct S { e: E }\nfn main() { let s = S { e: V(f64::NAN) }; println(s); }");
         assert!(err_of(
             "struct P { f: f64 }\nenum E { V(P, f64) }\nfn main() { println(V(P { f: f64::NAN }, 1.5)); }"
+        )
+        .contains("不可打印"));
+        assert!(err_of(
+            "enum E { V([f64; 2], f64) }\nfn main() { println(V([f64::NAN, 1.0], 1.5)); }"
         )
         .contains("不可打印"));
     }

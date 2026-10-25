@@ -1,0 +1,3 @@
+struct S { a: [E; 2] }
+enum E { V(f64) }
+fn main() { println(S { a: [V(f64::NAN), V(1.5)] }); }

@@ -1,0 +1,33 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S19-01	tests/stdout/cases/S19-01.zor	run	0	expected/S19-01.stdout	-	struct field single-payload enum direct
+S19-02	tests/stdout/cases/S19-02.zor	run	0	expected/S19-02.stdout	-	struct field multi-payload enum direct
+S19-03	tests/stdout/cases/S19-03.zor	run	0	expected/S19-03.stdout	-	array element enum direct
+S19-04	tests/stdout/cases/S19-04.zor	run	0	expected/S19-04.stdout	-	tuple element enum direct
+S19-05	tests/stdout/cases/S19-05.zor	run	0	expected/S19-05.stdout	-	depth2 struct enum direct
+S19-06	tests/stdout/cases/S19-06.zor	run	0	expected/S19-06.stdout	-	depth3 struct enum direct
+S19-07	tests/stdout/cases/S19-07.zor	run	0	expected/S19-07.stdout	-	struct extra members enum direct
+S19-08	tests/stdout/cases/S19-08.zor	run	0	expected/S19-08.stdout	-	array mixed elements enum direct
+S19-09	tests/stdout/cases/S19-09.zor	run	0	expected/S19-09.stdout	-	tuple extra members enum direct
+S19-10	tests/stdout/cases/S19-10.zor	run	0	expected/S19-10.stdout	-	outer alias struct enum direct
+S19-11	tests/stdout/cases/S19-11.zor	run	0	expected/S19-11.stdout	-	multi-arg nested enum direct
+S19-12	tests/stdout/cases/S19-12.zor	run	0	expected/S19-12.stdout	-	struct field f32 special direct
+S19-13	tests/stdout/cases/S19-13.zor	run	0	expected/S19-13.stdout	-	array of struct with enum direct
+S19-14	tests/stdout/cases/S19-14.zor	run	0	expected/S19-14.stdout	-	struct array field enum direct
+S19-15	tests/stdout/cases/S19-15.zor	run	0	expected/S19-15.stdout	-	struct tuple field enum direct
+S19-16	tests/stdout/cases/S19-16.zor	run	0	expected/S19-16.stdout	-	array of multi-payload enum direct
+S19-17	tests/stdout/cases/S19-17.zor	run	0	expected/S19-17.stdout	-	tuple of multi-payload enum direct
+S19-18	tests/stdout/cases/S19-18.zor	run	0	expected/S19-18.stdout	-	outer alias array enum direct
+S19-19	tests/stdout/cases/S19-19.zor	run	0	expected/S19-19.stdout	-	outer alias tuple enum direct
+S19-20	tests/stdout/cases/S19-20.zor	run	0	expected/S19-20.stdout	-	struct field multi-special enum direct
+S19-21	tests/stdout/cases/S19-21.zor	run	0	expected/S19-21.stdout	-	finite struct enum regression
+S19-22	tests/stdout/cases/S19-22.zor	run	0	expected/S19-22.stdout	-	finite array enum regression
+S19-23	tests/stdout/cases/S19-23.zor	run	0	expected/S19-23.stdout	-	finite tuple enum regression
+S19-24	tests/stdout/cases/S19-24.zor	run	0	expected/S19-24.stdout	-	binding struct enum regression
+S19-25	tests/stdout/cases/S19-25.zor	run	0	expected/S19-25.stdout	-	binding array enum regression
+S19-26	tests/stdout/cases/S19-26.zor	run	0	expected/S19-26.stdout	-	binding tuple enum regression
+S19-27	tests/stdout/cases/S19-27.zor	run	0	expected/S19-27.stdout	-	binding deep struct enum regression
+S19-28	tests/stdout/cases/S19-28.zor	run	0	expected/S19-28.stdout	-	binding outer alias regression
+S19-29	tests/stdout/cases/S19-29.zor	run	0	expected/S19-29.stdout	-	binding multi-arg regression
+S19-30	tests/stdout/cases/S19-30.zor	run	0	expected/S19-30.stdout	-	finite nested multi-payload regression
+S19-31	tests/stdout/cases/S19-31.zor	run	0	expected/S19-31.stdout	-	finite struct array field regression
+S19-32	tests/stdout/cases/S19-32.zor	run	0	expected/S19-32.stdout	-	finite struct tuple field regression
