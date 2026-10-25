@@ -267,7 +267,7 @@ fn nested_width_and_kind_are_strict() {
 }
 
 #[test]
-fn nested_arity_path_box_ext_and_arith_stay_fail_closed() {
+fn nested_arity_path_box_and_arith_stay_fail_closed() {
     assert_rc1(
         "arity",
         "enum E { V(f64, f64) }\nstruct S { e: E }\nfn main() {\n    println(S { e: V(f64::NAN) });\n}\n",
@@ -282,11 +282,6 @@ fn nested_arity_path_box_ext_and_arith_stay_fail_closed() {
         "box",
         "enum E { V(f64) }\nfn main() {\n    let b: Box<E> = box V(1.5);\n    println(*b);\n}\n",
         "let 类型标注",
-    );
-    assert_rc1(
-        "max",
-        "enum E { V(f64) }\nstruct S { e: E }\nfn main() {\n    println(S { e: V(f64::MAX) });\n}\n",
-        "E1101",
     );
     assert_rc1(
         "arith",

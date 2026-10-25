@@ -278,7 +278,7 @@ fn width_and_kind_are_strict_per_field() {
 }
 
 #[test]
-fn arity_path_box_ext_const_and_arith_stay_fail_closed() {
+fn arity_path_box_and_arith_stay_fail_closed() {
     assert_rc1(
         "arity",
         "enum E { V(f64, f64, f64) }\nfn main() {\n    println(V(f64::NAN, 1.5));\n}\n",
@@ -293,11 +293,6 @@ fn arity_path_box_ext_const_and_arith_stay_fail_closed() {
         "box",
         "enum E { V(f64, f64) }\nfn main() {\n    let b: Box<E> = box V(1.5, 2.5);\n    println(*b);\n}\n",
         "let 类型标注",
-    );
-    assert_rc1(
-        "max",
-        "enum E { V(f64, f64) }\nfn main() {\n    println(V(f64::MAX, 1.5));\n}\n",
-        "E1101",
     );
     assert_rc1(
         "arith",

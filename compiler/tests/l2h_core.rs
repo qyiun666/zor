@@ -249,9 +249,8 @@ fn unary_minus_rejects_specials_but_not_finite_bindings() {
 
 #[test]
 fn other_float_members_and_bare_names_are_e1101() {
+    // L2o：`MAX`／`MIN`／`EPSILON` 已转正（见 l2o_core）；其余成员与裸名仍 E1101。
     for (tag, src) in [
-        ("m1", "fn main() {\n    let x: f64 = f64::MAX;\n    println(x);\n}\n"),
-        ("m2", "fn main() {\n    let x: f32 = f32::EPSILON;\n    println(x);\n}\n"),
         ("m3", "fn main() {\n    let x: f64 = f64::nan;\n    println(x);\n}\n"),
         ("m4", "fn main() {\n    let x: f64 = f64::NEG_NAN;\n    println(x);\n}\n"),
         ("m5", "fn main() {\n    let x: f64 = f64::NAN(1);\n    println(x);\n}\n"),

@@ -1099,6 +1099,10 @@ fn special_f32(k: FloatSpecialKind) -> f32 {
         FloatSpecialKind::Nan => f32::NAN,
         FloatSpecialKind::Infinity => f32::INFINITY,
         FloatSpecialKind::NegInfinity => f32::NEG_INFINITY,
+        // L2o：`MIN` 为最负有限值（= -MAX），与 Rust 语义一致。
+        FloatSpecialKind::Max => f32::MAX,
+        FloatSpecialKind::Min => -f32::MAX,
+        FloatSpecialKind::Epsilon => f32::EPSILON,
     }
 }
 
@@ -1107,6 +1111,10 @@ fn special_f64(k: FloatSpecialKind) -> f64 {
         FloatSpecialKind::Nan => f64::NAN,
         FloatSpecialKind::Infinity => f64::INFINITY,
         FloatSpecialKind::NegInfinity => f64::NEG_INFINITY,
+        // L2o：`MIN` 为最负有限值（= -MAX），与 Rust 语义一致。
+        FloatSpecialKind::Max => f64::MAX,
+        FloatSpecialKind::Min => -f64::MAX,
+        FloatSpecialKind::Epsilon => f64::EPSILON,
     }
 }
 
