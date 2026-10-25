@@ -1,0 +1,23 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-237	tests/stdout/cases/N-237.zor	1	none	E1101	zor: runtime error	other member MAX_EXP
+N-238	tests/stdout/cases/N-238.zor	1	none	E1101	zor: runtime error	other member MIN_EXP
+N-239	tests/stdout/cases/N-239.zor	1	none	E1101	zor: runtime error	other member MANTISSA_DIGITS
+N-240	tests/stdout/cases/N-240.zor	1	none	E1101	zor: runtime error	other member DIGITS
+N-241	tests/stdout/cases/N-241.zor	1	none	E1101	zor: runtime error	other member RADIX
+N-242	tests/stdout/cases/N-242.zor	1	none	E1101	zor: runtime error	other member f32 MAX_EXP
+N-243	tests/stdout/cases/N-243.zor	1	none	E1101	zor: runtime error	unknown member NEG_NAN
+N-244	tests/stdout/cases/N-244.zor	1	none	E1101	zor: runtime error	bare name MIN_POSITIVE
+N-245	tests/stdout/cases/N-245.zor	1	none	E1101	zor: runtime error	call on constant
+N-246	tests/stdout/cases/N-246.zor	1	none	E1101	zor: runtime error	generic E path
+N-247	tests/stdout/cases/N-247.zor	1	none	E1201	zor: runtime error	cross width binding
+N-248	tests/stdout/cases/N-248.zor	1	none	E1201	zor: runtime error	cross width struct field
+N-249	tests/stdout/cases/N-249.zor	1	none	E1201	zor: runtime error	cross width enum field
+N-250	tests/stdout/cases/N-250.zor	1	none	E1201	zor: runtime error	cross width Box payload
+N-251	tests/stdout/cases/N-251.zor	1	none	E1201	zor: runtime error	unary minus constant
+N-252	tests/stdout/cases/N-252.zor	1	none	zorcc: codegen:	zor: runtime error	arithmetic on constant
+N-253	tests/stdout/cases/N-253.zor	1	none	zorcc: codegen:	zor: runtime error	comparison on constant
+N-254	tests/stdout/cases/N-254.zor	1	none	zorcc: codegen:	zor: runtime error	Box enum constant payload
+N-255	tests/stdout/cases/N-255.zor	1	none	zorcc: codegen:	zor: runtime error	variable Box payload
+N-256	tests/stdout/cases/N-256.zor	1	none	zorcc: codegen:	zor: runtime error	nested Box
+N-257	tests/stdout/cases/N-257.zor	1	none	zorcc: codegen:	zor: runtime error	reverse composite payload
+N-258	tests/stdout/cases/N-258.zor	1	none	E1201	zor: runtime error	array mixed width

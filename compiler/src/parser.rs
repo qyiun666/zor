@@ -43,10 +43,10 @@ pub enum Lit { Int(u128), Float(f64), Str(String), Bool(bool) }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FloatWidth { F32, F64 }
 
-/// L2h：三个特殊值形态；L2o：追加三个命名有限常量（`MAX`／`MIN`／`EPSILON`）。
-/// NaN 载荷／信号 NaN 不在面内。
+/// L2h：三个特殊值形态；L2o：追加三个命名有限常量（`MAX`／`MIN`／`EPSILON`）；
+/// L2p：追加 `MIN_POSITIVE`（最小正正规数）。NaN 载荷／信号 NaN 不在面内。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FloatSpecialKind { Nan, Infinity, NegInfinity, Max, Min, Epsilon }
+pub enum FloatSpecialKind { Nan, Infinity, NegInfinity, Max, Min, Epsilon, MinPositive }
 
 impl FloatWidth {
     pub fn ty(self) -> Ty {
@@ -200,7 +200,7 @@ impl Parser {
     fn diag_at(&mut self, code: &str, l: usize, c: usize, msg: impl Into<String>) {
         self.diags.push(Diag::new(code, l, c, msg));
     }
-    /// L2h 裁定 5：`::` 仅六个特殊值形式；其余成员形态统一 E1101。
+    /// L2h／L2o／L2p：`::` 仅六个特殊值与七个命名有限常量；其余成员形态统一 E1101。
     /// 单一发点，便于 e1101_catalog 守卫只记 +1。
     fn err_float_member(&mut self, l: usize, c: usize, msg: impl Into<String>) {
         self.diag_at("E1101", l, c, msg);
@@ -645,8 +645,8 @@ impl Parser {
             Tok::Ident(s) if s == "true" => Ex::Lit(Lit::Bool(true), l, c),
             Tok::Ident(s) if s == "false" => Ex::Lit(Lit::Bool(false), l, c),
             Tok::Ident(s) if s == "mut" => { self.diag_at("E1101", l, c, "'mut' 仅用于 &mut 位置"); Ex::Lit(Lit::Bool(true), l, c) }
-            // L2h／L2o：`f32|f64::MEMBER` 双冒号前瞻（不改 lexer、不新增关键字）。
-            // 仅六个特殊值与六个命名有限常量成为 FloatSpecial；其余 `::` 成员一律 E1101。
+            // L2h／L2o／L2p：`f32|f64::MEMBER` 双冒号前瞻（不改 lexer、不新增关键字）。
+            // 仅六个特殊值与七个命名有限常量成为 FloatSpecial；其余 `::` 成员一律 E1101。
             Tok::Ident(s)
                 if (s == "f32" || s == "f64")
                     && matches!(self.peek(), Tok::Colon)
@@ -670,6 +670,7 @@ impl Parser {
                     "MAX" => Some(FloatSpecialKind::Max),
                     "MIN" => Some(FloatSpecialKind::Min),
                     "EPSILON" => Some(FloatSpecialKind::Epsilon),
+                    "MIN_POSITIVE" => Some(FloatSpecialKind::MinPositive),
                     _ => None,
                 };
                 match kind {
@@ -689,7 +690,7 @@ impl Parser {
                             ml,
                             mc,
                             format!(
-                                "'{}::{}' 不在 0.3.7 支持面（仅六个特殊值与六个命名有限常量形式）",
+                                "'{}::{}' 不在 0.3.7 支持面（仅六个特殊值与七个命名有限常量形式）",
                                 s, member
                             ),
                         );

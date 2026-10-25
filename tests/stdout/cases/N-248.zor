@@ -1,0 +1,2 @@
+struct S { f: f32 }
+fn main() { println(S { f: f64::MIN_POSITIVE }); }

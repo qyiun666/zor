@@ -1103,6 +1103,8 @@ fn special_f32(k: FloatSpecialKind) -> f32 {
         FloatSpecialKind::Max => f32::MAX,
         FloatSpecialKind::Min => -f32::MAX,
         FloatSpecialKind::Epsilon => f32::EPSILON,
+        // L2p：最小正正规数（不是次正规数、不是 0）。
+        FloatSpecialKind::MinPositive => f32::MIN_POSITIVE,
     }
 }
 
@@ -1115,6 +1117,8 @@ fn special_f64(k: FloatSpecialKind) -> f64 {
         FloatSpecialKind::Max => f64::MAX,
         FloatSpecialKind::Min => -f64::MAX,
         FloatSpecialKind::Epsilon => f64::EPSILON,
+        // L2p：最小正正规数（不是次正规数、不是 0）。
+        FloatSpecialKind::MinPositive => f64::MIN_POSITIVE,
     }
 }
 

@@ -1,0 +1,1 @@
+fn main() { let b: Box<Box<f64>> = box box f64::MIN_POSITIVE; println(*b); }

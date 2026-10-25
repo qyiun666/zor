@@ -1,0 +1,3 @@
+struct P { f: f64 }
+enum E { V(P, f64) }
+fn main() { println(V(P { f: 1.5 }, f64::MIN_POSITIVE)); }

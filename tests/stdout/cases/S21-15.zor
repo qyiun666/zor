@@ -1,0 +1,1 @@
+fn main() { let a: [f64; 2] = [f64::MIN_POSITIVE, f64::MIN_POSITIVE]; println(a); }
