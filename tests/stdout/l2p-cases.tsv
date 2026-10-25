@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S21-01	tests/stdout/cases/S21-01.zor	run	0	expected/S21-01.stdout	-	scalar f64 MIN_POSITIVE
+S21-02	tests/stdout/cases/S21-02.zor	run	0	expected/S21-02.stdout	-	scalar f32 MIN_POSITIVE
+S21-03	tests/stdout/cases/S21-03.zor	run	0	expected/S21-03.stdout	-	unannotated binding f64
+S21-04	tests/stdout/cases/S21-04.zor	run	0	expected/S21-04.stdout	-	unannotated binding f32
+S21-05	tests/stdout/cases/S21-05.zor	run	0	expected/S21-05.stdout	-	annotated binding f64
+S21-06	tests/stdout/cases/S21-06.zor	run	0	expected/S21-06.stdout	-	annotated binding f32
+S21-07	tests/stdout/cases/S21-07.zor	run	0	expected/S21-07.stdout	-	Box<f64> payload
+S21-08	tests/stdout/cases/S21-08.zor	run	0	expected/S21-08.stdout	-	Box<f32> payload
+S21-09	tests/stdout/cases/S21-09.zor	run	0	expected/S21-09.stdout	-	enum f64 payload
+S21-10	tests/stdout/cases/S21-10.zor	run	0	expected/S21-10.stdout	-	enum f32 payload
+S21-11	tests/stdout/cases/S21-11.zor	run	0	expected/S21-11.stdout	-	enum two f64 fields
+S21-12	tests/stdout/cases/S21-12.zor	run	0	expected/S21-12.stdout	-	enum two f32 fields
+S21-13	tests/stdout/cases/S21-13.zor	run	0	expected/S21-13.stdout	-	struct f64 field
+S21-14	tests/stdout/cases/S21-14.zor	run	0	expected/S21-14.stdout	-	struct f32 field
+S21-15	tests/stdout/cases/S21-15.zor	run	0	expected/S21-15.stdout	-	array f64
+S21-16	tests/stdout/cases/S21-16.zor	run	0	expected/S21-16.stdout	-	tuple with i64
+S21-17	tests/stdout/cases/S21-17.zor	run	0	expected/S21-17.stdout	-	struct with array
+S21-18	tests/stdout/cases/S21-18.zor	run	0	expected/S21-18.stdout	-	struct with enum
+S21-19	tests/stdout/cases/S21-19.zor	run	0	expected/S21-19.stdout	-	array of enums
+S21-20	tests/stdout/cases/S21-20.zor	run	0	expected/S21-20.stdout	-	multi-arg mixed width
+S21-21	tests/stdout/cases/S21-21.zor	run	0	expected/S21-21.stdout	-	struct and enum multi-arg
+S21-22	tests/stdout/cases/S21-22.zor	run	0	expected/S21-22.stdout	-	S20-27 analog
+S21-23	tests/stdout/cases/S21-23.zor	run	0	expected/S21-23.stdout	-	string multi-arg
+S21-24	tests/stdout/cases/S21-24.zor	run	0	expected/S21-24.stdout	-	mixed width struct
