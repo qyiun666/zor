@@ -1,0 +1,18 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-220	tests/stdout/cases/N-220.zor	1	none	E1101	zor: runtime error	other member MIN_POSITIVE
+N-221	tests/stdout/cases/N-221.zor	1	none	E1101	zor: runtime error	other member MAX_EXP
+N-222	tests/stdout/cases/N-222.zor	1	none	E1101	zor: runtime error	other member DIGITS
+N-223	tests/stdout/cases/N-223.zor	1	none	E1101	zor: runtime error	other member f32 RADIX
+N-224	tests/stdout/cases/N-224.zor	1	none	E1201	zor: runtime error	cross width binding
+N-225	tests/stdout/cases/N-225.zor	1	none	E1201	zor: runtime error	struct f32 field gets f64 constant
+N-226	tests/stdout/cases/N-226.zor	1	none	E1201	zor: runtime error	enum f32 field gets f64 constant
+N-227	tests/stdout/cases/N-227.zor	1	none	zorcc: codegen:	zor: runtime error	arithmetic on constant
+N-228	tests/stdout/cases/N-228.zor	1	none	zorcc: codegen:	zor: runtime error	comparison on constants
+N-229	tests/stdout/cases/N-229.zor	1	none	E1201	zor: runtime error	unary minus constant
+N-230	tests/stdout/cases/N-230.zor	1	none	E1101	zor: runtime error	generic E path
+N-231	tests/stdout/cases/N-231.zor	1	none	zorcc: codegen:	zor: runtime error	Box enum constant payload
+N-232	tests/stdout/cases/N-232.zor	1	none	zorcc: codegen:	zor: runtime error	Box readback
+N-233	tests/stdout/cases/N-233.zor	1	none	E1101	zor: runtime error	other member in struct
+N-234	tests/stdout/cases/N-234.zor	1	none	E1201	zor: runtime error	enum f64 field gets f32 constant
+N-235	tests/stdout/cases/N-235.zor	1	none	E1101	zor: runtime error	other member in enum
+N-236	tests/stdout/cases/N-236.zor	1	none	E1201	zor: runtime error	array mixed width constants

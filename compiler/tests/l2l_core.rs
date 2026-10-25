@@ -231,7 +231,7 @@ fn width_and_payload_kind_are_strict() {
 }
 
 #[test]
-fn unary_minus_path_syntax_and_extended_constants_stay_fail_closed() {
+fn unary_minus_and_path_syntax_stay_fail_closed() {
     assert_rc1(
         "unary",
         "enum E { V(f64) }\nfn main() {\n    println(V(-f64::NAN));\n}\n",
@@ -240,11 +240,6 @@ fn unary_minus_path_syntax_and_extended_constants_stay_fail_closed() {
     assert_rc1(
         "path",
         "enum E { V(f64) }\nfn main() {\n    let e = E::V(f64::NAN);\n    println(1);\n}\n",
-        "E1101",
-    );
-    assert_rc1(
-        "max",
-        "fn main() {\n    println(f64::MAX);\n}\n",
         "E1101",
     );
 }

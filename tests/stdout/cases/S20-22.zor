@@ -1,0 +1,3 @@
+struct S { f: f64 }
+enum E { V(f64) }
+fn main() { println(S { f: f64::MIN }, V(f64::MAX)); }

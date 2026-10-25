@@ -1,0 +1,2 @@
+struct S { a: [f64; 2] }
+fn main() { println(S { a: [f64::MAX, f64::MIN] }); }

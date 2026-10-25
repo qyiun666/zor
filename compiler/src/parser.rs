@@ -43,9 +43,10 @@ pub enum Lit { Int(u128), Float(f64), Str(String), Bool(bool) }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FloatWidth { F32, F64 }
 
-/// L2h：0.3.7 仅三个特殊值形态；NaN 载荷／信号 NaN 不在面内。
+/// L2h：三个特殊值形态；L2o：追加三个命名有限常量（`MAX`／`MIN`／`EPSILON`）。
+/// NaN 载荷／信号 NaN 不在面内。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FloatSpecialKind { Nan, Infinity, NegInfinity }
+pub enum FloatSpecialKind { Nan, Infinity, NegInfinity, Max, Min, Epsilon }
 
 impl FloatWidth {
     pub fn ty(self) -> Ty {
@@ -644,8 +645,8 @@ impl Parser {
             Tok::Ident(s) if s == "true" => Ex::Lit(Lit::Bool(true), l, c),
             Tok::Ident(s) if s == "false" => Ex::Lit(Lit::Bool(false), l, c),
             Tok::Ident(s) if s == "mut" => { self.diag_at("E1101", l, c, "'mut' 仅用于 &mut 位置"); Ex::Lit(Lit::Bool(true), l, c) }
-            // L2h：`f32|f64::MEMBER` 双冒号前瞻（不改 lexer、不新增关键字）。
-            // 仅六个精确组合成为特殊值；其余 `::` 成员一律 E1101（裁定 5）。
+            // L2h／L2o：`f32|f64::MEMBER` 双冒号前瞻（不改 lexer、不新增关键字）。
+            // 仅六个特殊值与六个命名有限常量成为 FloatSpecial；其余 `::` 成员一律 E1101。
             Tok::Ident(s)
                 if (s == "f32" || s == "f64")
                     && matches!(self.peek(), Tok::Colon)
@@ -666,6 +667,9 @@ impl Parser {
                     "NAN" => Some(FloatSpecialKind::Nan),
                     "INFINITY" => Some(FloatSpecialKind::Infinity),
                     "NEG_INFINITY" => Some(FloatSpecialKind::NegInfinity),
+                    "MAX" => Some(FloatSpecialKind::Max),
+                    "MIN" => Some(FloatSpecialKind::Min),
+                    "EPSILON" => Some(FloatSpecialKind::Epsilon),
                     _ => None,
                 };
                 match kind {
@@ -675,7 +679,7 @@ impl Parser {
                             self.err_float_member(
                                 cl,
                                 cc,
-                                "特殊值不是函数，不可调用（NaN 载荷不在 0.3.7 面内）",
+                                "特殊值／命名有限常量不是函数，不可调用（NaN 载荷不在 0.3.7 面内）",
                             );
                         }
                         Ex::FloatSpecial(width, k, l, c)
@@ -684,7 +688,10 @@ impl Parser {
                         self.err_float_member(
                             ml,
                             mc,
-                            format!("'{}::{}' 不在 0.3.7 支持面（仅六个特殊值形式）", s, member),
+                            format!(
+                                "'{}::{}' 不在 0.3.7 支持面（仅六个特殊值与六个命名有限常量形式）",
+                                s, member
+                            ),
                         );
                         Ex::Path(s, l, c)
                     }

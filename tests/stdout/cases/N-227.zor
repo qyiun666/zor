@@ -1,0 +1,2 @@
+enum E { V(f64) }
+fn main() { println(f64::MAX + 1.0); }

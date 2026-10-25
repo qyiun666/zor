@@ -1,0 +1,2 @@
+enum E { V(f64, f64) }
+fn main() { println(V(f64::MAX, f64::MIN)); }
