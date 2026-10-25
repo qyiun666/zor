@@ -244,21 +244,12 @@ fn composite_field_with_special_stays_fail_closed() {
 }
 
 #[test]
-fn nested_direct_forms_stay_fail_closed() {
-    assert_rc1(
-        "field",
-        "enum E { V(f64, f64) }\nstruct S { e: E }\nfn main() {\n    println(S { e: V(f64::NAN, 1.5) });\n}\n",
-        "println 实参不可打印",
-    );
-    assert_rc1(
-        "tuple",
-        "enum E { V(f64, f64) }\nfn main() {\n    println((V(f64::NAN, 1.5), 1));\n}\n",
-        "println 实参不可打印",
-    );
-    assert_rc1(
-        "array",
-        "enum E { V(f64, f64) }\nfn main() {\n    println([V(f64::NAN, 1.5)]);\n}\n",
-        "println 实参不可打印",
+fn nested_direct_forms_print_after_l2n() {
+    // L2n（PMO 批准）：多字段枚举的嵌套直接形式转正。
+    assert_runs(
+        "enum E { V(f64, f64) }\nstruct S { e: E }\nfn main() {\n    println(S { e: V(f64::NAN, 1.5) });\n    println((V(f64::NAN, 1.5), 1));\n    println([V(f64::NAN, 1.5)]);\n}\n",
+        "nested",
+        b"S { e: V(nan, 1.5) }\n(V(nan, 1.5), 1)\n[V(nan, 1.5)]\n",
     );
 }
 
