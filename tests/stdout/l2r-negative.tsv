@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-275	tests/stdout/cases/N-275.zor	1	none	E1101	zor: runtime error	qualified bare no parens
+N-276	tests/stdout/cases/N-276.zor	1	none	E1101	zor: runtime error	unit variant value no parens
+N-277	tests/stdout/cases/N-277.zor	1	none	E1101	zor: runtime error	multi-level path
+N-278	tests/stdout/cases/N-278.zor	1	none	E1101	zor: runtime error	unknown enum
+N-279	tests/stdout/cases/N-279.zor	1	none	E1101	zor: runtime error	non-enum qualifier
+N-280	tests/stdout/cases/N-280.zor	1	none	E1101	zor: runtime error	variant not in enum
+N-281	tests/stdout/cases/N-281.zor	1	none	E1101	zor: runtime error	associated function
+N-282	tests/stdout/cases/N-282.zor	1	none	E1601	zor: runtime error	wrong arity zero
+N-283	tests/stdout/cases/N-283.zor	1	none	E1601	zor: runtime error	wrong arity two
+N-284	tests/stdout/cases/N-284.zor	1	none	E1201	zor: runtime error	cross-width payload
+N-285	tests/stdout/cases/N-285.zor	1	none	E1202	zor: runtime error	integer to float payload
+N-286	tests/stdout/cases/N-286.zor	1	none	E1201	zor: runtime error	bool to float payload
+N-287	tests/stdout/cases/N-287.zor	1	none	let 类型标注	zor: runtime error	Box<enum> qualified
+N-288	tests/stdout/cases/N-288.zor	1	none	let 类型标注	zor: runtime error	Box composite enum field
+N-289	tests/stdout/cases/N-289.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-290	tests/stdout/cases/N-290.zor	1	none	let 类型标注	zor: runtime error	variable Box payload
+N-291	tests/stdout/cases/N-291.zor	1	none	E1201	zor: runtime error	qualified type mismatch
+N-292	tests/stdout/cases/N-292.zor	1	none	E1101	zor: runtime error	local variable qualifier
