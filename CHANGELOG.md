@@ -4,6 +4,41 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.18] - 2026-10-26
+
+内部验证里程碑，非可用语言版本：本版为 L2s「Box 常量性边界定义切片」——**无新增语言能力、编译器行为不变**（`compiler/src` 零 diff）；把既有 Box 常量载荷行为固化为 claim 面（CS-1～CS-4）、fail-closed 面（FC-1～FC-10）与负控，新增 `l2s-baseline` 第十五基线；claim 采用口径①（结构面＋命名成员叶全 claim，含 L2q 命名整型成员作复合叶）；六项边界不对称按裁定冻结、不在本切片修复；`Box<enum>` 归 ②，`Box<?>` 诊断归 ④b。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：claim 面——CS-1 标量 `Box<T>` 8 个整型宽度（字面量／具名整型成员含负值／无标注 `box 1`／`box (1)`／常量重初始化／Box→Box 移动）；CS-2 标量 `Box<f32|f64>`（有限含负值／`-0.0`／六特殊值／命名有限常量／重初始化）；CS-3 复合 `Box<struct>`／`Box<[T;N]>` 常量树（整型 8 宽／bool／f32／f64／特殊值／嵌套 struct／定长数组／空数组／空 struct；命名成员与负值叶，含 `S{f64::MAX_EXP}`、`[f64::MAX_EXP, f64::MIN_EXP]`、`Box<[i64;0]>` 等）；CS-4 源形态仅字面量／具名常量，变量／表达式 fail-closed，直接 `box -N` fail-closed，复合内负字面量允许，无标注仅整型字面量。仍 fail-closed：FC-1～FC-10（变量／表达式／嵌套 Box／Box 字段／Box 数组／`Box<enum>`／enum 字段／enum 元素／tuple／unit／`Box<bool>`／`Box<byte>`／`Box<unit>`／`Box<[byte;N]>`／无标注浮点／struct／array／跨宽与范围不符）；token 允许 `let 类型标注`／`box 载荷非整型字面量`／`box 载荷须为字面量常量`／`赋值语句`，不新增 E 码。六项不对称（`box -1` vs `S{f:-1}`、`Box<bool>` vs `Box<[bool;3]>`、`Box<[u8;N]>` vs `Box<[byte;N]>`、无标注整型 vs 浮点／struct／array、`Box<f64>←整型成员` E1201 vs 字段浮点 E1202、`Box<?>`）按裁定冻结、不修复。计数：P=**40**／Q=**28**／Ret=**0**；Q 码位／token E1201×6／E1202×1／`box 载荷非整型字面量`×7／`box 载荷须为字面量常量`×2／`let 类型标注`×10／`赋值语句`×2；R=**430**（390＋40）、G=**267**（239＋28）、T=**714**、A=**718**、N=**827**（759＋40＋28）；`l2s-baseline` cases **827**／files **1274**／unique **1274**；旧 14 基线 162／209、188／246、206／275、247／327、297／398、345／466、417／590、461／660、506／734、554／816、599／891、645／963、701／1062、759／1163 与 `l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 均零改；分代活跃 L2I=26／L2L=14／L2M=15／L2N=14／L2O=10／L2P=15／L2Q=16／L2R=18／L2S=28。E1101 编目 30；ASAN K=0（无新增堆路径、默认 manifest 48／41／7 零改）；Linux x86_64 为唯一终证，macOS 仅辅助；无安装／打包／性能承诺。
+
+### Added
+
+- **Box 常量性边界 claim 矩阵（定义切片）**：CS-1～CS-4 正式 claim 既有 Box 常量载荷行为（结构与命名成员叶）；FC-1～FC-10 冻结拒绝面；六项边界不对称按裁定冻结。无新增语言能力、无编译器行为变化、`compiler/src` 零 diff。
+- **`l2s-baseline` 第十五基线**：`stdout-contract` 在 `l2r` 之后校验 `l2s-baseline`（827／1274／1274），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿；旧 14 基线字节零改。
+
+### Changed
+
+- **计数与资产**：Stage-1 P=40 正例、Q=28 负控；Ret=0（无既有负控翻转）；R 390→430、G 239→267、T 646→714、A 650→718、N 759→827、M 1163→1274；`l2s-baseline.tsv` 827 条（828 行含表头）、`.sha256` 1274 行；分代活跃 L2I=26／L2L=14／L2M=15／L2N=14／L2O=10／L2P=15／L2Q=16／L2R=18／L2S=28；Q 码位／token E1201×6／E1202×1／`box 载荷非整型字面量`×7／`box 载荷须为字面量常量`×2／`let 类型标注`×10／`赋值语句`×2。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.17` 落至 `0.3.18`；`compiler/Cargo.toml:5` description 版本串同步；`Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.18`。
+- **CI**：十五基线并存；无新 job／YAML／ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2s-01：**PASS**——feature head `29bdb7b`（PR #175）；CI run `40294377124`；`baseline`／`stdout-contract`／`runtime-codes`／`asan-linux`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2s-baseline|cases=827 files=1274 unique=1274 fail=0`；`PASS|stdout-contract|runtime=430 negative=267 fail=0 ran=430/267`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；`PASS|asan-l2k|cases=6 fail=0 ran=6/6`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：十五基线判词全 PASS；ASAN 第二 manifest **6/6**、默认 manifest **48／41／7** 零改；P 40/40（两轮）、六档 `-O*` **240/240**、Q 28/28、locale **40/40 SAME**、Ret=0；`cargo test --release --locked` **448 passed／0 failed**；E1101 编目 **30**；全 job `SKIP|`／`FAIL|` 0 行。
+- 计数口径：P=**40**／Q=**28**／Ret=**0**／R=**430**／G=**267**／T=**714**／A=**718**／N=**827**／M=**1274**。
+- 证据：产品签署 `shared/ZOR-L2s-Stage2-S24会签-产品-v1-signed.md`（70 行／6393 B，sha256 `eee30cf8…5a3a`）；QA Stage-2 报告 `shared/ZOR-L2s-Stage2-验证报告-质量-v1.md`（101 行／5582 B，sha256 `2d9cea81…8012`）；QA 会签输入 `65ed4dee…bce2`（145 行）；矩阵 v2 `454c64f6…547d`（145 行）；`l2s-baseline.tsv` `afb2d88e…1170f7`；`l2s-baseline.sha256` `812c9f4f…d8eb519`；PR #175 **114 files**。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **定义切片**：本版无新增语言能力、无编译器行为变化（`compiler/src` 零 diff）；账本与 README 均按此口径表述。
+- **六项边界不对称**：`box -1` vs `S{f:-1}`、`Box<bool>` vs `Box<[bool;3]>`、`Box<[u8;N]>` vs `Box<[byte;N]>`、无标注整型 vs 浮点／struct／array、`Box<f64>←整型成员` E1201 vs 字段浮点 E1202、`Box<?>` 显示；按裁定冻结，不在本切片修复。
+- **⑤ 之外**：`Box<enum>`／含 Box 枚举载荷归 ②；`Box<?>` 与 `check.rs:654` 括注归 ④b；变量载荷／嵌套 Box 维持 fail-closed。
+- **E1101 编目**：保持 30；不新增 E 码／关键字；允许既有非 E 码 token（`let 类型标注`／`box 载荷非整型字面量`／`box 载荷须为字面量常量`／`赋值语句`）作为负控断言。
+- **版本语境**：0.3.17 及更早节的表述按版本语境保留、不回改；历史节逐字节零改。
+- **ASAN**：K=0（无新增 ASAN 用例、默认 manifest 48／41／7 零改）不等于「已证无泄漏」。
+- **平台／发布／性能**：Linux x86_64 唯一终证，macOS 仅辅助；零 tag／Release，不构成安装或环境可用性承诺；不出性能数字、不作性能承诺。
+
 ## [0.3.17] - 2026-10-26
 
 内部验证里程碑，非可用语言版本：本版为 L2r「限定枚举变体构造」——在 0.3.16 的十个整型常量之上，开放单层限定枚举变体构造 `Enum::Variant(args...)`（含零实参 `Enum::Variant()`）；单位变体作值（`E::W` 不带括号）不纳入；限定形式输出与裸变体**逐字节一致**（`E::V(1.5)`→`V(1.5)`、`E::N()`→`N`、`Outer::O(Inner::I(1))`→`O(I(1))`）；限定符必须是已声明枚举、变体必须属于该枚举，裸变体首匹配语义零改；不新增 E 码／关键字／语法／运行期能力，无堆／drop／ASAN 变化；E1101 编目保持 30。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
