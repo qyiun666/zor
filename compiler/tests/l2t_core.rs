@@ -176,10 +176,11 @@ fn box_enum_ownership_forms() {
 
 #[test]
 fn box_enum_constness_fail_closed() {
-    assert_rc1(
+    // L2v：变量枚举载荷翻转（Copy 语义）；表达式／无标注仍 fail-closed。
+    assert_runs(
+        "enum E { A(i64) }\nfn main() {\n    let e = A(1);\n    let b: Box<E> = box e;\n    println(*b);\n    println(e);\n}\n",
         "variable",
-        "enum E { A(i64) }\nfn main() {\n    let e = A(1);\n    let b: Box<E> = box e;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        b"A(1)\nA(1)\n",
     );
     assert_rc1(
         "expression",
