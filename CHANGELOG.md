@@ -4,6 +4,42 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.21] - 2026-10-26
+
+内部验证里程碑，非可用语言版本：本版为 L2v「②a `Box<enum>` 变量载荷＋变量重初始化」——在 0.3.20 诊断文本层之上，开放标注绑定 `let b: Box<E> = box e;` 与变量重初始化 `b = box e2;` 的**运行期 Copy 枚举变量载荷**：e／e2 为标量字段枚举变量（8 整型／bool／f32／f64＋有限／特殊值／命名常量／整型成员），`box e` 复制、e 之后仍可用；`println(*b)` 与 `println(e)` 逐字节一致；`unbox`／作用域 drop 只释放 Box 一次；`b = box e2` 旧值 drop 一次、不消耗 e2；C 端以 `EnumInit` 配方物化 tag＋union 副本；无递归析构。**不开放**：`box V(x)`／`box V(1+2)`（构造调用载荷）、无标注 `box e`、嵌套 Box、Box 复合含 enum、`Box<[E;N]>`、enum 含 Box／struct／array／enum／tuple／unit 字段、非枚举变量载荷、`let v=*b`／`println(b)`；均维持 fail-closed。Ret=3（N-290／N-321／N-323，仅执行面）；L2u N-290 单 ID 覆盖移除；ASAN K=2（新建 `l2v-asan-manifest.tsv` 2 例＋`l2k-asan-manifest.tsv` 原 6 例零改，观测 9+2=11；默认 manifest 48／41／7 零改）；`l2v-baseline` 第十八基线（937／1450）；按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：支持形态——标注 `let b: Box<E> = box e;`（e 为标量字段枚举变量；Copy，e 仍可用）；变量重初始化 `b = box e2;`（e2 仍可用；旧 Box drop 一次）；`println(*b)` 与 `println(e)` 逐字节一致；多 Box／移动／`unbox`／作用域 drop 沿用；零／单／多字段；字段仅 L2t 标量白名单（8 整型／bool／f32／f64＋有限／特殊值／命名常量／整型成员）。仍 fail-closed：`box V(x)`／`box V(1+2)`（表达式／构造调用载荷）、无标注 `box e`、嵌套 Box（`Box<Box<E>>`）、Box 复合含 enum（struct 字段／`Box<[E;N]>`）、enum 变体含 Box／struct／array／enum／tuple／unit 字段、非枚举变量载荷、`let v=*b`／`println(b)`／`println((*b,1))`；类型／宽度不符沿用 E1201／E1202／E1601，重复 unbox／unbox 后使用 E2301、移动后使用 E2101。计数：P=**24**、Q=**19**、Ret=**3**（N-290／N-321／N-323，仅执行面；源／TSV／各代 baseline 字节零改、ID 不复用）；Q 码位／token `box 载荷须为字面量常量`×2／`box 载荷非整型字面量`×2／`let 类型标注`×9／`解引用源不是 Box 绑定`×1／`println 实参不可打印`×2／E2301×2／E2101×1；R=**486**（462＋24）、G=**312**（296−3＋19）、T=**815**、A=**819**、N=**937**（894＋24＋19）；`l2v-baseline` cases **937**／files **1450**／unique **1450**；旧 17 基线 162／209、188／246、206／275、247／327、297／398、345／466、417／590、461／660、506／734、554／816、599／891、645／963、701／1062、759／1163、827／1274、884／1367、894／1379 与 `l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 均零改；分代活跃 L2R=16／L2T=23／L2V=19（其余分代不变）。ASAN 9+2=11（K=2；l2k 原 6 例字节零改、默认 manifest 48／41／7 零改；无泄漏／double-free／UAF）；E1101 编目 30；Linux x86_64 为唯一终证，macOS 无 LSAN 不作终证；无安装／打包／性能承诺。
+
+### Added
+
+- **`Box<enum>` 变量载荷＋变量重初始化（②a）**：标注 `let b: Box<E> = box e;` 与 `b = box e2;`；e／e2 为 Copy 枚举变量，字段仅 L2t 标量白名单；`box e` 复制、e 仍可用；`println(*b)` 与 `println(e)` 逐字节一致；`unbox`／作用域 drop 一次；重初始化旧值 drop 一次；C 端 `EnumInit` 配方物化 tag＋union；无递归析构。
+- **`l2v-baseline` 第十八基线**：`stdout-contract` 在 `l2u` 之后校验 `l2v-baseline`（937／1450／1450），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿；旧 17 基线字节零改。
+- **`l2v-asan-manifest.tsv`（K=2）**：变量载荷构造＋作用域 drop、变量重初始化 2 例；`run_asan_l2v.sh` 独立判词；`l2k-asan-manifest.tsv` 原 6 例与默认 manifest 48／41／7 零改；观测 9+2=11。
+
+### Changed
+
+- **Ret=3 与执行面覆盖**：N-290（L2r 限定变量载荷）、N-321（L2t 变量载荷）、N-323（L2t 变量重初始化）退休；仅执行面，源／TSV／各代 baseline 字节零改、ID 不复用；L2R=16／L2T=23；移除 L2u N-290 单 ID 覆盖，无双写。
+- **计数与资产**：P=24、Q=19、Ret=3；R 462→486、G 296→312、T 775→815、A 779→819、N 894→937、M 1379→1450；`l2v-baseline.tsv` 937 条（938 行含表头）、`.sha256` 1450 行；L2V=19。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.20` 落至 `0.3.21`；`compiler/Cargo.toml:5` description 版本串同步；`Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.21`。
+- **CI**：十八基线并存；无新 job／YAML／ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2v-01：**PASS**——integration head `0874ad7`（PR #192）；CI run `40335434082`；`baseline`／`stdout-contract`／`runtime-codes`／`asan-linux`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2v-baseline|cases=937 files=1450 unique=1450 fail=0`；`PASS|stdout-contract|runtime=486 negative=312 fail=0 ran=486/312`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；`PASS|asan-l2k|cases=9 fail=0 ran=9/9`；`PASS|asan-l2v|cases=2 fail=0 ran=2/2`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：十八基线判词全 PASS；P 24/24、六档 `-O*` **144/144**、Q 19/19、locale **24/24 SAME**、Ret 3/3；ASAN **11/11**（9+2，K=2；ASAN/LSAN 零报告）；`cargo test --release --locked` **473 passed／0 failed**（`l2v_core` 9、`l2t_core` 10）；E1101 编目 **30**；T-4 无 golden 更新；全 job `SKIP|`／`FAIL|` 0 行。
+- 计数口径：P=**24**／Q=**19**／Ret=**3**／R=**486**／G=**312**／T=**815**／A=**819**／N=**937**／M=**1450**。
+- 证据：产品签署 `shared/ZOR-L2v-Stage2-S27会签-产品-v1-signed.md`（72 行／6697 B，sha256 `45fd0e3d…d6cc`）；QA Stage-2 报告 `shared/ZOR-L2v-Stage2-验证报告-质量-v1.md`（96 行／6661 B，sha256 `c61a1179…c4b2`）；QA 会签输入（155 行／10785 B，sha256 `7bdf04a9…6163`）；`l2v-baseline.tsv` `0afb730d…ae20e58`；`l2v-baseline.sha256` `47c5587c…9928b6ae3`；`l2v-cases.tsv` `3378aef5…e7232065`；`l2v-negative.tsv` `78dcf70a…3fd11071`；`l2v-asan-manifest.tsv` `80e5eeee…5eb461`；PR #192 **85 files**（核心 6＋QA 73＋CI 6）。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **源形态**：`box V(x)`／`box V(1+2)` 维持 fail-closed（构造调用载荷，与 `box e` 不对称）；用户先 `let e = V(x); box e`。账本／README 不得写成表达式载荷已开放。
+- **范围**：仅变量枚举载荷＋变量重初始化，Copy 标量字段；表达式／嵌套 Box／Box 复合／enum 含 Box／递归析构未开放，仍归后续切片。
+- **Ret=3**：仅执行面退休；历史 TSV／baseline 字节零改、ID 不复用；L2u N-290 单 ID 覆盖已移除，无双写。
+- **平台／ASAN**：macOS 无 LSAN，不作 ASAN 终证；终证为 Linux CI 11/11；默认 manifest 48／41／7、l2k 6、l2t 3 零改。
+- **版本语境**：0.3.20 及更早节的表述按版本语境保留、不回改；历史节逐字节零改。
+- **发布**：零 tag／Release，不构成安装或环境可用性承诺；不出性能数字。
+
 ## [0.3.20] - 2026-10-26
 
 内部验证里程碑，非可用语言版本：本版为 L2u「④b-A 诊断文本层」——诊断文本与 `Box<?>` 收敛切片，**无新增语言能力、无新增 E 码／关键字／AC、无运行期行为变化**。D1 将一元负号拒绝特殊值的文案由「（含绑定后读取；仅直接打印）」收敛为「（含绑定后读取）」，E1201 与前缀保留；D2 在 `compatible()` 对 `BoxTy(Bad)` 做归并——载荷已为 `Ty::Bad` 时不再派生外层 Box 不匹配，使 `Box<i64> ← f64::NAN/MAX` 仅报 E1202、`Box<E> ← W(1)` 仅报 E1101，同时保留合法 Box 不匹配 E1201（`Box<f64>←1024`、`Box<A>←B 值`、跨宽）；D5 将 `compiler/scripts/e1101_catalog.sh` 期望 29 修正为 30（lexer 3／parser 20／check 7）。新增 `l2u-baseline` 第十七基线（894／1379／1379）；P=0／Q=10／Ret=0；R=462／G=296／T=775／A=779／N=894；ASAN 6+3=9 与默认 manifest 48／41／7 零改；T-4 结构／render／JSON 不变；按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
