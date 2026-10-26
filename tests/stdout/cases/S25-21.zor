@@ -1,0 +1,5 @@
+enum E { V(i64) }
+fn main() {
+    let b: Box<E> = box V(f64::MIN_EXP);
+    println(*b);
+}

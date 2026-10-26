@@ -1,0 +1,7 @@
+enum E { V(f64) }
+fn main() {
+    let b: Box<E> = box V(f64::MAX);
+    println(*b);
+    b = box V(f64::MIN_POSITIVE);
+    println(*b);
+}
