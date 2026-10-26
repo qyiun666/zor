@@ -102,7 +102,11 @@ fn narrowable_const(e: &Ex) -> bool {
     matches!(
         e,
         Ex::Un(op, inner, _, _)
-            if op == "-" && matches!(inner.as_ref(), Ex::Lit(Lit::Int(_) | Lit::Float(_), _, _))
+            if op == "-"
+                && matches!(
+                    inner.as_ref(),
+                    Ex::Lit(Lit::Int(_) | Lit::IntConst(_) | Lit::Float(_), _, _)
+                )
     )
 }
 
@@ -297,7 +301,7 @@ fn let_init_kind(
                 _ => None,
             };
             // 整型字面量载荷（既有通道，判词不变）。
-            if matches!(inner.as_ref(), Ex::Lit(Lit::Int(_), _, _)) {
+            if matches!(inner.as_ref(), Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _)) {
                 let payload = match ann {
                     None => Ty::Prim("i64"),
                     Some(BindingKind::Box(p)) => p.clone(),
@@ -353,6 +357,12 @@ fn let_init_kind(
             Err(SubsetError::new(*il, *ic, "box 载荷非整型字面量"))
         }
         Ex::Lit(Lit::Int(_), _, _) => match ann {
+            None => Ok(BindingKind::I64),
+            Some(k) if is_int_kind(k) || k == &BindingKind::Byte => Ok(k.clone()),
+            Some(_) => Err(SubsetError::new(l, c, "let 类型标注与整型初值不符")),
+        },
+        // L2q：具名整型常量与整数字面量同口径绑定。
+        Ex::Lit(Lit::IntConst(_), _, _) => match ann {
             None => Ok(BindingKind::I64),
             Some(k) if is_int_kind(k) || k == &BindingKind::Byte => Ok(k.clone()),
             Some(_) => Err(SubsetError::new(l, c, "let 类型标注与整型初值不符")),
@@ -529,7 +539,7 @@ fn box_reinit_ok(
         return false;
     };
     match inner {
-        Ex::Lit(Lit::Int(_), _, _) | Ex::FloatSpecial(..) => true,
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _) | Ex::FloatSpecial(..) => true,
         Ex::Lit(Lit::Float(_), _, _) => matches!(p.as_ref(), Ty::Prim("f32") | Ty::Prim("f64")),
         Ex::Un(op, x, _, _) if op == "-" => {
             matches!(x.as_ref(), Ex::Lit(Lit::Float(_), _, _))
@@ -588,7 +598,7 @@ fn payload_init_ok(e: &Ex, types: &TypeTable, prog: &Prog) -> bool {
         return false;
     }
     match e {
-        Ex::Lit(Lit::Int(_) | Lit::Float(_) | Lit::Bool(_), _, _) => true,
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_) | Lit::Float(_) | Lit::Bool(_), _, _) => true,
         Ex::FloatSpecial(..) => true,
         Ex::Un(op, x, _, _) if op == "-" || op == "!" => payload_init_ok(x, types, prog),
         Ex::Record(_, fields, _, _) => fields.iter().all(|(_, v)| payload_init_ok(v, types, prog)),
@@ -660,7 +670,7 @@ fn supported_value_expr_in(
     match e {
         Ex::FloatSpecial(..) => allow_special,
         Ex::Lit(Lit::Str(_), _, _) => is_byte_array_ty(t),
-        Ex::Lit(Lit::Int(_) | Lit::Float(_) | Lit::Bool(_), _, _) | Ex::UnitLit(_, _) => true,
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_) | Lit::Float(_) | Lit::Bool(_), _, _) | Ex::UnitLit(_, _) => true,
         Ex::Path(n, _, _) => match bindings.get(n) {
             Some(BindingKind::Str) => is_byte_array_ty(t),
             Some(BindingKind::Composite(bt)) => bt == t,
@@ -745,7 +755,7 @@ fn supported_value_expr_in(
 /// Q-3：`[byte;N]`／`[u8;N]` 字面量元素须为编译期常量形态。
 fn is_const_value_expr(e: &Ex) -> bool {
     match e {
-        Ex::Lit(Lit::Int(_) | Lit::Float(_) | Lit::Bool(_), _, _) | Ex::UnitLit(_, _) => true,
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_) | Lit::Float(_) | Lit::Bool(_), _, _) | Ex::UnitLit(_, _) => true,
         Ex::Un(op, inner, _, _) if op == "-" || op == "!" => is_const_value_expr(inner),
         _ => false,
     }
@@ -797,13 +807,13 @@ fn is_copy_kind(k: &BindingKind) -> bool {
 }
 
 fn is_int_lit(e: &Ex) -> bool {
-    matches!(e, Ex::Lit(Lit::Int(_), _, _))
+    matches!(e, Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _))
 }
 
 /// 整型算术的形态判定：字面量向同侧整型收敛；其他在册整型放行给 lower。
 fn int_expr_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> Option<BindingKind> {
     match e {
-        Ex::Lit(Lit::Int(_), _, _) => Some(BindingKind::I64),
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _) => Some(BindingKind::I64),
         Ex::Path(n, _, _) => bindings
             .get(n)
             .cloned()
@@ -859,7 +869,7 @@ fn const_unary_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> Option<B
 
 fn scalar_expr_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> Option<BindingKind> {
     match e {
-        Ex::Lit(Lit::Int(_), _, _) => Some(BindingKind::I64),
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _) => Some(BindingKind::I64),
         Ex::Lit(Lit::Float(_), _, _) => Some(BindingKind::F64),
         Ex::Lit(Lit::Bool(_), _, _) => Some(BindingKind::Bool),
         Ex::UnitLit(_, _) => Some(BindingKind::Unit),

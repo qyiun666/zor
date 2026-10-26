@@ -224,6 +224,25 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
                             }
                         },
+                        // L2q：具名整型常量与整数字面量同口径绑定（含 `MIN_EXP` 负值）。
+                        Ex::Lit(Lit::IntConst(v), il, ic) => match &local_ty {
+                            Ty::I64 => {
+                                let value = i64::try_from(*v)
+                                    .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i64"))?;
+                                body.push(Stmt::BindI64 { local: id, value, line: *l, col: *c });
+                                slots.push(Slot { ty: Ty::I64, live: true, konst: None, bytes: None });
+                            }
+                            Ty::U8 | Ty::U32 => {
+                                let ty = ir_int_ty(&local_ty).expect("u8/u32");
+                                let expr = IntExpr::Const(int_const_i128(*v, ty, init)?);
+                                body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
+                                slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
+                            }
+                            _ => {
+                                let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
+                                slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
+                            }
+                        },
                         Ex::Lit(Lit::Bool(_) | Lit::Float(_), _, _)
                         | Ex::UnitLit(..)
                         | Ex::FloatSpecial(..) => {
@@ -544,7 +563,7 @@ fn print_arg(
             }
             Ok(PrintArg::Str(StrArg::Bytes(s.as_bytes().to_vec())))
         }
-        Ex::Lit(Lit::Int(_), _, _) => {
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _) => {
             let ty = int_ty_of(b.types, e, "println 实参")?;
             let expr = lower_int_expr(e, ty, b.types, b.slots, scope)?;
             Ok(PrintArg::Int { ty, expr })
@@ -722,7 +741,7 @@ fn lower_value(
             }
             Ok(Value::Bytes(s.as_bytes().to_vec()))
         }
-        Ex::Lit(Lit::Int(_), _, _)
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _)
         | Ex::Lit(Lit::Float(_) | Lit::Bool(_), _, _)
         | Ex::UnitLit(..)
         | Ex::Un(..)
@@ -941,6 +960,13 @@ fn byte_const(e: &Ex) -> Result<u8, SubsetError> {
             }
             Ok(n as u8)
         }
+        // L2q：具名整型常量作字节元素时同样只接受 0..=255。
+        Ex::Lit(Lit::IntConst(v), l, c) => {
+            if !(0..=u8::MAX as i128).contains(v) {
+                return Err(SubsetError::new(*l, *c, "lower：byte 元素超出 0..=255"));
+            }
+            Ok(*v as u8)
+        }
         other => {
             let (l, c) = subset::expr_span(other);
             Err(SubsetError::new(l, c, "lower：字节数组元素须为整数字面量"))
@@ -1009,6 +1035,13 @@ fn const_scalar(
                 return Err(SubsetError::new(*il, *ic, "lower：整型字面量超出声明宽度"));
             }
             Ok(ConstVal::Int(n))
+        }
+        // L2q：具名整型常量按有符号值直接做范围判定。
+        Ex::Lit(Lit::IntConst(v), il, ic) => {
+            if !int_in_range(want, *v) {
+                return Err(SubsetError::new(*il, *ic, "lower：整型字面量超出声明宽度"));
+            }
+            Ok(ConstVal::Int(*v))
         }
         Ex::Lit(Lit::Float(v), _, _) => match want {
             Ty::F32 => Ok(ConstVal::F32(*v as f32)),
@@ -1332,6 +1365,15 @@ fn const_value(
             }
             Ok(ConstValue::Int(n))
         }
+        // L2q：复合载荷叶子按声明宽度直接判定（仅沿用 L2k 既有常量树能力；裁定 §3 归 ⑤，不测试/不宣称）。
+        Ex::Lit(Lit::IntConst(v), il, ic) => {
+            let irt = ast_to_ir(want)
+                .ok_or_else(|| SubsetError::new(l, c, "lower：box 载荷叶子类型不在 codegen 子集"))?;
+            if !int_in_range(&irt, *v) {
+                return Err(SubsetError::new(*il, *ic, "lower：整型字面量超出声明宽度"));
+            }
+            Ok(ConstValue::Int(*v))
+        }
         Ex::Lit(Lit::Float(v), fl, fc) => match want {
             AstTy::Prim("f32") => Ok(ConstValue::F32Bits((*v as f32).to_bits())),
             AstTy::Prim("f64") => Ok(ConstValue::F64Bits(v.to_bits())),
@@ -1579,6 +1621,21 @@ fn int_const(v: &u128, ty: IntTy, e: &Ex) -> Result<i128, SubsetError> {
     }
 }
 
+/// L2q：具名整型常量的有符号范围判定（含负值；u8／u32 只接受非负）。
+fn int_const_i128(n: i128, ty: IntTy, e: &Ex) -> Result<i128, SubsetError> {
+    let (l, c) = subset::expr_span(e);
+    let fits = match ty {
+        IntTy::I64 => (i64::MIN as i128..=i64::MAX as i128).contains(&n),
+        IntTy::U8 => (0..=u8::MAX as i128).contains(&n),
+        IntTy::U32 => (0..=u32::MAX as i128).contains(&n),
+    };
+    if fits {
+        Ok(n)
+    } else {
+        Err(SubsetError::new(l, c, "lower：整型字面量超出声明宽度"))
+    }
+}
+
 fn arith_op(op: &str) -> Option<ArithOp> {
     match op {
         "+" => Some(ArithOp::Add),
@@ -1611,6 +1668,7 @@ fn lower_int_expr(
     }
     match e {
         Ex::Lit(Lit::Int(v), _, _) => Ok(IntExpr::Const(int_const(v, ty, e)?)),
+        Ex::Lit(Lit::IntConst(v), _, _) => Ok(IntExpr::Const(int_const_i128(*v, ty, e)?)),
         Ex::Path(n, nl, nc) => {
             let id = lookup(scope, n, *nl, *nc)?;
             if slots.get(id.0 as usize).map(|s| &s.ty) != Some(&ty.ir_ty()) {
@@ -1690,6 +1748,27 @@ fn box_lit(e: &Ex, ty: BoxIntTy) -> Result<i128, SubsetError> {
             };
             if (0..=max).contains(&n) {
                 Ok(n)
+            } else {
+                Err(SubsetError::new(*l, *c, "lower：整型字面量超出声明宽度"))
+            }
+        }
+        // L2q：具名整型常量按载荷宽度判定；有符号宽度接受负值。
+        Ex::Lit(Lit::IntConst(v), l, c) => {
+            let (lo, hi) = match ty {
+                BoxIntTy::I8 => (i8::MIN as i128, i8::MAX as i128),
+                BoxIntTy::I16 => (i16::MIN as i128, i16::MAX as i128),
+                BoxIntTy::I32 => (i32::MIN as i128, i32::MAX as i128),
+                BoxIntTy::I64 => (i64::MIN as i128, i64::MAX as i128),
+                BoxIntTy::U8 => (0, u8::MAX as i128),
+                BoxIntTy::U16 => (0, u16::MAX as i128),
+                BoxIntTy::U32 => (0, u32::MAX as i128),
+                BoxIntTy::U64 => (0, u64::MAX as i128),
+                BoxIntTy::F32 | BoxIntTy::F64 => {
+                    return Err(SubsetError::new(*l, *c, "lower：浮点载荷非整型字面量"));
+                }
+            };
+            if (lo..=hi).contains(v) {
+                Ok(*v)
             } else {
                 Err(SubsetError::new(*l, *c, "lower：整型字面量超出声明宽度"))
             }
