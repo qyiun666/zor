@@ -1,0 +1,33 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S25-01	tests/stdout/cases/S25-01.zor	run	0	expected/S25-01.stdout	-	Box<E> i64 literal
+S25-02	tests/stdout/cases/S25-02.zor	run	0	expected/S25-02.stdout	-	Box<E> i8 negative literal
+S25-03	tests/stdout/cases/S25-03.zor	run	0	expected/S25-03.stdout	-	Box<E> i16 negative literal
+S25-04	tests/stdout/cases/S25-04.zor	run	0	expected/S25-04.stdout	-	Box<E> i32 literal
+S25-05	tests/stdout/cases/S25-05.zor	run	0	expected/S25-05.stdout	-	Box<E> u8 literal
+S25-06	tests/stdout/cases/S25-06.zor	run	0	expected/S25-06.stdout	-	Box<E> u16 literal
+S25-07	tests/stdout/cases/S25-07.zor	run	0	expected/S25-07.stdout	-	Box<E> u32 literal
+S25-08	tests/stdout/cases/S25-08.zor	run	0	expected/S25-08.stdout	-	Box<E> u64 max
+S25-09	tests/stdout/cases/S25-09.zor	run	0	expected/S25-09.stdout	-	Box<E> bool true
+S25-10	tests/stdout/cases/S25-10.zor	run	0	expected/S25-10.stdout	-	Box<E> bool false
+S25-11	tests/stdout/cases/S25-11.zor	run	0	expected/S25-11.stdout	-	Box<E> f64 finite
+S25-12	tests/stdout/cases/S25-12.zor	run	0	expected/S25-12.stdout	-	Box<E> f64 negative finite
+S25-13	tests/stdout/cases/S25-13.zor	run	0	expected/S25-13.stdout	-	Box<E> f64 negative zero
+S25-14	tests/stdout/cases/S25-14.zor	run	0	expected/S25-14.stdout	-	Box<E> f64 NAN
+S25-15	tests/stdout/cases/S25-15.zor	run	0	expected/S25-15.stdout	-	Box<E> f64 INFINITY
+S25-16	tests/stdout/cases/S25-16.zor	run	0	expected/S25-16.stdout	-	Box<E> f64 NEG_INFINITY
+S25-17	tests/stdout/cases/S25-17.zor	run	0	expected/S25-17.stdout	-	Box<E> f64 MAX
+S25-18	tests/stdout/cases/S25-18.zor	run	0	expected/S25-18.stdout	-	Box<E> f64 MIN_POSITIVE
+S25-19	tests/stdout/cases/S25-19.zor	run	0	expected/S25-19.stdout	-	Box<E> f64 EPSILON
+S25-20	tests/stdout/cases/S25-20.zor	run	0	expected/S25-20.stdout	-	Box<E> integer member MAX_EXP
+S25-21	tests/stdout/cases/S25-21.zor	run	0	expected/S25-21.stdout	-	Box<E> integer member MIN_EXP negative
+S25-22	tests/stdout/cases/S25-22.zor	run	0	expected/S25-22.stdout	-	Box<E> f32 finite
+S25-23	tests/stdout/cases/S25-23.zor	run	0	expected/S25-23.stdout	-	Box<E> f32 NAN
+S25-24	tests/stdout/cases/S25-24.zor	run	0	expected/S25-24.stdout	-	Box<E> f32 MAX
+S25-25	tests/stdout/cases/S25-25.zor	run	0	expected/S25-25.stdout	-	zero-field bare + qualified, two Boxes
+S25-26	tests/stdout/cases/S25-26.zor	run	0	expected/S25-26.stdout	-	Box<E> multi-field f64
+S25-27	tests/stdout/cases/S25-27.zor	run	0	expected/S25-27.stdout	-	Box<E> mixed scalar fields
+S25-28	tests/stdout/cases/S25-28.zor	run	0	expected/S25-28.stdout	-	Box<E> qualified variant
+S25-29	tests/stdout/cases/S25-29.zor	run	0	expected/S25-29.stdout	-	Box<E> move
+S25-30	tests/stdout/cases/S25-30.zor	run	0	expected/S25-30.stdout	-	Box<E> constant reinit
+S25-31	tests/stdout/cases/S25-31.zor	run	0	expected/S25-31.stdout	-	Box<E> unbox
+S25-32	tests/stdout/cases/S25-32.zor	run	0	expected/S25-32.stdout	-	two variants, two Boxes

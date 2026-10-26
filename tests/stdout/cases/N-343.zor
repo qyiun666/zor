@@ -1,0 +1,3 @@
+enum E { V(i64) }
+enum F { W(i64) }
+fn main() { let b: Box<E> = box F::W(1); println(*b); }
