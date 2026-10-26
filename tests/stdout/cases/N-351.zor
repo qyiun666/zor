@@ -1,0 +1,1 @@
+fn main() { let b: Box<f64> = box 1024; println(*b); }

@@ -1,0 +1,11 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-346	tests/stdout/cases/N-346.zor	1	none	含绑定后读取	仅直接打印	D1: unary minus new message (E1201)
+N-347	tests/stdout/cases/N-347.zor	1	none	E1202	E1201	D2: Box<i64> <- f64::NAN (E1202 only)
+N-348	tests/stdout/cases/N-348.zor	1	none	E1202	E1201	D2: Box<i64> <- f64::MAX (N-315 semantics)
+N-349	tests/stdout/cases/N-349.zor	1	none	E1101	E1201	D3: Box<E> <- W(1) (E1101 only)
+N-350	tests/stdout/cases/N-350.zor	1	none	E1201	Box<?>	D2: Box<f32> <- f64::NAN (single E1201)
+N-351	tests/stdout/cases/N-351.zor	1	none	E1201	Box<?>	valid Box mismatch: Box<f64> <- 1024
+N-352	tests/stdout/cases/N-352.zor	1	none	E1201	Box<?>	valid Box mismatch: Box<A> <- B::V(1)
+N-353	tests/stdout/cases/N-353.zor	1	none	E1201	Box<?>	inner width mismatch: enum field f32 <- f64::NAN
+N-354	tests/stdout/cases/N-354.zor	1	none	E1101	E1201	D2/D3: qualified unknown variant E::W(1)
+N-355	tests/stdout/cases/N-355.zor	1	none	E1101	E1201	D2: unknown enum X::V(1) (E1101 only)
