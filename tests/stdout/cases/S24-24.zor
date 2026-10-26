@@ -1,0 +1,2 @@
+struct S { a: i64, b: u8 }
+fn main() { let b: Box<S> = box S { a: f64::MAX_EXP, b: f32::DIGITS }; println(*b); }

@@ -1,0 +1,29 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-293	tests/stdout/cases/N-293.zor	1	none	box 载荷非整型字面量	zor: runtime error	variable scalar payload
+N-294	tests/stdout/cases/N-294.zor	1	none	box 载荷须为字面量常量	zor: runtime error	variable composite payload
+N-295	tests/stdout/cases/N-295.zor	1	none	赋值语句	zor: runtime error	variable scalar reinit
+N-296	tests/stdout/cases/N-296.zor	1	none	赋值语句	zor: runtime error	variable composite reinit
+N-297	tests/stdout/cases/N-297.zor	1	none	box 载荷非整型字面量	zor: runtime error	expression scalar payload
+N-298	tests/stdout/cases/N-298.zor	1	none	box 载荷须为字面量常量	zor: runtime error	expression composite payload
+N-299	tests/stdout/cases/N-299.zor	1	none	box 载荷非整型字面量	zor: runtime error	scalar negative literal
+N-300	tests/stdout/cases/N-300.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-301	tests/stdout/cases/N-301.zor	1	none	let 类型标注	zor: runtime error	Box field
+N-302	tests/stdout/cases/N-302.zor	1	none	let 类型标注	zor: runtime error	Box array
+N-303	tests/stdout/cases/N-303.zor	1	none	let 类型标注	zor: runtime error	Box<enum>
+N-304	tests/stdout/cases/N-304.zor	1	none	let 类型标注	zor: runtime error	enum field
+N-305	tests/stdout/cases/N-305.zor	1	none	let 类型标注	zor: runtime error	enum array element
+N-306	tests/stdout/cases/N-306.zor	1	none	let 类型标注	zor: runtime error	tuple payload
+N-307	tests/stdout/cases/N-307.zor	1	none	let 类型标注	zor: runtime error	unit payload
+N-308	tests/stdout/cases/N-308.zor	1	none	let 类型标注	zor: runtime error	Box<bool> scalar
+N-309	tests/stdout/cases/N-309.zor	1	none	E1201	zor: runtime error	Box<byte> scalar
+N-310	tests/stdout/cases/N-310.zor	1	none	let 类型标注	zor: runtime error	Box<unit> scalar
+N-311	tests/stdout/cases/N-311.zor	1	none	E1201	zor: runtime error	byte array
+N-312	tests/stdout/cases/N-312.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated float
+N-313	tests/stdout/cases/N-313.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated struct
+N-314	tests/stdout/cases/N-314.zor	1	none	E1201	zor: runtime error	cross-width float
+N-315	tests/stdout/cases/N-315.zor	1	none	E1201	zor: runtime error	float into integer Box
+N-316	tests/stdout/cases/N-316.zor	1	none	E1201	zor: runtime error	named member out of range
+N-317	tests/stdout/cases/N-317.zor	1	none	E1201	zor: runtime error	unary minus special
+N-318	tests/stdout/cases/N-318.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated special
+N-319	tests/stdout/cases/N-319.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated array
+N-320	tests/stdout/cases/N-320.zor	1	none	E1202	zor: runtime error	integer member into float struct field

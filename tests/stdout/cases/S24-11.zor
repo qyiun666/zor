@@ -1,0 +1,1 @@
+fn main() { let b: Box<i16> = box f64::MIN_EXP; println(*b); }

@@ -1,0 +1,2 @@
+struct S { a: i64 }
+fn main() { let b: Box<S> = box S { a: 1 + 2 }; println(*b); }

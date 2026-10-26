@@ -1,0 +1,2 @@
+struct S { a: [i64; 2], b: bool }
+fn main() { let b: Box<S> = box S { a: [1, 2], b: true }; println(*b); }
