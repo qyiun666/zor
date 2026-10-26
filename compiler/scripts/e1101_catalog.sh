@@ -11,7 +11,7 @@ for f in compiler/src/lexer.rs compiler/src/parser.rs compiler/src/check.rs; do
     total=$((total + n))
 done
 printf 'total\t%s\n' "$total"
-if [ "$total" -ne 29 ]; then
-    echo "E1101 发点数漂移：期望 29，实测 $total（L2c 冻结：不扩面）" >&2
+if [ "$total" -ne 30 ]; then
+    echo "E1101 发点数漂移：期望 30，实测 $total（L2r 后编目＝30：lexer 3／parser 20／check 7）" >&2
     exit 1
 fi
