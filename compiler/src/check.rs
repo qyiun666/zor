@@ -651,7 +651,7 @@ impl<'a> Ck<'a> {
                                 *l,
                                 *c,
                                 format!(
-                                    "一元 '-' 不接受特殊值 '{}'（含绑定后读取；仅直接打印）",
+                                    "一元 '-' 不接受特殊值 '{}'（含绑定后读取）",
                                     t.display()
                                 ),
                             );
@@ -1154,6 +1154,8 @@ fn elem_ref_of(x: &Ty) -> Option<Ty> {
 fn compatible(expect: &Ty, got: &Ty) -> bool {
     if expect == got || expect == &Ty::Bad || got == &Ty::Bad { return true; }
     match (expect, got) {
+        // L2u D2：Box 载荷已返回 Bad（必然伴随既有诊断）时，不再派生外层 Box 不匹配。
+        (Ty::BoxTy(_), Ty::BoxTy(inner)) if matches!(inner.as_ref(), Ty::Bad) => true,
         // 字面量默认已解析：其余必须精确匹配（禁隐式转换）
         (Ty::Arr(a, n1), Ty::Arr(b, n2)) => a == b && (n1 == n2 || *n1 == 0),
         _ => false,
