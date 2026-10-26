@@ -16,8 +16,8 @@
 #   显式 FAIL 优先；任一段 FAIL → 脚本 rc=1。
 #
 # 判据：
-#   - 静态资产：462 runtime（65+6+9+9+19+18+49+24+27+32+28+24+40+40+40+32）＋318 negative（12+11+14+28+27+23+23+16+16+15+14+22+16+18+28+25+10）＋17 CLI＝797；new-cases 120（锁定）；
-#     L2u 后活跃 462／296／17＝775（L2u P=0／Q=10／Ret=0，旧 16 条与 TSV 字节零改；静态 l2p-negative 仍 22 行）；
+#   - 静态资产：486 runtime（65+6+9+9+19+18+49+24+27+32+28+24+40+40+40+32+24）＋337 negative（12+11+14+28+27+23+23+16+16+15+14+22+16+18+28+25+10+19）＋17 CLI＝840；new-cases 120（锁定）；
+#     L2v 后活跃 486／312／17＝815（L2v P=24／Q=19／Ret=3，旧 17 条与 TSV 字节零改；静态 l2p-negative 仍 22 行）；
 #     L2g 活跃负控排除 N-21～N-25（退休清单；l2f 资产零改、静态仍校验 20 行）；L2h 新增 S11-01～09／N-50～81（N-81 仅执行面退休）；
 #     L2i 新增 S12-01～19／N-82～112（N-94 仅执行面退休）；L2j 新增 S13-01～18／N-113～142；schema／路径／重复／expected 缺件（Stage-1 阶段新增 expected 缺件为预期）。
 #     L2k 新增 S14-01～31／S15-01～18／N-143～165；Ret=12（N-26/27/31/32/93/95/117～120/125/126）仅执行面退休；schema／路径／重复／expected 缺件（Stage-1 阶段新增 expected 缺件为预期）。
@@ -34,6 +34,8 @@
 #     L2t 新增 S25-01～32／N-321～345（P=32／Q=25）；Ret=6（N-146／203／231／254／287／303 仅执行面退休，各代资产字节零改）；
 #     Stage-3 接入 L2t TSV 后活跃 462／286／17＝765（全量口径 462／286／765／769／884）。
 #     L2u 新增 N-346～355（Q=10，P=0，Ret=0）；Stage-3 接入 L2u 负控后活跃 462／296／17＝775（全量口径 462／296／775／779／894）。
+#     L2v 新增 S26-01～24／N-356～374（P=24／Q=19，Ret=3：N-290／N-321／N-323 仅执行面退休）；
+#     Stage-3 接入 L2v TSV 后活跃 486／312／17＝815（全量口径 486／312／815／819／937）。
 #   - 旧资产快照：legacy-snapshot.sha256 逐文件 sha256；l2c-baseline.sha256 锁 68 条未变用例；
 #     旧五值／runtime-codes／manifest 计数复核。
 #   - runtime：两轮构建＋运行；stdout 逐字节 cmp；run 模式 stderr 0 B；terminate 模式 rc=101 且只判 stdout。
@@ -79,6 +81,8 @@ L2S_NEGATIVE_TSV="$STDOUT_DIR/l2s-negative.tsv"
 L2T_RUNTIME_TSV="$STDOUT_DIR/l2t-cases.tsv"
 L2T_NEGATIVE_TSV="$STDOUT_DIR/l2t-negative.tsv"
 L2U_NEGATIVE_TSV="$STDOUT_DIR/l2u-negative.tsv"
+L2V_RUNTIME_TSV="$STDOUT_DIR/l2v-cases.tsv"
+L2V_NEGATIVE_TSV="$STDOUT_DIR/l2v-negative.tsv"
 CLI_TSV="$STDOUT_DIR/cli-cases.tsv"
 NEW_TSV="$STDOUT_DIR/new-cases.tsv"
 SNAPSHOT="$STDOUT_DIR/legacy-snapshot.sha256"
@@ -106,7 +110,8 @@ EXPECT_RUNTIME_L2Q=40
 EXPECT_RUNTIME_L2R=40
 EXPECT_RUNTIME_L2S=40
 EXPECT_RUNTIME_L2T=32
-EXPECT_RUNTIME=462
+EXPECT_RUNTIME_L2V=24
+EXPECT_RUNTIME=486
 EXPECT_NEGATIVE_LEGACY=12
 EXPECT_NEGATIVE_L2F=20
 EXPECT_NEGATIVE_L2F_ACTIVE=11
@@ -139,26 +144,29 @@ EXPECT_NEGATIVE_L2Q=16
 # L2q 无退休：16 条全部活跃。
 EXPECT_NEGATIVE_L2Q_ACTIVE=16
 EXPECT_NEGATIVE_L2R=18
-# L2r 无退休；L2t 再退 N-287（18−1=17）。
-EXPECT_NEGATIVE_L2R_ACTIVE=17
+# L2t 退 N-287；L2v 再退 N-290（18−2=16）。
+EXPECT_NEGATIVE_L2R_ACTIVE=16
 EXPECT_NEGATIVE_L2S=28
 # L2s Ret=0；L2t 再退 N-303（28−1=27）。
 EXPECT_NEGATIVE_L2S_ACTIVE=27
 EXPECT_NEGATIVE_L2T=25
-# L2t 无额外退休：25 条全部活跃（Ret=6 已在各代扣除）。
-EXPECT_NEGATIVE_L2T_ACTIVE=25
+# L2v 退 N-321／N-323（25−2=23；L2t Ret=6 已在各代扣除）。
+EXPECT_NEGATIVE_L2T_ACTIVE=23
 EXPECT_NEGATIVE_L2U=10
 # L2u P=0／Q=10／Ret=0：10 条全部活跃。
 EXPECT_NEGATIVE_L2U_ACTIVE=10
-EXPECT_NEGATIVE=296
+EXPECT_NEGATIVE_L2V=19
+# L2v P=24／Q=19／Ret=3：19 条全部活跃。
+EXPECT_NEGATIVE_L2V_ACTIVE=19
+EXPECT_NEGATIVE=312
 EXPECT_CLI=17
 EXPECT_NEW_CASES=120
-EXPECT_TOTAL=775
+EXPECT_TOTAL=815
 # 退休清单：仅退出活跃负控执行；源文件、l2f/l2h/l2i/l2j/l2k/l2l/l2m/l2n/l2o-negative.tsv 与各代基线零改。
 # L2q v1.2 Ret=9：N-221／222／223（L2o）＋N-237～242（L2p）转为整型常量正例，仅在执行面退休。
 # L2r Ret=7：N-96（L2i）／N-172／N-173（L2l）／N-195（L2m）／N-211（L2n）／N-230（L2o）／N-246（L2p）转为限定变体正例，仅在执行面退休。
 # L2t Ret=6：N-146（L2k）／N-203（L2m）／N-231（L2o）／N-254（L2p）／N-287（L2r）／N-303（L2s）转为 Box<enum> 常量正例，仅在执行面退休。
-RETIRED_NEGATIVE_RE='^(N-2[1-5]|N-26|N-27|N-31|N-32|N-81|N-93|N-94|N-95|N-11[7-9]|N-120|N-125|N-126|N-183|N-184|N-200|N-72|N-73|N-78|N-110|N-140|N-178|N-179|N-198|N-212|N-220|N-233|N-235|N-22[1-3]|N-23[7-9]|N-24[0-2]|N-96|N-17[23]|N-195|N-211|N-230|N-246|N-146|N-203|N-231|N-254|N-287|N-303)$'
+RETIRED_NEGATIVE_RE='^(N-2[1-5]|N-26|N-27|N-31|N-32|N-81|N-93|N-94|N-95|N-11[7-9]|N-120|N-125|N-126|N-183|N-184|N-200|N-72|N-73|N-78|N-110|N-140|N-178|N-179|N-198|N-212|N-220|N-233|N-235|N-22[1-3]|N-23[7-9]|N-24[0-2]|N-96|N-17[23]|N-195|N-211|N-230|N-246|N-146|N-203|N-231|N-254|N-287|N-303|N-290|N-321|N-323)$'
 RUNTIME_ALL=""
 NEGATIVE_ALL=""
 
@@ -210,27 +218,31 @@ if [ "$EXPECT_NEGATIVE_L2Q" -ne "$EXPECT_NEGATIVE_L2Q_ACTIVE" ]; then
   echo "[stdout-contract] L2q 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2Q != $EXPECT_NEGATIVE_L2Q_ACTIVE（L2q 无退休）" >&2
   exit 2
 fi
-if [ $((EXPECT_NEGATIVE_L2R - 1)) -ne "$EXPECT_NEGATIVE_L2R_ACTIVE" ]; then
-  echo "[stdout-contract] L2r 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2R-1 != $EXPECT_NEGATIVE_L2R_ACTIVE（L2t N-287 退休）" >&2
+if [ $((EXPECT_NEGATIVE_L2R - 2)) -ne "$EXPECT_NEGATIVE_L2R_ACTIVE" ]; then
+  echo "[stdout-contract] L2r 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2R-2 != $EXPECT_NEGATIVE_L2R_ACTIVE（L2t N-287、L2v N-290 退休）" >&2
   exit 2
 fi
 if [ $((EXPECT_NEGATIVE_L2S - 1)) -ne "$EXPECT_NEGATIVE_L2S_ACTIVE" ]; then
   echo "[stdout-contract] L2s 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2S-1 != $EXPECT_NEGATIVE_L2S_ACTIVE（L2t N-303 退休）" >&2
   exit 2
 fi
-if [ "$EXPECT_NEGATIVE_L2T" -ne "$EXPECT_NEGATIVE_L2T_ACTIVE" ]; then
-  echo "[stdout-contract] L2t 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2T != $EXPECT_NEGATIVE_L2T_ACTIVE（L2t 无额外退休）" >&2
+if [ $((EXPECT_NEGATIVE_L2T - 2)) -ne "$EXPECT_NEGATIVE_L2T_ACTIVE" ]; then
+  echo "[stdout-contract] L2t 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2T-2 != $EXPECT_NEGATIVE_L2T_ACTIVE（L2v N-321／N-323 退休）" >&2
   exit 2
 fi
 if [ "$EXPECT_NEGATIVE_L2U" -ne "$EXPECT_NEGATIVE_L2U_ACTIVE" ]; then
   echo "[stdout-contract] L2u 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2U != $EXPECT_NEGATIVE_L2U_ACTIVE（L2u Ret=0）" >&2
   exit 2
 fi
-if [ $((EXPECT_RUNTIME_LEGACY + EXPECT_RUNTIME_L2F + EXPECT_RUNTIME_L2G + EXPECT_RUNTIME_L2H + EXPECT_RUNTIME_L2I + EXPECT_RUNTIME_L2J + EXPECT_RUNTIME_L2K + EXPECT_RUNTIME_L2L + EXPECT_RUNTIME_L2M + EXPECT_RUNTIME_L2N + EXPECT_RUNTIME_L2O + EXPECT_RUNTIME_L2P + EXPECT_RUNTIME_L2Q + EXPECT_RUNTIME_L2R + EXPECT_RUNTIME_L2S + EXPECT_RUNTIME_L2T)) -ne "$EXPECT_RUNTIME" ]; then
+if [ "$EXPECT_NEGATIVE_L2V" -ne "$EXPECT_NEGATIVE_L2V_ACTIVE" ]; then
+  echo "[stdout-contract] L2v 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2V != $EXPECT_NEGATIVE_L2V_ACTIVE（L2v Ret=3 已在各代扣除）" >&2
+  exit 2
+fi
+if [ $((EXPECT_RUNTIME_LEGACY + EXPECT_RUNTIME_L2F + EXPECT_RUNTIME_L2G + EXPECT_RUNTIME_L2H + EXPECT_RUNTIME_L2I + EXPECT_RUNTIME_L2J + EXPECT_RUNTIME_L2K + EXPECT_RUNTIME_L2L + EXPECT_RUNTIME_L2M + EXPECT_RUNTIME_L2N + EXPECT_RUNTIME_L2O + EXPECT_RUNTIME_L2P + EXPECT_RUNTIME_L2Q + EXPECT_RUNTIME_L2R + EXPECT_RUNTIME_L2S + EXPECT_RUNTIME_L2T + EXPECT_RUNTIME_L2V)) -ne "$EXPECT_RUNTIME" ]; then
   echo "[stdout-contract] 分组合并 runtime 常量不自洽（期望 $EXPECT_RUNTIME）" >&2
   exit 2
 fi
-if [ $((EXPECT_NEGATIVE_LEGACY + EXPECT_NEGATIVE_L2F_ACTIVE + EXPECT_NEGATIVE_L2G + EXPECT_NEGATIVE_L2H_ACTIVE + EXPECT_NEGATIVE_L2I_ACTIVE + EXPECT_NEGATIVE_L2J_ACTIVE + EXPECT_NEGATIVE_L2K_ACTIVE + EXPECT_NEGATIVE_L2L_ACTIVE + EXPECT_NEGATIVE_L2M_ACTIVE + EXPECT_NEGATIVE_L2N_ACTIVE + EXPECT_NEGATIVE_L2O_ACTIVE + EXPECT_NEGATIVE_L2P_ACTIVE + EXPECT_NEGATIVE_L2Q_ACTIVE + EXPECT_NEGATIVE_L2R_ACTIVE + EXPECT_NEGATIVE_L2S_ACTIVE + EXPECT_NEGATIVE_L2T_ACTIVE + EXPECT_NEGATIVE_L2U_ACTIVE)) -ne "$EXPECT_NEGATIVE" ]; then
+if [ $((EXPECT_NEGATIVE_LEGACY + EXPECT_NEGATIVE_L2F_ACTIVE + EXPECT_NEGATIVE_L2G + EXPECT_NEGATIVE_L2H_ACTIVE + EXPECT_NEGATIVE_L2I_ACTIVE + EXPECT_NEGATIVE_L2J_ACTIVE + EXPECT_NEGATIVE_L2K_ACTIVE + EXPECT_NEGATIVE_L2L_ACTIVE + EXPECT_NEGATIVE_L2M_ACTIVE + EXPECT_NEGATIVE_L2N_ACTIVE + EXPECT_NEGATIVE_L2O_ACTIVE + EXPECT_NEGATIVE_L2P_ACTIVE + EXPECT_NEGATIVE_L2Q_ACTIVE + EXPECT_NEGATIVE_L2R_ACTIVE + EXPECT_NEGATIVE_L2S_ACTIVE + EXPECT_NEGATIVE_L2T_ACTIVE + EXPECT_NEGATIVE_L2U_ACTIVE + EXPECT_NEGATIVE_L2V_ACTIVE)) -ne "$EXPECT_NEGATIVE" ]; then
   echo "[stdout-contract] 分组合并 negative 常量不自洽（期望 $EXPECT_NEGATIVE）" >&2
   exit 2
 fi
@@ -283,7 +295,7 @@ cli_fail_msg() { cli_fail+=("$1"); cli_n=$((cli_n+1)); }
 # ---------- 静态校验 ----------
 validate_assets() {
   local bad=0
-  for f in "$RUNTIME_TSV" "$NEGATIVE_TSV" "$L2F_RUNTIME_TSV" "$L2F_NEGATIVE_TSV" "$L2G_RUNTIME_TSV" "$L2G_NEGATIVE_TSV" "$L2H_RUNTIME_TSV" "$L2H_NEGATIVE_TSV" "$L2I_RUNTIME_TSV" "$L2I_NEGATIVE_TSV" "$L2J_RUNTIME_TSV" "$L2J_NEGATIVE_TSV" "$L2K_RUNTIME_TSV" "$L2K_NEGATIVE_TSV" "$L2L_RUNTIME_TSV" "$L2L_NEGATIVE_TSV" "$L2M_RUNTIME_TSV" "$L2M_NEGATIVE_TSV" "$L2N_RUNTIME_TSV" "$L2N_NEGATIVE_TSV" "$L2O_RUNTIME_TSV" "$L2O_NEGATIVE_TSV" "$L2P_RUNTIME_TSV" "$L2P_NEGATIVE_TSV" "$L2Q_RUNTIME_TSV" "$L2Q_NEGATIVE_TSV" "$L2R_RUNTIME_TSV" "$L2R_NEGATIVE_TSV" "$L2S_RUNTIME_TSV" "$L2S_NEGATIVE_TSV" "$L2T_RUNTIME_TSV" "$L2T_NEGATIVE_TSV" "$L2U_NEGATIVE_TSV" "$CLI_TSV" "$NEW_TSV" "$SNAPSHOT" "$L2C_BASELINE" "$NDJSON_CHECK"; do
+  for f in "$RUNTIME_TSV" "$NEGATIVE_TSV" "$L2F_RUNTIME_TSV" "$L2F_NEGATIVE_TSV" "$L2G_RUNTIME_TSV" "$L2G_NEGATIVE_TSV" "$L2H_RUNTIME_TSV" "$L2H_NEGATIVE_TSV" "$L2I_RUNTIME_TSV" "$L2I_NEGATIVE_TSV" "$L2J_RUNTIME_TSV" "$L2J_NEGATIVE_TSV" "$L2K_RUNTIME_TSV" "$L2K_NEGATIVE_TSV" "$L2L_RUNTIME_TSV" "$L2L_NEGATIVE_TSV" "$L2M_RUNTIME_TSV" "$L2M_NEGATIVE_TSV" "$L2N_RUNTIME_TSV" "$L2N_NEGATIVE_TSV" "$L2O_RUNTIME_TSV" "$L2O_NEGATIVE_TSV" "$L2P_RUNTIME_TSV" "$L2P_NEGATIVE_TSV" "$L2Q_RUNTIME_TSV" "$L2Q_NEGATIVE_TSV" "$L2R_RUNTIME_TSV" "$L2R_NEGATIVE_TSV" "$L2S_RUNTIME_TSV" "$L2S_NEGATIVE_TSV" "$L2T_RUNTIME_TSV" "$L2T_NEGATIVE_TSV" "$L2U_NEGATIVE_TSV" "$L2V_RUNTIME_TSV" "$L2V_NEGATIVE_TSV" "$CLI_TSV" "$NEW_TSV" "$SNAPSHOT" "$L2C_BASELINE" "$NDJSON_CHECK"; do
     if [ ! -f "$f" ]; then
       so_fail_msg "缺件:${f#$REPO_ROOT/}"
       bad=1
@@ -358,6 +370,10 @@ validate_assets() {
   [ "$hdr" = $'case_id\tsource_path\texpect_rc\texpect_artifact\texpect_stderr_contains\texpect_stderr_not_contains\tnotes' ] || { so_fail_msg "l2t-negative.tsv 表头"; bad=1; }
   hdr="$(head -n1 "$L2U_NEGATIVE_TSV")"
   [ "$hdr" = $'case_id\tsource_path\texpect_rc\texpect_artifact\texpect_stderr_contains\texpect_stderr_not_contains\tnotes' ] || { so_fail_msg "l2u-negative.tsv 表头"; bad=1; }
+  hdr="$(head -n1 "$L2V_RUNTIME_TSV")"
+  [ "$hdr" = $'case_id\tsource_path\tmode\texpect_rc\texpect_stdout\tflags\tnotes' ] || { so_fail_msg "l2v-cases.tsv 表头"; bad=1; }
+  hdr="$(head -n1 "$L2V_NEGATIVE_TSV")"
+  [ "$hdr" = $'case_id\tsource_path\texpect_rc\texpect_artifact\texpect_stderr_contains\texpect_stderr_not_contains\tnotes' ] || { so_fail_msg "l2v-negative.tsv 表头"; bad=1; }
   hdr="$(head -n1 "$CLI_TSV")"
   [ "$hdr" = $'case_id\tmode\targs\texpect_rc\tnotes' ] || { so_fail_msg "cli-cases.tsv 表头"; bad=1; }
   hdr="$(head -n1 "$NEW_TSV")"
@@ -396,6 +412,8 @@ validate_assets() {
   [ "$rows" = "$EXPECT_RUNTIME_L2S" ] || { so_fail_msg "L2s runtime 行数=$rows 期望 $EXPECT_RUNTIME_L2S"; bad=1; }
   rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$L2T_RUNTIME_TSV")"
   [ "$rows" = "$EXPECT_RUNTIME_L2T" ] || { so_fail_msg "L2t runtime 行数=$rows 期望 $EXPECT_RUNTIME_L2T"; bad=1; }
+  rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$L2V_RUNTIME_TSV")"
+  [ "$rows" = "$EXPECT_RUNTIME_L2V" ] || { so_fail_msg "L2v runtime 行数=$rows 期望 $EXPECT_RUNTIME_L2V"; bad=1; }
   rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$NEGATIVE_TSV")"
   [ "$rows" = "$EXPECT_NEGATIVE_LEGACY" ] || { so_fail_msg "legacy negative 行数=$rows 期望 $EXPECT_NEGATIVE_LEGACY"; bad=1; }
   rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$L2F_NEGATIVE_TSV")"
@@ -430,6 +448,8 @@ validate_assets() {
   [ "$rows" = "$EXPECT_NEGATIVE_L2T" ] || { so_fail_msg "L2t negative 行数=$rows 期望 $EXPECT_NEGATIVE_L2T"; bad=1; }
   rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$L2U_NEGATIVE_TSV")"
   [ "$rows" = "$EXPECT_NEGATIVE_L2U" ] || { so_fail_msg "L2u negative 行数=$rows 期望 $EXPECT_NEGATIVE_L2U"; bad=1; }
+  rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$L2V_NEGATIVE_TSV")"
+  [ "$rows" = "$EXPECT_NEGATIVE_L2V" ] || { so_fail_msg "L2v negative 行数=$rows 期望 $EXPECT_NEGATIVE_L2V"; bad=1; }
   rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$CLI_TSV")"
   [ "$rows" = "$EXPECT_CLI" ] || { so_fail_msg "CLI 行数=$rows 期望 $EXPECT_CLI"; bad=1; }
   rows="$(awk 'NR>1 && NF {n++} END{print n+0}' "$NEW_TSV")"
@@ -676,6 +696,21 @@ validate_assets() {
     case "$flags" in ""|-|-O0) ;; *) so_fail_msg "$cid flags 非法:$flags"; bad=1 ;; esac
   done < "$L2T_RUNTIME_TSV"
 
+  while IFS=$'\t' read -r cid src mode erc exp flags note; do
+    [ "$cid" = "case_id" ] && continue
+    [ -n "$cid" ] || continue
+    case "$seen" in *" $cid "*) so_fail_msg "重复 ID:$cid"; bad=1 ;; esac
+    seen="$seen$cid "
+    case "$cid" in S26-0[1-9]|S26-1[0-9]|S26-2[0-4]) ;; *) so_fail_msg "非法 L2v runtime ID:$cid"; bad=1 ;; esac
+    case "$src" in tests/stdout/cases/*) ;; *) so_fail_msg "$cid 源路径不在 tests/stdout/cases"; bad=1 ;; esac
+    [ -f "$REPO_ROOT/$src" ] || { so_fail_msg "$cid 源缺件:$src"; bad=1; }
+    case "$exp" in expected/*) ;; *) so_fail_msg "$cid expected 路径非法"; bad=1 ;; esac
+    [ -f "$STDOUT_DIR/$exp" ] || { so_fail_msg "$cid expected 缺件:$exp（Stage-2 捕获前预期）"; bad=1; }
+    case "$mode" in run|stdout-terminate) ;; *) so_fail_msg "$cid mode 非法:$mode"; bad=1 ;; esac
+    case "$erc" in 0|101) ;; *) so_fail_msg "$cid expect_rc 非法:$erc"; bad=1 ;; esac
+    case "$flags" in ""|-|-O0) ;; *) so_fail_msg "$cid flags 非法:$flags"; bad=1 ;; esac
+  done < "$L2V_RUNTIME_TSV"
+
   local contains notc artifact
   while IFS=$'\t' read -r cid src erc artifact contains notc note; do
     [ "$cid" = "case_id" ] && continue
@@ -897,8 +932,21 @@ validate_assets() {
     case "$notc" in "zor: runtime error"|"仅直接打印"|E1201|"Box<?>") ;; *) so_fail_msg "$cid 禁词不在 L2u 允许集合:$notc"; bad=1 ;; esac
   done < "$L2U_NEGATIVE_TSV"
 
+  while IFS=$'\t' read -r cid src erc artifact contains notc note; do
+    [ "$cid" = "case_id" ] && continue
+    [ -n "$cid" ] || continue
+    case "$seen" in *" $cid "*) so_fail_msg "重复 ID:$cid"; bad=1 ;; esac
+    seen="$seen$cid "
+    case "$cid" in N-35[6-9]|N-36[0-9]|N-37[0-4]) ;; *) so_fail_msg "非法 L2v negative ID:$cid"; bad=1 ;; esac
+    [ -f "$REPO_ROOT/$src" ] || { so_fail_msg "$cid 源缺件:$src"; bad=1; }
+    [ "$erc" = "1" ] || { so_fail_msg "$cid expect_rc 非 1"; bad=1; }
+    [ "$artifact" = "none" ] || { so_fail_msg "$cid expect_artifact 非 none"; bad=1; }
+    case "$contains" in E1101|E1201|E1202|E1601|E2101|E2301|"zorcc: codegen:"|"let 类型标注"|"box 载荷非整型字面量"|"box 载荷须为字面量常量"|"println 实参不可打印"|"解引用源不是 Box 绑定"|"赋值语句") ;; *) so_fail_msg "$cid 判词不在固定集合:$contains"; bad=1 ;; esac
+    [ "$notc" = "zor: runtime error" ] || { so_fail_msg "$cid 禁词非固定值"; bad=1; }
+  done < "$L2V_NEGATIVE_TSV"
+
   local dups
-  dups="$(awk -F'\t' 'FNR>1 && NF {print $1}' "$RUNTIME_TSV" "$L2F_RUNTIME_TSV" "$L2G_RUNTIME_TSV" "$L2H_RUNTIME_TSV" "$L2I_RUNTIME_TSV" "$L2J_RUNTIME_TSV" "$L2K_RUNTIME_TSV" "$L2L_RUNTIME_TSV" "$L2M_RUNTIME_TSV" "$L2N_RUNTIME_TSV" "$L2O_RUNTIME_TSV" "$L2P_RUNTIME_TSV" "$L2Q_RUNTIME_TSV" "$L2R_RUNTIME_TSV" "$L2S_RUNTIME_TSV" "$L2T_RUNTIME_TSV" "$NEGATIVE_TSV" "$L2F_NEGATIVE_TSV" "$L2G_NEGATIVE_TSV" "$L2H_NEGATIVE_TSV" "$L2I_NEGATIVE_TSV" "$L2J_NEGATIVE_TSV" "$L2K_NEGATIVE_TSV" "$L2L_NEGATIVE_TSV" "$L2M_NEGATIVE_TSV" "$L2N_NEGATIVE_TSV" "$L2O_NEGATIVE_TSV" "$L2P_NEGATIVE_TSV" "$L2Q_NEGATIVE_TSV" "$L2R_NEGATIVE_TSV" "$L2S_NEGATIVE_TSV" "$L2T_NEGATIVE_TSV" "$L2U_NEGATIVE_TSV" "$CLI_TSV" | sort | uniq -d)"
+  dups="$(awk -F'\t' 'FNR>1 && NF {print $1}' "$RUNTIME_TSV" "$L2F_RUNTIME_TSV" "$L2G_RUNTIME_TSV" "$L2H_RUNTIME_TSV" "$L2I_RUNTIME_TSV" "$L2J_RUNTIME_TSV" "$L2K_RUNTIME_TSV" "$L2L_RUNTIME_TSV" "$L2M_RUNTIME_TSV" "$L2N_RUNTIME_TSV" "$L2O_RUNTIME_TSV" "$L2P_RUNTIME_TSV" "$L2Q_RUNTIME_TSV" "$L2R_RUNTIME_TSV" "$L2S_RUNTIME_TSV" "$L2T_RUNTIME_TSV" "$L2V_RUNTIME_TSV" "$NEGATIVE_TSV" "$L2F_NEGATIVE_TSV" "$L2G_NEGATIVE_TSV" "$L2H_NEGATIVE_TSV" "$L2I_NEGATIVE_TSV" "$L2J_NEGATIVE_TSV" "$L2K_NEGATIVE_TSV" "$L2L_NEGATIVE_TSV" "$L2M_NEGATIVE_TSV" "$L2N_NEGATIVE_TSV" "$L2O_NEGATIVE_TSV" "$L2P_NEGATIVE_TSV" "$L2Q_NEGATIVE_TSV" "$L2R_NEGATIVE_TSV" "$L2S_NEGATIVE_TSV" "$L2T_NEGATIVE_TSV" "$L2U_NEGATIVE_TSV" "$L2V_NEGATIVE_TSV" "$CLI_TSV" | sort | uniq -d)"
   [ -z "$dups" ] || { so_fail_msg "跨 TSV 重复 ID:$(printf '%s' "$dups" | tr '\n' ',')"; bad=1; }
 
   while IFS=$'\t' read -r cid mode args erc note; do
@@ -983,9 +1031,9 @@ run_capture() { # run_capture <rcfile> <outfile> <errfile> <timeout> <cmd...>
 build_merged_tsvs() {
   RUNTIME_ALL="$OUT_DIR/runtime-all.tsv"
   NEGATIVE_ALL="$OUT_DIR/negative-all.tsv"
-  { head -n1 "$RUNTIME_TSV"; tail -n +2 "$RUNTIME_TSV"; tail -n +2 "$L2F_RUNTIME_TSV"; tail -n +2 "$L2G_RUNTIME_TSV"; tail -n +2 "$L2H_RUNTIME_TSV"; tail -n +2 "$L2I_RUNTIME_TSV"; tail -n +2 "$L2J_RUNTIME_TSV"; tail -n +2 "$L2K_RUNTIME_TSV"; tail -n +2 "$L2L_RUNTIME_TSV"; tail -n +2 "$L2M_RUNTIME_TSV"; tail -n +2 "$L2N_RUNTIME_TSV"; tail -n +2 "$L2O_RUNTIME_TSV"; tail -n +2 "$L2P_RUNTIME_TSV"; tail -n +2 "$L2Q_RUNTIME_TSV"; tail -n +2 "$L2R_RUNTIME_TSV"; tail -n +2 "$L2S_RUNTIME_TSV"; tail -n +2 "$L2T_RUNTIME_TSV"; } > "$RUNTIME_ALL"
+  { head -n1 "$RUNTIME_TSV"; tail -n +2 "$RUNTIME_TSV"; tail -n +2 "$L2F_RUNTIME_TSV"; tail -n +2 "$L2G_RUNTIME_TSV"; tail -n +2 "$L2H_RUNTIME_TSV"; tail -n +2 "$L2I_RUNTIME_TSV"; tail -n +2 "$L2J_RUNTIME_TSV"; tail -n +2 "$L2K_RUNTIME_TSV"; tail -n +2 "$L2L_RUNTIME_TSV"; tail -n +2 "$L2M_RUNTIME_TSV"; tail -n +2 "$L2N_RUNTIME_TSV"; tail -n +2 "$L2O_RUNTIME_TSV"; tail -n +2 "$L2P_RUNTIME_TSV"; tail -n +2 "$L2Q_RUNTIME_TSV"; tail -n +2 "$L2R_RUNTIME_TSV"; tail -n +2 "$L2S_RUNTIME_TSV"; tail -n +2 "$L2T_RUNTIME_TSV"; tail -n +2 "$L2V_RUNTIME_TSV"; } > "$RUNTIME_ALL"
   # N-21～N-25（L2g）／N-81（L2h）／N-94（L2i）／L2k Ret=12／L2m N-183／L2n N-184／N-200／L2o 九条／L2p N-220／N-233／N-235／L2q Ret=9 仅退出活跃执行；各代 TSV 与源文件零改。
-  { head -n1 "$NEGATIVE_TSV"; tail -n +2 "$NEGATIVE_TSV"; tail -n +2 "$L2F_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2G_NEGATIVE_TSV"; tail -n +2 "$L2H_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2I_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2J_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2K_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2L_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2M_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2N_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2O_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2P_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2Q_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2R_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2S_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2T_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2U_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; } > "$NEGATIVE_ALL"
+  { head -n1 "$NEGATIVE_TSV"; tail -n +2 "$NEGATIVE_TSV"; tail -n +2 "$L2F_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2G_NEGATIVE_TSV"; tail -n +2 "$L2H_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2I_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2J_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2K_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2L_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2M_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2N_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2O_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2P_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2Q_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2R_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2S_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2T_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2U_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; tail -n +2 "$L2V_NEGATIVE_TSV" | awk -F'\t' -v re="$RETIRED_NEGATIVE_RE" '$1 !~ re'; } > "$NEGATIVE_ALL"
   local rt neg
   rt="$(awk 'NR>1 && NF {n++} END{print n+0}' "$RUNTIME_ALL")"
   neg="$(awk 'NR>1 && NF {n++} END{print n+0}' "$NEGATIVE_ALL")"
@@ -1052,12 +1100,12 @@ run_negative() {
     [ -n "$cid" ] || continue
     neg_ran=$((neg_ran+1))
     # L2u ④b-A 单 ID 执行面覆盖（产品 v1.1 9578da6d…70c0＋Q 计数补件 2e4c4b19…63c4）：
-    # N-344 D2/D3 后仅 E1101；N-315 D2 后仅 E1202；N-290 D4 仅新 token。
-    # 仅按 case_id 精确匹配这 3 条；TSV 与旧 16 条 baseline 字节零改。
+    # N-344 D2/D3 后仅 E1101；N-315 D2 后仅 E1202。
+    # 仅按 case_id 精确匹配这 2 条；TSV 与旧 17 条 baseline 字节零改。
+    # N-290 自 L2v 起由 RETIRED_NEGATIVE_RE 退休，覆盖已移除，退休优先。
     case "$cid" in
       N-344) contains="E1101" ;;
       N-315) contains="E1202" ;;
-      N-290) contains="box 载荷须为字面量常量" ;;
     esac
     local ok=1
     for round in 1 2; do
