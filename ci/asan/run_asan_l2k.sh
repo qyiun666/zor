@@ -9,7 +9,8 @@
 #       与 ci/asan/run_asan.sh，不新增 job／workflow YAML 结构／ruleset。
 #
 # 判据（任一不满足＝FAIL，strict 不 SKIP）：
-#   1. manifest 恰 9 行；七列 schema；无 CR／空行；case_id／source_path 唯一；
+#   1. 默认合并 manifest 恰 9 行（l2k 原 6 + l2t 新增 3，l2k 文件字节零改）；
+#      七列 schema；无 CR／空行；case_id／source_path 唯一；
 #      mode 仅 build-run；expect_rc=0；source 为 tests/ 下普通相对文件（非 symlink）。
 #   2. expect_stdout_sha256 必须是 64hex；空值判 FAIL reason=expected_pending
 #      （Stage-1 尚未捕获 expected，fail-closed；禁止占位哈希／静默通过）。

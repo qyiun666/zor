@@ -22,7 +22,7 @@
 # L2q：stdout 判词 350／228／17；stdout-contract 内加第十三基线 l2q（701／1062），Ret=9（N-221／222／223＋N-237～242 仅执行面）；ASAN K=0；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 # L2r：stdout 判词 390／239／17；stdout-contract 内加第十四基线 l2r（759／1163），Ret=7（N-96／172／173／195／211／230／246 仅执行面）；ASAN K=0；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 # L2s：stdout 判词 430／267／17；stdout-contract 内加第十五基线 l2s（827／1274），Ret=0（定义切片，无编译器行为变化）；ASAN K=0；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
-# L2t：stdout 判词 462／286／17；stdout-contract 内加第十六基线 l2t（884／1366），Ret=6（N-146／203／231／254／287／303 仅执行面）；ASAN 第二 manifest 6→9（K=3）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
+# L2t：stdout 判词 462／286／17；stdout-contract 内加第十六基线 l2t（884／1367），Ret=6（N-146／203／231／254／287／303 仅执行面）；ASAN 第二 manifest 组 6+3=9（K=3；l2k 原 6 例字节零改）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 set -uo pipefail
 shopt -s nullglob  # S-1：未命中 glob 展开为空数组，杜绝字面 glob 进循环的旁路
 
@@ -685,7 +685,7 @@ stage_asan() { # L2a CI-01：宿主固定 + QA-01 ASAN/LSAN 脚本；fail-closed
   CC_REAL="$cc_real" ZORC_BIN="$ZORC" \
     bash ci/asan/run_asan.sh --strict --zorc "$ZORC" --out "$LOG_DIR/asan" >>"$log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
-    # L2t CI-01：第二 manifest 扩至 K=9（L2t 新增 Box<enum> 3 例）；默认 manifest 48／41／7 与 run_asan.sh 零改。
+    # L2t CI-01：第二 manifest 组 6+3=9（l2k 原 6 例字节零改 + 新 l2t 3 例，K=3）；默认 manifest 48／41／7 与 run_asan.sh 零改。
     local rc_l2k=0
     CC_REAL="$cc_real" ZORC_BIN="$ZORC" \
       bash ci/asan/run_asan_l2k.sh --validate-only >>"$log" 2>&1 || rc_l2k=$?
