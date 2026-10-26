@@ -4,6 +4,40 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.16] - 2026-10-26
+
+内部验证里程碑，非可用语言版本：本版为 L2q「十整型常量」——在 0.3.15 的 `MIN_POSITIVE` 之上，新增 `MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` × f64／f32 共 **10 个整型常量成员**；按 ZOR 既有「整数字面量」语义接入（无标注默认 `i64`、有整型标注时收敛、与同值十进制整数字面量逐字节一致），`MIN_EXP` 的值本身为负（-1021／-125），不是一元负号表达式；同时完成 ④a E1101 支持面枚举与陈旧版本串同步（零行为变更），并把 `l2q-baseline` 接入 `stdout-contract`，形成 `l2e`～`l2q` 十三基线 fail-closed 门禁。R2 按产品 v1.1／v1.2 口径改判：命名整型成员 → 浮点标量 `Box` 载荷与整数字面量同码 **E1201**（N-268 改判），N-115／N-116 红线保持；⑤ `Box<struct>`／`Box<[T;N]>` 内含命名整型成员归后续切片，本版不测试、不宣称。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：10 个成员为编译期整型常量（f64 `1024／-1021／53／15／2`；f32 `128／-125／24／6／2`），可在标量 `println`、绑定（无标注／`i64`／`i32`／`u32`／`i16`／`u8` 等可容纳值的整型标注）、`Box` 标量整型载荷、枚举载荷、struct 字段、数组、元组、多实参与既有嵌套中使用；`println(<成员>)` 与同值字面量逐字节一致；既有整型一元负号／算术对成员同样适用（沿用既有能力，不新增）；浮点算术／比较仍不做。仍 fail-closed：未列名成员（`MIN_10_EXP`／`MAX_10_EXP`／`DIG`／`NEG_NAN` 等）、成员调用、整型成员→浮点绑定／struct／enum 标注 E1202、整型成员→浮点标量 `Box` 载荷 E1201（与整数字面量同码）、负值→无符号或超范围 E1201、浮点成员→整型标注 E1202、`E::V`／`Box<enum>`／含 Box 复合／嵌套 Box／变量载荷／反方向 N-217／218 维持既有拦截；`box -N` 源形态维持既有拦截，S22-22（`Box<i16> ← f64::MIN_EXP`）输出 `-1021`。④a 文案统一为「六特殊值＋八命名有限浮点常量＋十整型成员（共 24 形式）」，清除代码路径 3 处「0.3.7」，保留测试依赖子串「一元 '-' 不接受特殊值」；E1101 发点编目保持 lexer 3／parser 20／check 7＝30。计数：P=**40**、Q=**16**、Ret=**9**（N-221／222／223＋N-237～242，仅执行面；源／TSV／各代 baseline 字节零改、ID 不复用）；Q 码位 E1101×6／E1201×5／E1202×5；R=**350**（310＋40）、G=**228**（221−9＋16）、T=**595**、A=**599**、N=**701**（645＋40＋16）；`l2q-baseline` cases **701**／files **1062**／unique **1062**；旧 12 基线 162／209、188／246、206／275、247／327、297／398、345／466、417／590、461／660、506／734、554／816、599／891、645／963 与 `l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 均零改；`L2O_ACTIVE=11`、`L2P_ACTIVE=16`、`L2Q_ACTIVE=16`。ASAN K=0（无新增堆路径、默认 manifest 48／41／7 零改）；Linux x86_64 为唯一终证，macOS 仅辅助；无安装／打包／性能承诺。
+
+### Added
+
+- **10 个整型常量成员**：`f64::MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` 与 `f32::` 同名五项；按整数字面量语义接入，默认 `i64`、整型标注收敛、与同值字面量逐字节一致；`MIN_EXP` 负值本身成立；标量／绑定／`Box` 标量整型载荷／枚举／struct／数组／元组／多实参／既有嵌套 A 档；既有整型一元负号与算术沿用。
+- **`l2q-baseline` 第十三基线**：`stdout-contract` 在 `l2p` 之后校验 `l2q-baseline`（701／1062／1062），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿；旧 12 基线字节零改。
+
+### Changed
+
+- **计数与资产**：Stage-1 P=40 正例、Q=16 负控；Ret=9 仅执行面（N-221／222／223＋N-237～242）；R 310→350、G 221→228、T 548→595、A 552→599、N 645→701、M 963→1062；`l2q-baseline.tsv` 701 条（702 行含表头）、`.sha256` 1062 行；`L2O_ACTIVE=11`、`L2P_ACTIVE=16`、`L2Q_ACTIVE=16`；Q 码位分布 E1101×6／E1201×5／E1202×5。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.15` 落至 `0.3.16`；`compiler/Cargo.toml:5` description 版本串同步；`Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.16`。
+- **CI**：十三基线并存；无新 job／YAML／ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2q-01：**PASS**——feature head `1425d01`（PR #164）；CI run `40270038300`；`baseline`／`stdout-contract`／`runtime-codes`／`asan-linux`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2q-baseline|cases=701 files=1062 unique=1062 fail=0`；`PASS|stdout-contract|runtime=350 negative=228 fail=0 ran=350/228`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；`PASS|asan-l2k|cases=6 fail=0 ran=6/6`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：十三基线判词全 PASS；ASAN 第二 manifest **6/6**、默认 manifest **48／41／7** 零改；P 40/40（两轮）、六档 `-O*` **240/240**、Q 16/16（N-268=E1201）、9/9 翻转、locale **40/40 SAME**；`cargo test --release --locked` **439 passed／0 failed**（`l2q_core` 12）；E1101 编目 **30**；全 job `SKIP|`／`FAIL|` 0 行。
+- 计数口径：P=**40**／Q=**16**／Ret=**9**／R=**350**／G=**228**／T=**595**／A=**599**／N=**701**／M=**1062**。
+- 证据：产品签署 `shared/ZOR-L2q-Stage2-S22会签-产品-v1.2-signed.md`（72 行／6172 B，sha256 `ae980a46…07cd`）；QA 门禁报告 `shared/ZOR-L2q-门禁报告-质量-v1.2.md`（75 行／4842 B，sha256 `cca87a93…c15f`）；QA 会签输入 `cae547e5…2ce4`；矩阵 `f714213d…03a5`；报告 v2 `44e5435b…9bad`；`l2q-baseline.tsv` `ff4f8018…91c4d`；`l2q-baseline.sha256` `c0f7b96b…3d1f9`；PR #164 **109 files**（QA 99＋核心 7＋CI 4，含 1 处重叠）。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **⑤ Box 复合载荷**：`Box<struct>`／`Box<[T;N]>` 内含命名整型成员归 ⑤，本版不测试、不宣称；L2k 既有字面量载荷能力不变，不为该面新增拦截代码。
+- **未列名成员**：`MIN_10_EXP`／`MAX_10_EXP`／`DIG`／`NEG_NAN` 等维持 E1101；`E::V`／`Box<enum>`／嵌套 Box／变量载荷／反方向 N-217／218 维持 fail-closed，结转后续切片。
+- **既有文案**：`check.rs:654` 一元负号「仅直接打印」括注为历史表述，本版未改，归 ④b／下一片；N-263／264 stderr 双码 E1101＋E1601 为既有行为，不新增 E 码。
+- **版本语境**：0.3.15 及更早节的 fail-closed／结转表述按版本语境保留、不回改；历史节逐字节零改；0.3.16 节使用正确计数「六特殊值＋八命名有限浮点常量＋十整型成员（24 形式）」。
+- **ASAN**：K=0（无新增 ASAN 用例、默认 manifest 48／41／7 零改）不等于「已证无泄漏」。
+- **平台／发布／性能**：Linux x86_64 唯一终证，macOS 仅辅助；零 tag／Release，不构成安装或环境可用性承诺；不出性能数字、不作性能承诺。
+
 ## [0.3.15] - 2026-10-25
 
 内部验证里程碑，非可用语言版本：本版为 L2p「MIN_POSITIVE」——在 0.3.14 的六个命名有限常量之上，新增 `f64::MIN_POSITIVE`／`f32::MIN_POSITIVE`（最小正**正规**有限值，不是最小正次正规数、不是零、不是 `MIN`）；可在既有有限浮点字面量可用的位置使用：标量 `println`、绑定、`Box` 载荷、枚举载荷、复合字段与多实参（A 档）；`println(<常量>)` 与同值有限字面量**逐字节一致**；宽度按类型严格匹配，跨宽沿用既有诊断；其他 `::` 成员（`MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` 等）维持 E1101；`0.3.7` 文案债仅 `MIN_POSITIVE` 消解；六个特殊值集合不放宽；反方向（特殊值／常量位于枚举自身复合载荷内）维持 fail-closed；无算术／比较／条件／运行期浮点库，无堆（无新增堆路径）、不改 drop。并把 `l2p-baseline` 接入 `stdout-contract`，形成 `l2e`～`l2p` 十二基线 fail-closed 门禁。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
