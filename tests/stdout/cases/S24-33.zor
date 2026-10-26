@@ -1,0 +1,3 @@
+struct Inner { x: i64 }
+struct Outer { i: Inner }
+fn main() { let b: Box<Outer> = box Outer { i: Inner { x: 1 } }; println(*b); }
