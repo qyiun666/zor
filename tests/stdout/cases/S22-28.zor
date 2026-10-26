@@ -1,0 +1,2 @@
+struct S { f: i32 }
+fn main() { println(S { f: f32::DIGITS }); }

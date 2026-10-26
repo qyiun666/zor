@@ -1,0 +1,1 @@
+fn main() { let t: (i64, i64) = (f64::MAX_EXP, f64::MIN_EXP); println(t); }

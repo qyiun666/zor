@@ -35,9 +35,11 @@ impl Ty {
     }
 }
 
-/// 字面量在推断前以 (Lit kind, span) 表达，check 时按期望收敛
+/// 字面量在推断前以 (Lit kind, span) 表达，check 时按期望收敛。
+/// L2q：`IntConst` 为具名整型常量成员（有符号、编译期常量），语义等同整数字面量；
+/// 与 `Int(u128)` 分列以承载 `MIN_EXP` 的负值，且不改变既有无符号字面量口径。
 #[derive(Clone, Debug, PartialEq)]
-pub enum Lit { Int(u128), Float(f64), Str(String), Bool(bool) }
+pub enum Lit { Int(u128), IntConst(i128), Float(f64), Str(String), Bool(bool) }
 
 /// L2h：特殊浮点值的宽度由源形态自带（宽度严格，禁跨宽推断）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,6 +47,8 @@ pub enum FloatWidth { F32, F64 }
 
 /// L2h：三个特殊值形态；L2o：追加三个命名有限常量（`MAX`／`MIN`／`EPSILON`）；
 /// L2p：追加 `MIN_POSITIVE`（最小正正规数）。NaN 载荷／信号 NaN 不在面内。
+/// L2q：十个整型成员（`MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` × f32／f64）
+/// 不建本枚举，解析为 `Lit::IntConst`（整数字面量语义）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FloatSpecialKind { Nan, Infinity, NegInfinity, Max, Min, Epsilon, MinPositive }
 
@@ -200,8 +204,8 @@ impl Parser {
     fn diag_at(&mut self, code: &str, l: usize, c: usize, msg: impl Into<String>) {
         self.diags.push(Diag::new(code, l, c, msg));
     }
-    /// L2h／L2o／L2p：`::` 仅六个特殊值与七个命名有限常量；其余成员形态统一 E1101。
-    /// 单一发点，便于 e1101_catalog 守卫只记 +1。
+    /// L2h／L2o／L2p／L2q：`::` 支持六个特殊值、八个命名有限浮点常量与十个整型成员
+    /// （共 24 形式）；其余成员形态统一 E1101。单一发点，便于 e1101_catalog 守卫只记 +1。
     fn err_float_member(&mut self, l: usize, c: usize, msg: impl Into<String>) {
         self.diag_at("E1101", l, c, msg);
     }
@@ -645,8 +649,9 @@ impl Parser {
             Tok::Ident(s) if s == "true" => Ex::Lit(Lit::Bool(true), l, c),
             Tok::Ident(s) if s == "false" => Ex::Lit(Lit::Bool(false), l, c),
             Tok::Ident(s) if s == "mut" => { self.diag_at("E1101", l, c, "'mut' 仅用于 &mut 位置"); Ex::Lit(Lit::Bool(true), l, c) }
-            // L2h／L2o／L2p：`f32|f64::MEMBER` 双冒号前瞻（不改 lexer、不新增关键字）。
-            // 仅六个特殊值与七个命名有限常量成为 FloatSpecial；其余 `::` 成员一律 E1101。
+            // L2h／L2o／L2p／L2q：`f32|f64::MEMBER` 双冒号前瞻（不改 lexer、不新增关键字）。
+            // 六个特殊值与八个命名有限浮点常量成为 FloatSpecial；十个整型成员成为
+            // `Lit::IntConst`（整数字面量语义）；其余 `::` 成员一律 E1101。
             Tok::Ident(s)
                 if (s == "f32" || s == "f64")
                     && matches!(self.peek(), Tok::Colon)
@@ -663,6 +668,31 @@ impl Parser {
                         return Ex::Path(s, l, c);
                     }
                 };
+                // L2q ③b：五个整型成员 × f32／f64（值由产品裁定件 §2 锁定，与 rustc 同名常量一致）。
+                let int_value = match (s.as_str(), member.as_str()) {
+                    ("f64", "MAX_EXP") => Some(1024),
+                    ("f64", "MIN_EXP") => Some(-1021),
+                    ("f64", "MANTISSA_DIGITS") => Some(53),
+                    ("f64", "DIGITS") => Some(15),
+                    ("f64", "RADIX") => Some(2),
+                    ("f32", "MAX_EXP") => Some(128),
+                    ("f32", "MIN_EXP") => Some(-125),
+                    ("f32", "MANTISSA_DIGITS") => Some(24),
+                    ("f32", "DIGITS") => Some(6),
+                    ("f32", "RADIX") => Some(2),
+                    _ => None,
+                };
+                if let Some(v) = int_value {
+                    if matches!(self.peek(), Tok::LParen) {
+                        let (cl, cc) = self.at();
+                        self.err_float_member(
+                            cl,
+                            cc,
+                            "特殊值／命名常量不是函数，不可调用（NaN 载荷不在支持面内）",
+                        );
+                    }
+                    return Ex::Lit(Lit::IntConst(v), l, c);
+                }
                 let kind = match member.as_str() {
                     "NAN" => Some(FloatSpecialKind::Nan),
                     "INFINITY" => Some(FloatSpecialKind::Infinity),
@@ -680,7 +710,7 @@ impl Parser {
                             self.err_float_member(
                                 cl,
                                 cc,
-                                "特殊值／命名有限常量不是函数，不可调用（NaN 载荷不在 0.3.7 面内）",
+                                "特殊值／命名常量不是函数，不可调用（NaN 载荷不在支持面内）",
                             );
                         }
                         Ex::FloatSpecial(width, k, l, c)
@@ -690,7 +720,7 @@ impl Parser {
                             ml,
                             mc,
                             format!(
-                                "'{}::{}' 不在 0.3.7 支持面（仅六个特殊值与七个命名有限常量形式）",
+                                "'{}::{}' 不在支持面（支持六特殊值＋八命名有限浮点常量＋十整型成员，共 24 形式）",
                                 s, member
                             ),
                         );

@@ -1,0 +1,2 @@
+struct S { a: i64, b: i32 }
+fn main() { println(S { a: f64::MAX_EXP, b: f32::MAX_EXP }); }

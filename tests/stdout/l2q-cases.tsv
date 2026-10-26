@@ -1,0 +1,41 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S22-01	tests/stdout/cases/S22-01.zor	run	0	expected/S22-01.stdout	-	scalar f64 MAX_EXP + literal equivalence
+S22-02	tests/stdout/cases/S22-02.zor	run	0	expected/S22-02.stdout	-	scalar f64 MIN_EXP (negative) + literal equivalence
+S22-03	tests/stdout/cases/S22-03.zor	run	0	expected/S22-03.stdout	-	scalar f64 MANTISSA_DIGITS + literal equivalence
+S22-04	tests/stdout/cases/S22-04.zor	run	0	expected/S22-04.stdout	-	scalar f64 DIGITS + literal equivalence
+S22-05	tests/stdout/cases/S22-05.zor	run	0	expected/S22-05.stdout	-	scalar f64 RADIX + literal equivalence
+S22-06	tests/stdout/cases/S22-06.zor	run	0	expected/S22-06.stdout	-	scalar f32 MAX_EXP + literal equivalence
+S22-07	tests/stdout/cases/S22-07.zor	run	0	expected/S22-07.stdout	-	scalar f32 MIN_EXP (negative) + literal equivalence
+S22-08	tests/stdout/cases/S22-08.zor	run	0	expected/S22-08.stdout	-	scalar f32 MANTISSA_DIGITS + literal equivalence
+S22-09	tests/stdout/cases/S22-09.zor	run	0	expected/S22-09.stdout	-	scalar f32 DIGITS + literal equivalence
+S22-10	tests/stdout/cases/S22-10.zor	run	0	expected/S22-10.stdout	-	scalar f32 RADIX + literal equivalence
+S22-11	tests/stdout/cases/S22-11.zor	run	0	expected/S22-11.stdout	-	unannotated binding defaults i64
+S22-12	tests/stdout/cases/S22-12.zor	run	0	expected/S22-12.stdout	-	unannotated binding negative value
+S22-13	tests/stdout/cases/S22-13.zor	run	0	expected/S22-13.stdout	-	annotated binding i64
+S22-14	tests/stdout/cases/S22-14.zor	run	0	expected/S22-14.stdout	-	annotated binding i32
+S22-15	tests/stdout/cases/S22-15.zor	run	0	expected/S22-15.stdout	-	annotated binding u32
+S22-16	tests/stdout/cases/S22-16.zor	run	0	expected/S22-16.stdout	-	annotated binding i16 holds 1024
+S22-17	tests/stdout/cases/S22-17.zor	run	0	expected/S22-17.stdout	-	annotated binding u8
+S22-18	tests/stdout/cases/S22-18.zor	run	0	expected/S22-18.stdout	-	annotated binding i8
+S22-19	tests/stdout/cases/S22-19.zor	run	0	expected/S22-19.stdout	-	annotated binding i8 holds -125
+S22-20	tests/stdout/cases/S22-20.zor	run	0	expected/S22-20.stdout	-	Box<i64> scalar payload
+S22-21	tests/stdout/cases/S22-21.zor	run	0	expected/S22-21.stdout	-	Box<i32> scalar payload
+S22-22	tests/stdout/cases/S22-22.zor	run	0	expected/S22-22.stdout	-	Box<i16> negative payload
+S22-23	tests/stdout/cases/S22-23.zor	run	0	expected/S22-23.stdout	-	Box<u8> scalar payload
+S22-24	tests/stdout/cases/S22-24.zor	run	0	expected/S22-24.stdout	-	enum single i64 payload
+S22-25	tests/stdout/cases/S22-25.zor	run	0	expected/S22-25.stdout	-	enum single i32 negative payload
+S22-26	tests/stdout/cases/S22-26.zor	run	0	expected/S22-26.stdout	-	enum two integer fields
+S22-27	tests/stdout/cases/S22-27.zor	run	0	expected/S22-27.stdout	-	struct i64 field
+S22-28	tests/stdout/cases/S22-28.zor	run	0	expected/S22-28.stdout	-	struct i32 field
+S22-29	tests/stdout/cases/S22-29.zor	run	0	expected/S22-29.stdout	-	struct two integer fields
+S22-30	tests/stdout/cases/S22-30.zor	run	0	expected/S22-30.stdout	-	array i64 elements incl negative
+S22-31	tests/stdout/cases/S22-31.zor	run	0	expected/S22-31.stdout	-	array i32 elements
+S22-32	tests/stdout/cases/S22-32.zor	run	0	expected/S22-32.stdout	-	tuple elements default i64
+S22-33	tests/stdout/cases/S22-33.zor	run	0	expected/S22-33.stdout	-	annotated tuple (i64, i64)
+S22-34	tests/stdout/cases/S22-34.zor	run	0	expected/S22-34.stdout	-	multi-arg mixed width
+S22-35	tests/stdout/cases/S22-35.zor	run	0	expected/S22-35.stdout	-	multi-arg with string
+S22-36	tests/stdout/cases/S22-36.zor	run	0	expected/S22-36.stdout	-	struct with array field
+S22-37	tests/stdout/cases/S22-37.zor	run	0	expected/S22-37.stdout	-	struct with enum field
+S22-38	tests/stdout/cases/S22-38.zor	run	0	expected/S22-38.stdout	-	array of enums with negative payloads
+S22-39	tests/stdout/cases/S22-39.zor	run	0	expected/S22-39.stdout	-	unary minus on integer member
+S22-40	tests/stdout/cases/S22-40.zor	run	0	expected/S22-40.stdout	-	integer arithmetic on members

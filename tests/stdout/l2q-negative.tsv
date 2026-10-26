@@ -1,0 +1,17 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-259	tests/stdout/cases/N-259.zor	1	none	E1101	zor: runtime error	unnamed member MIN_10_EXP
+N-260	tests/stdout/cases/N-260.zor	1	none	E1101	zor: runtime error	unnamed member MAX_10_EXP
+N-261	tests/stdout/cases/N-261.zor	1	none	E1101	zor: runtime error	unnamed member DIG
+N-262	tests/stdout/cases/N-262.zor	1	none	E1101	zor: runtime error	unnamed member NEG_NAN f32
+N-263	tests/stdout/cases/N-263.zor	1	none	E1101	zor: runtime error	member call syntax f64
+N-264	tests/stdout/cases/N-264.zor	1	none	E1101	zor: runtime error	member call syntax f32
+N-265	tests/stdout/cases/N-265.zor	1	none	E1202	zor: runtime error	integer member annotated f64 binding
+N-266	tests/stdout/cases/N-266.zor	1	none	E1202	zor: runtime error	integer member into f64 struct field
+N-267	tests/stdout/cases/N-267.zor	1	none	E1202	zor: runtime error	integer member into f32 enum field
+N-268	tests/stdout/cases/N-268.zor	1	none	E1201	zor: runtime error	integer member into Box<f64> payload (literal-path parity per product v1.1)
+N-269	tests/stdout/cases/N-269.zor	1	none	E1201	zor: runtime error	negative member into u32
+N-270	tests/stdout/cases/N-270.zor	1	none	E1201	zor: runtime error	negative member into u8
+N-271	tests/stdout/cases/N-271.zor	1	none	E1201	zor: runtime error	1024 out of u8 range
+N-272	tests/stdout/cases/N-272.zor	1	none	E1201	zor: runtime error	-1021 out of i8 range
+N-273	tests/stdout/cases/N-273.zor	1	none	E1202	zor: runtime error	float member into i64 regression
+N-274	tests/stdout/cases/N-274.zor	1	none	E1202	zor: runtime error	float member into i32 regression

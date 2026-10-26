@@ -1,0 +1,2 @@
+struct S { f: f64 }
+fn main() { println(S { f: f64::MANTISSA_DIGITS }); }

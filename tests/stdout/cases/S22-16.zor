@@ -1,0 +1,1 @@
+fn main() { let x: i16 = f64::MAX_EXP; println(x); }
