@@ -1,0 +1,1 @@
+fn main() { let b: Box<i64> = box 1; b = box f64::MAX_EXP; println(*b); }

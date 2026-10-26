@@ -1,0 +1,2 @@
+struct E {}
+fn main() { let b: Box<E> = box E {}; println(*b); }

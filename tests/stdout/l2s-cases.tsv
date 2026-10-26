@@ -1,0 +1,41 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S24-01	tests/stdout/cases/S24-01.zor	run	0	expected/S24-01.stdout	-	Box<i8> integer literal
+S24-02	tests/stdout/cases/S24-02.zor	run	0	expected/S24-02.stdout	-	Box<i16> integer literal
+S24-03	tests/stdout/cases/S24-03.zor	run	0	expected/S24-03.stdout	-	Box<i32> integer literal
+S24-04	tests/stdout/cases/S24-04.zor	run	0	expected/S24-04.stdout	-	Box<i64> integer literal
+S24-05	tests/stdout/cases/S24-05.zor	run	0	expected/S24-05.stdout	-	Box<u8> integer literal
+S24-06	tests/stdout/cases/S24-06.zor	run	0	expected/S24-06.stdout	-	Box<u16> integer literal
+S24-07	tests/stdout/cases/S24-07.zor	run	0	expected/S24-07.stdout	-	Box<u32> integer literal
+S24-08	tests/stdout/cases/S24-08.zor	run	0	expected/S24-08.stdout	-	Box<u64> integer literal
+S24-09	tests/stdout/cases/S24-09.zor	run	0	expected/S24-09.stdout	-	unannotated box 1 defaults i64
+S24-10	tests/stdout/cases/S24-10.zor	run	0	expected/S24-10.stdout	-	parenthesized integer literal
+S24-11	tests/stdout/cases/S24-11.zor	run	0	expected/S24-11.stdout	-	named integer member negative
+S24-12	tests/stdout/cases/S24-12.zor	run	0	expected/S24-12.stdout	-	named integer member unsigned
+S24-13	tests/stdout/cases/S24-13.zor	run	0	expected/S24-13.stdout	-	constant reinit named member
+S24-14	tests/stdout/cases/S24-14.zor	run	0	expected/S24-14.stdout	-	Box to Box move
+S24-15	tests/stdout/cases/S24-15.zor	run	0	expected/S24-15.stdout	-	Box<f64> finite literal
+S24-16	tests/stdout/cases/S24-16.zor	run	0	expected/S24-16.stdout	-	Box<f32> finite literal
+S24-17	tests/stdout/cases/S24-17.zor	run	0	expected/S24-17.stdout	-	Box<f64> negative finite
+S24-18	tests/stdout/cases/S24-18.zor	run	0	expected/S24-18.stdout	-	Box<f64> negative zero
+S24-19	tests/stdout/cases/S24-19.zor	run	0	expected/S24-19.stdout	-	Box<f64> special NAN
+S24-20	tests/stdout/cases/S24-20.zor	run	0	expected/S24-20.stdout	-	Box<f64> named MAX
+S24-21	tests/stdout/cases/S24-21.zor	run	0	expected/S24-21.stdout	-	Box<f64> named MIN_POSITIVE
+S24-22	tests/stdout/cases/S24-22.zor	run	0	expected/S24-22.stdout	-	Box<f32> special NAN
+S24-23	tests/stdout/cases/S24-23.zor	run	0	expected/S24-23.stdout	-	Box<f64> constant reinit
+S24-24	tests/stdout/cases/S24-24.zor	run	0	expected/S24-24.stdout	-	struct named member leaves
+S24-25	tests/stdout/cases/S24-25.zor	run	0	expected/S24-25.stdout	-	array named member leaves
+S24-26	tests/stdout/cases/S24-26.zor	run	0	expected/S24-26.stdout	-	struct negative literal leaf
+S24-27	tests/stdout/cases/S24-27.zor	run	0	expected/S24-27.stdout	-	struct named negative member leaf
+S24-28	tests/stdout/cases/S24-28.zor	run	0	expected/S24-28.stdout	-	struct named float leaf
+S24-29	tests/stdout/cases/S24-29.zor	run	0	expected/S24-29.stdout	-	struct special leaf
+S24-30	tests/stdout/cases/S24-30.zor	run	0	expected/S24-30.stdout	-	struct array
+S24-31	tests/stdout/cases/S24-31.zor	run	0	expected/S24-31.stdout	-	nested array
+S24-32	tests/stdout/cases/S24-32.zor	run	0	expected/S24-32.stdout	-	struct with array and bool
+S24-33	tests/stdout/cases/S24-33.zor	run	0	expected/S24-33.stdout	-	nested struct
+S24-34	tests/stdout/cases/S24-34.zor	run	0	expected/S24-34.stdout	-	bool array
+S24-35	tests/stdout/cases/S24-35.zor	run	0	expected/S24-35.stdout	-	f64 array special and named
+S24-36	tests/stdout/cases/S24-36.zor	run	0	expected/S24-36.stdout	-	f32 array special and finite
+S24-37	tests/stdout/cases/S24-37.zor	run	0	expected/S24-37.stdout	-	empty array
+S24-38	tests/stdout/cases/S24-38.zor	run	0	expected/S24-38.stdout	-	u8 array
+S24-39	tests/stdout/cases/S24-39.zor	run	0	expected/S24-39.stdout	-	empty struct
+S24-40	tests/stdout/cases/S24-40.zor	run	0	expected/S24-40.stdout	-	composite constant reinit

@@ -1,0 +1,1 @@
+fn main() { let b: Box<byte> = box 0; println(*b); }
