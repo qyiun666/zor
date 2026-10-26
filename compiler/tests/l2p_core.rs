@@ -217,19 +217,13 @@ fn width_is_strict_for_min_positive() {
 
 #[test]
 fn other_float_members_stay_e1101() {
-    for (tag, member) in [
-        ("max-exp", "MAX_EXP"),
-        ("min-exp", "MIN_EXP"),
-        ("mantissa", "MANTISSA_DIGITS"),
-        ("digits", "DIGITS"),
-        ("radix", "RADIX"),
-    ] {
-        assert_rc1(
-            tag,
-            &format!("fn main() {{\n    println(f64::{member});\n}}\n"),
-            "E1101",
-        );
-    }
+    // L2q ③b：`MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` 已由 E1101 转正
+    // （见 l2q_core）；仍未列名的成员由 l2o_core 的 `DIG`／`NEG_NAN` 等断言守。
+    assert_runs(
+        "fn main() {\n    println(f64::MAX_EXP);\n    println(f64::MIN_EXP);\n    println(f64::MANTISSA_DIGITS);\n    println(f64::DIGITS);\n    println(f64::RADIX);\n    println(f32::MAX_EXP);\n    println(f32::MIN_EXP);\n    println(f32::MANTISSA_DIGITS);\n    println(f32::DIGITS);\n    println(f32::RADIX);\n}\n",
+        "l2q-flip",
+        b"1024\n-1021\n53\n15\n2\n128\n-125\n24\n6\n2\n",
+    );
 }
 
 #[test]
