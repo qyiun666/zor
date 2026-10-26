@@ -247,10 +247,11 @@ fn unary_minus_stays_fail_closed_and_qualified_path_is_supported() {
 
 #[test]
 fn box_enum_and_unprintable_variants_stay_fail_closed() {
-    assert_rc1(
-        "box-enum",
+    // L2t：`Box<E>` 常量子集转正（正例矩阵见 l2t_core）。
+    assert_runs(
         "enum E { A(f64) }\nfn main() {\n    let b: Box<E> = box A(1.5);\n    println(*b);\n}\n",
-        "let 类型标注",
+        "box-enum-l2t",
+        b"A(1.5)\n",
     );
     assert_rc1(
         "box-variant",

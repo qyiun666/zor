@@ -318,10 +318,11 @@ fn nested_box_and_box_in_composite_stay_fail_closed() {
 
 #[test]
 fn enum_unit_tuple_and_byte_payloads_stay_fail_closed() {
-    assert_rc1(
-        "box-enum",
+    // L2t：`Box<E>` 常量子集转正（正例矩阵见 l2t_core）。
+    assert_runs(
         "enum E { A(i64) }\nfn main() {\n    let b: Box<E> = box A(1);\n    println(*b);\n}\n",
-        "let 类型标注",
+        "box-enum-l2t",
+        b"A(1)\n",
     );
     assert_rc1(
         "struct-enum-field",

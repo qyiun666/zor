@@ -246,10 +246,11 @@ fn annotation_mismatch_is_e1201() {
 
 #[test]
 fn box_and_variable_payload_stay_fail_closed() {
-    assert_rc1(
-        "box-enum",
+    // L2t：`Box<E>` 常量子集转正（正例矩阵见 l2t_core）。
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let b: Box<E> = box E::V(1);\n    println(*b);\n}\n",
-        "let 类型标注",
+        "box-enum-l2t",
+        b"V(1)\n",
     );
     assert_rc1(
         "box-struct-enum-field",
