@@ -95,6 +95,26 @@ fn emit_payload_defs(out: &mut String, prog: &Program) {
                 let n = (*len).max(1);
                 let _ = writeln!(out, "typedef {elem} {name}[{n}];");
             }
+            // L2t：枚举载荷 typedef（tag＋union；零载荷变体占位，C11 不允许空 union）。
+            PayloadDef::Enum { c_name, variants } => {
+                out.push_str("typedef struct {\n    int32_t tag;\n    union {\n");
+                if variants.is_empty() {
+                    out.push_str("        struct { uint8_t _zor_pad; } _empty;\n");
+                } else {
+                    for (tag, fields) in variants {
+                        if fields.is_empty() {
+                            let _ = writeln!(out, "        struct {{ uint8_t _zor_pad; }} v{};", tag);
+                        } else {
+                            out.push_str("        struct {\n");
+                            for (fname, fty) in fields {
+                                let _ = writeln!(out, "            {fty} {fname};");
+                            }
+                            let _ = writeln!(out, "        }} v{};", tag);
+                        }
+                    }
+                }
+                let _ = writeln!(out, "    }} u;\n}} {c_name};");
+            }
         }
     }
     if !prog.payload_defs.is_empty() {
@@ -675,6 +695,26 @@ fn emit_alloc_composite(out: &mut String, id: &LocalId, ty: &Ty, cv: &ConstValue
         (Ty::Array(_, n), ConstValue::Array { values, .. }) => {
             debug_assert_eq!(*n, values.len() as u64);
             emit_array_init(out, id, &format!("(*zor_box_{})", id.0), ty, values);
+        }
+        // L2t：枚举载荷（tag＋union；字段仅标量；零载荷仅初始化 tag）。
+        (Ty::Enum(_), ConstValue::Enum { tag, fields, .. }) => {
+            if fields.is_empty() {
+                let _ = writeln!(out, "    *zor_box_{} = ({}){{ .tag = {} }};", id.0, cty, tag);
+            } else {
+                let mut parts = Vec::with_capacity(fields.len());
+                for (i, (fty, fv)) in fields.iter().enumerate() {
+                    parts.push(format!(".f{} = {}", i, leaf_literal(fty, fv)));
+                }
+                let _ = writeln!(
+                    out,
+                    "    *zor_box_{} = ({}){{ .tag = {}, .u.v{} = {{ {} }} }};",
+                    id.0,
+                    cty,
+                    tag,
+                    tag,
+                    parts.join(", ")
+                );
+            }
         }
         _ => unreachable!("composite payload shape"),
     }

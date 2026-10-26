@@ -252,10 +252,11 @@ fn unary_arith_and_reverse_stay_fail_closed() {
 
 #[test]
 fn box_enum_stays_fail_closed_and_qualified_path_is_supported() {
-    assert_rc1(
-        "box-enum",
+    // L2t：`Box<E>` 常量子集转正（正例矩阵见 l2t_core）。
+    assert_runs(
         "enum E { V(f64) }\nfn main() {\n    let b: Box<E> = box V(f64::MIN_POSITIVE);\n    println(*b);\n}\n",
-        "let 类型标注",
+        "box-enum-l2t",
+        b"V(2.2250738585072014e-308)\n",
     );
     // L2r：`E::V(...)` 限定构造转正。
     assert_runs(

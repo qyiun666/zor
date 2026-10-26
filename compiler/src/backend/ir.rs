@@ -29,6 +29,8 @@ pub enum Ty {
     Struct(String),
     /// L2k：仅作 Box 载荷槽位的定长数组（元素为载荷允许叶子／复合）。
     Array(Box<Ty>, u64),
+    /// L2t：仅作 Box 载荷槽位的枚举（常量子集；tag＋union）。
+    Enum(String),
 }
 
 fn sanitize_ident(s: &str) -> String {
@@ -60,6 +62,7 @@ pub fn payload_c_ty(t: &Ty) -> Option<String> {
         Ty::F64 => "double".to_string(),
         Ty::Struct(name) => format!("zor_struct_{}", sanitize_ident(name)),
         Ty::Array(elem, n) => format!("zor_arr_{}_{}", type_key(elem)?, n),
+        Ty::Enum(name) => format!("zor_enum_{}", sanitize_ident(name)),
         _ => return None,
     })
 }
@@ -80,6 +83,7 @@ pub fn type_key(t: &Ty) -> Option<String> {
         Ty::F64 => "f64".to_string(),
         Ty::Struct(name) => sanitize_ident(name),
         Ty::Array(elem, n) => format!("{}_a{}", type_key(elem)?, n),
+        Ty::Enum(name) => format!("e_{}", sanitize_ident(name)),
         _ => return None,
     })
 }
@@ -99,6 +103,13 @@ pub enum ConstValue {
     Array {
         elem: Ty,
         values: Vec<ConstValue>,
+    },
+    /// L2t：编译期枚举常量（字段仅标量；tag 取变体声明序）。
+    Enum {
+        name: String,
+        tag: u32,
+        variant: String,
+        fields: Vec<(Ty, ConstValue)>,
     },
 }
 
@@ -120,6 +131,11 @@ pub enum PayloadDef {
         name: String,
         elem: String,
         len: u64,
+    },
+    /// L2t：枚举载荷 typedef（tag＋union；变体字段仅标量）。
+    Enum {
+        c_name: String,
+        variants: Vec<(u32, Vec<(String, String)>)>,
     },
 }
 

@@ -341,9 +341,13 @@ fn let_init_kind(
                 return Ok(BindingKind::Box(payload));
             }
             // L2k：复合字面量载荷（常量树；变量即 fail-closed）。
+            // L2t：枚举常量载荷（`box V(..)`／`box E::V(..)`）同走复合通道。
             if let Some(p) = &ann_payload {
                 if is_composite_payload_ty(p) && l2k_payload_ty(p, prog) {
-                    let literal = matches!(inner.as_ref(), Ex::Record(..) | Ex::ArrLit(..));
+                    let literal = matches!(
+                        inner.as_ref(),
+                        Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..)
+                    );
                     if !literal || !payload_init_ok(inner, types, prog) {
                         return Err(SubsetError::new(*il, *ic, "box 载荷须为字面量常量"));
                     }
@@ -545,7 +549,7 @@ fn box_reinit_ok(
             matches!(x.as_ref(), Ex::Lit(Lit::Float(_), _, _))
                 && matches!(p.as_ref(), Ty::Prim("f32") | Ty::Prim("f64"))
         }
-        Ex::Record(..) | Ex::ArrLit(..) => {
+        Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..) => {
             is_composite_payload_ty(p) && l2k_payload_ty(p, prog) && payload_init_ok(inner, types, prog)
         }
         _ => false,
@@ -558,33 +562,70 @@ fn is_composite_payload_ty(t: &Ty) -> bool {
 }
 
 /// L2k Box 复合载荷白名单（深递归）：8 整型宽度／bool／f32／f64／struct／定长数组；
-/// 排除 `[byte; N]`（含嵌套）、enum、unit、tuple、Box、引用。
+/// L2t：顶层 enum 允许（所有变体字段全标量），嵌套在 struct／array 内的 enum 仍排除；
+/// 排除 `[byte; N]`（含嵌套）、嵌套 enum、unit、tuple、Box、引用。
 fn l2k_payload_ty(t: &Ty, prog: &Prog) -> bool {
     let mut seen = HashSet::new();
-    l2k_payload_ty_in(t, prog, &mut seen)
+    l2k_payload_ty_in(t, prog, &mut seen, true)
 }
 
-fn l2k_payload_ty_in(t: &Ty, prog: &Prog, seen: &mut HashSet<String>) -> bool {
+fn l2k_payload_ty_in(t: &Ty, prog: &Prog, seen: &mut HashSet<String>, allow_enum: bool) -> bool {
     match t {
         Ty::Prim(p) => matches!(
             *p,
             "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" | "bool"
         ),
         Ty::Arr(elem, _) => {
-            !matches!(elem.as_ref(), Ty::Prim("byte")) && l2k_payload_ty_in(elem, prog, seen)
+            !matches!(elem.as_ref(), Ty::Prim("byte"))
+                && l2k_payload_ty_in(elem, prog, seen, false)
         }
         Ty::Named(n) => {
             if !seen.insert(n.clone()) {
                 return false;
             }
+            // L2t：enum 仅允许作为 Box 顶层载荷（字段全标量）；嵌套在 struct／array
+            // 内的 enum 字段维持 fail-closed（归后续切片）。
+            if let Some(e) = prog.enums.iter().find(|e| &e.name == n) {
+                if !allow_enum || e.variants.is_empty() {
+                    return false;
+                }
+                return e.variants.iter().all(|(_, payload, _, _)| {
+                    payload.iter().all(|(ft, _, _)| is_scalar_payload_ty(ft))
+                });
+            }
             match prog.structs.iter().find(|s| &s.name == n) {
                 Some(s) => s
                     .fields
                     .iter()
-                    .all(|(_, ft, _, _)| l2k_payload_ty_in(ft, prog, seen)),
+                    .all(|(_, ft, _, _)| l2k_payload_ty_in(ft, prog, seen, false)),
                 None => false,
             }
         }
+        _ => false,
+    }
+}
+
+/// L2t：枚举变体字段的标量白名单（8 整型宽度／bool／f32／f64）。
+fn is_scalar_payload_ty(t: &Ty) -> bool {
+    matches!(
+        t,
+        Ty::Prim(p)
+            if matches!(
+                *p,
+                "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" | "bool"
+            )
+    )
+}
+
+/// L2t：枚举常量实参形态（字面量／具名常量／负字面量）；变量与表达式拒绝。
+fn is_const_scalar_arg(e: &Ex) -> bool {
+    match e {
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_) | Lit::Float(_) | Lit::Bool(_), _, _) => true,
+        Ex::FloatSpecial(..) => true,
+        Ex::Un(op, x, _, _) if op == "-" => matches!(
+            x.as_ref(),
+            Ex::Lit(Lit::Int(_) | Lit::IntConst(_) | Lit::Float(_), _, _)
+        ),
         _ => false,
     }
 }
@@ -603,6 +644,23 @@ fn payload_init_ok(e: &Ex, types: &TypeTable, prog: &Prog) -> bool {
         Ex::Un(op, x, _, _) if op == "-" || op == "!" => payload_init_ok(x, types, prog),
         Ex::Record(_, fields, _, _) => fields.iter().all(|(_, v)| payload_init_ok(v, types, prog)),
         Ex::ArrLit(es, _, _) => es.iter().all(|x| payload_init_ok(x, types, prog)),
+        // L2t：枚举常量载荷（变体实参须为常量标量形态；变量／表达式拒绝）。
+        Ex::Call(callee, args, _, _) => {
+            let Ex::Path(v, _, _) = callee.as_ref() else { return false };
+            let Ty::Named(en) = t else { return false };
+            let Some(e) = prog.enums.iter().find(|e| &e.name == en) else {
+                return false;
+            };
+            let var = match v.split_once("::") {
+                Some((q, r)) if q == en.as_str() => r,
+                Some(_) => return false,
+                None => v.as_str(),
+            };
+            let Some((_, payload, _, _)) = e.variants.iter().find(|(n, _, _, _)| n.as_str() == var) else {
+                return false;
+            };
+            payload.len() == args.len() && args.iter().all(is_const_scalar_arg)
+        }
         _ => false,
     }
 }
