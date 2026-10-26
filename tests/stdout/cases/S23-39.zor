@@ -1,0 +1,3 @@
+enum A { V(i64) }
+enum B { V(f64) }
+fn main() { println(B::V(1.5)); }

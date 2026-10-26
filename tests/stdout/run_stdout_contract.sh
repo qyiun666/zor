@@ -27,7 +27,9 @@
 #     L2o 新增 S20-01～28／N-220～236；Ret=9（N-72/73/78/110/140/178/179/198/212 仅执行面退休，六代资产字节零改）；schema／路径／重复／expected 缺件（Stage-1 阶段新增 expected 缺件为预期）。
 #     L2p 新增 S21-01～24／N-237～258；Ret=3（N-220／N-233／N-235 仅执行面退休，l2o 资产字节零改）；schema／路径／重复／expected 缺件（Stage-1 阶段新增 expected 缺件为预期）。
 #     L2q 新增 S22-01～40／N-259～274；Stage-3 接入 L2q TSV（P=40／Q=16）；
-#     Ret=9（N-221／222／223＋N-237～242 仅执行面退休，l2o／l2p 源／TSV／各代 baseline 字节零改）；活跃 350／228／17＝595（v1.2 全量口径 350／228／595／599／701）。
+#     Ret=9（N-221／222／223＋N-237～242 仅执行面退休，l2o／l2p 源／TSV／各代 baseline 字节零改）；L2q 完成时活跃 350／228／17＝595（v1.2 全量口径 350／228／595／599／701）。
+#     L2r Stage-1 新增 S23-01～40／N-275～292（P=40／Q=18）；Ret=7（N-96／172／173／195／211／230／246 仅执行面退休，各代资产字节零改）；
+#     本阶段活跃 350／221／17＝588；Stage-3 接线后 390／239／646／650／759。
 #   - 旧资产快照：legacy-snapshot.sha256 逐文件 sha256；l2c-baseline.sha256 锁 68 条未变用例；
 #     旧五值／runtime-codes／manifest 计数复核。
 #   - runtime：两轮构建＋运行；stdout 逐字节 cmp；run 模式 stderr 0 B；terminate 模式 rc=101 且只判 stdout。
@@ -98,33 +100,35 @@ EXPECT_NEGATIVE_L2G=14
 EXPECT_NEGATIVE_L2H=32
 EXPECT_NEGATIVE_L2H_ACTIVE=28
 EXPECT_NEGATIVE_L2I=31
-EXPECT_NEGATIVE_L2I_ACTIVE=27
+# L2r Ret=7：L2i N-96 与 L2l N-172／173、L2m N-195、L2n N-211、L2o N-230、L2p N-246 仅执行面退休。
+EXPECT_NEGATIVE_L2I_ACTIVE=26
 EXPECT_NEGATIVE_L2J=30
 EXPECT_NEGATIVE_L2J_ACTIVE=23
 EXPECT_NEGATIVE_L2K=23
 # L2o 九条跨代退休：L2h N-72/73/78、L2i N-110、L2j N-140、L2l N-178/179、L2m N-198、L2n N-212（资产行数不变）。
 EXPECT_NEGATIVE_L2L=20
-EXPECT_NEGATIVE_L2L_ACTIVE=16
+EXPECT_NEGATIVE_L2L_ACTIVE=14
 EXPECT_NEGATIVE_L2M=18
-EXPECT_NEGATIVE_L2M_ACTIVE=16
+EXPECT_NEGATIVE_L2M_ACTIVE=15
 EXPECT_NEGATIVE_L2N=16
-EXPECT_NEGATIVE_L2N_ACTIVE=15
+EXPECT_NEGATIVE_L2N_ACTIVE=14
 EXPECT_NEGATIVE_L2O=17
-# L2q v1.2：L2o 代 N-221／222／223 与 L2p 代 N-237～242 一并仅执行面退休（17−6=11）。
-EXPECT_NEGATIVE_L2O_ACTIVE=11
+# L2q v1.2：L2o 代 N-221／222／223 与 L2p 代 N-237～242 一并仅执行面退休（17−6=11）；L2r 再退 N-230（17−7=10）。
+EXPECT_NEGATIVE_L2O_ACTIVE=10
 EXPECT_NEGATIVE_L2P=22
-# L2q Stage-1：N-237～242 仅执行面退休（l2p 静态资产仍 22 行、l2p-baseline 零改）。
-EXPECT_NEGATIVE_L2P_ACTIVE=16
+# L2q Stage-1：N-237～242 仅执行面退休（l2p 静态资产仍 22 行、l2p-baseline 零改）；L2r 再退 N-246（22−7=15）。
+EXPECT_NEGATIVE_L2P_ACTIVE=15
 EXPECT_NEGATIVE_L2Q=16
 # L2q 无退休：16 条全部活跃。
 EXPECT_NEGATIVE_L2Q_ACTIVE=16
-EXPECT_NEGATIVE=228
+EXPECT_NEGATIVE=221
 EXPECT_CLI=17
 EXPECT_NEW_CASES=120
-EXPECT_TOTAL=595
+EXPECT_TOTAL=588
 # 退休清单：仅退出活跃负控执行；源文件、l2f/l2h/l2i/l2j/l2k/l2l/l2m/l2n/l2o-negative.tsv 与各代基线零改。
 # L2q v1.2 Ret=9：N-221／222／223（L2o）＋N-237～242（L2p）转为整型常量正例，仅在执行面退休。
-RETIRED_NEGATIVE_RE='^(N-2[1-5]|N-26|N-27|N-31|N-32|N-81|N-93|N-94|N-95|N-11[7-9]|N-120|N-125|N-126|N-183|N-184|N-200|N-72|N-73|N-78|N-110|N-140|N-178|N-179|N-198|N-212|N-220|N-233|N-235|N-22[1-3]|N-23[7-9]|N-24[0-2])$'
+# L2r Ret=7：N-96（L2i）／N-172／N-173（L2l）／N-195（L2m）／N-211（L2n）／N-230（L2o）／N-246（L2p）转为限定变体正例，仅在执行面退休。
+RETIRED_NEGATIVE_RE='^(N-2[1-5]|N-26|N-27|N-31|N-32|N-81|N-93|N-94|N-95|N-11[7-9]|N-120|N-125|N-126|N-183|N-184|N-200|N-72|N-73|N-78|N-110|N-140|N-178|N-179|N-198|N-212|N-220|N-233|N-235|N-22[1-3]|N-23[7-9]|N-24[0-2]|N-96|N-17[23]|N-195|N-211|N-230|N-246)$'
 RUNTIME_ALL=""
 NEGATIVE_ALL=""
 
@@ -140,32 +144,32 @@ if [ $((EXPECT_NEGATIVE_L2H - 4)) -ne "$EXPECT_NEGATIVE_L2H_ACTIVE" ]; then
   echo "[stdout-contract] L2h 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2H-4 != $EXPECT_NEGATIVE_L2H_ACTIVE（N-81／N-72／N-73／N-78 退休）" >&2
   exit 2
 fi
-if [ $((EXPECT_NEGATIVE_L2I - 4)) -ne "$EXPECT_NEGATIVE_L2I_ACTIVE" ]; then
-  echo "[stdout-contract] L2i 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2I-4 != $EXPECT_NEGATIVE_L2I_ACTIVE（N-93／N-94／N-95／N-110 退休）" >&2
+if [ $((EXPECT_NEGATIVE_L2I - 5)) -ne "$EXPECT_NEGATIVE_L2I_ACTIVE" ]; then
+  echo "[stdout-contract] L2i 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2I-5 != $EXPECT_NEGATIVE_L2I_ACTIVE（N-93／N-94／N-95／N-110 与 L2r N-96 退休）" >&2
   exit 2
 fi
 if [ $((EXPECT_NEGATIVE_L2J - 7)) -ne "$EXPECT_NEGATIVE_L2J_ACTIVE" ]; then
   echo "[stdout-contract] L2j 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2J-7 != $EXPECT_NEGATIVE_L2J_ACTIVE（N-117～120／N-125／N-126／N-140 退休）" >&2
   exit 2
 fi
-if [ $((EXPECT_NEGATIVE_L2L - 4)) -ne "$EXPECT_NEGATIVE_L2L_ACTIVE" ]; then
-  echo "[stdout-contract] L2l 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2L-4 != $EXPECT_NEGATIVE_L2L_ACTIVE（N-183／N-184／N-178／N-179 退休）" >&2
+if [ $((EXPECT_NEGATIVE_L2L - 6)) -ne "$EXPECT_NEGATIVE_L2L_ACTIVE" ]; then
+  echo "[stdout-contract] L2l 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2L-6 != $EXPECT_NEGATIVE_L2L_ACTIVE（N-183／N-184／N-178／N-179 与 L2r N-172／173 退休）" >&2
   exit 2
 fi
-if [ $((EXPECT_NEGATIVE_L2M - 2)) -ne "$EXPECT_NEGATIVE_L2M_ACTIVE" ]; then
-  echo "[stdout-contract] L2m 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2M-2 != $EXPECT_NEGATIVE_L2M_ACTIVE（N-200／N-198 退休）" >&2
+if [ $((EXPECT_NEGATIVE_L2M - 3)) -ne "$EXPECT_NEGATIVE_L2M_ACTIVE" ]; then
+  echo "[stdout-contract] L2m 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2M-3 != $EXPECT_NEGATIVE_L2M_ACTIVE（N-200／N-198 与 L2r N-195 退休）" >&2
   exit 2
 fi
-if [ $((EXPECT_NEGATIVE_L2N - 1)) -ne "$EXPECT_NEGATIVE_L2N_ACTIVE" ]; then
-  echo "[stdout-contract] L2n 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2N-1 != $EXPECT_NEGATIVE_L2N_ACTIVE（N-212 退休）" >&2
+if [ $((EXPECT_NEGATIVE_L2N - 2)) -ne "$EXPECT_NEGATIVE_L2N_ACTIVE" ]; then
+  echo "[stdout-contract] L2n 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2N-2 != $EXPECT_NEGATIVE_L2N_ACTIVE（N-212 与 L2r N-211 退休）" >&2
   exit 2
 fi
-if [ $((EXPECT_NEGATIVE_L2O - 6)) -ne "$EXPECT_NEGATIVE_L2O_ACTIVE" ]; then
-  echo "[stdout-contract] L2o 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2O-6 != $EXPECT_NEGATIVE_L2O_ACTIVE（N-220／N-233／N-235 与 L2q N-221／222／223 退休）" >&2
+if [ $((EXPECT_NEGATIVE_L2O - 7)) -ne "$EXPECT_NEGATIVE_L2O_ACTIVE" ]; then
+  echo "[stdout-contract] L2o 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2O-7 != $EXPECT_NEGATIVE_L2O_ACTIVE（N-220／N-233／N-235 与 L2q N-221／222／223、L2r N-230 退休）" >&2
   exit 2
 fi
-if [ $((EXPECT_NEGATIVE_L2P - 6)) -ne "$EXPECT_NEGATIVE_L2P_ACTIVE" ]; then
-  echo "[stdout-contract] L2p 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2P-6 != $EXPECT_NEGATIVE_L2P_ACTIVE（L2q 退休 N-237～242）" >&2
+if [ $((EXPECT_NEGATIVE_L2P - 7)) -ne "$EXPECT_NEGATIVE_L2P_ACTIVE" ]; then
+  echo "[stdout-contract] L2p 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2P-7 != $EXPECT_NEGATIVE_L2P_ACTIVE（L2q 退休 N-237～242 与 L2r N-246）" >&2
   exit 2
 fi
 if [ "$EXPECT_NEGATIVE_L2Q" -ne "$EXPECT_NEGATIVE_L2Q_ACTIVE" ]; then

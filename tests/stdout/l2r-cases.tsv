@@ -1,0 +1,41 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S23-01	tests/stdout/cases/S23-01.zor	run	0	expected/S23-01.stdout	-	bare scalar finite
+S23-02	tests/stdout/cases/S23-02.zor	run	0	expected/S23-02.stdout	-	qualified scalar finite
+S23-03	tests/stdout/cases/S23-03.zor	run	0	expected/S23-03.stdout	-	bare scalar special
+S23-04	tests/stdout/cases/S23-04.zor	run	0	expected/S23-04.stdout	-	qualified scalar special
+S23-05	tests/stdout/cases/S23-05.zor	run	0	expected/S23-05.stdout	-	bare binding unannotated
+S23-06	tests/stdout/cases/S23-06.zor	run	0	expected/S23-06.stdout	-	qualified binding unannotated
+S23-07	tests/stdout/cases/S23-07.zor	run	0	expected/S23-07.stdout	-	bare struct field
+S23-08	tests/stdout/cases/S23-08.zor	run	0	expected/S23-08.stdout	-	qualified struct field
+S23-09	tests/stdout/cases/S23-09.zor	run	0	expected/S23-09.stdout	-	bare array
+S23-10	tests/stdout/cases/S23-10.zor	run	0	expected/S23-10.stdout	-	qualified array
+S23-11	tests/stdout/cases/S23-11.zor	run	0	expected/S23-11.stdout	-	bare tuple
+S23-12	tests/stdout/cases/S23-12.zor	run	0	expected/S23-12.stdout	-	qualified tuple
+S23-13	tests/stdout/cases/S23-13.zor	run	0	expected/S23-13.stdout	-	bare multi-arg
+S23-14	tests/stdout/cases/S23-14.zor	run	0	expected/S23-14.stdout	-	qualified multi-arg
+S23-15	tests/stdout/cases/S23-15.zor	run	0	expected/S23-15.stdout	-	bare nested struct array
+S23-16	tests/stdout/cases/S23-16.zor	run	0	expected/S23-16.stdout	-	qualified nested struct array
+S23-17	tests/stdout/cases/S23-17.zor	run	0	expected/S23-17.stdout	-	bare enum-in-enum
+S23-18	tests/stdout/cases/S23-18.zor	run	0	expected/S23-18.stdout	-	qualified enum-in-enum
+S23-19	tests/stdout/cases/S23-19.zor	run	0	expected/S23-19.stdout	-	bare zero-arg
+S23-20	tests/stdout/cases/S23-20.zor	run	0	expected/S23-20.stdout	-	qualified zero-arg
+S23-21	tests/stdout/cases/S23-21.zor	run	0	expected/S23-21.stdout	-	qualified annotated binding
+S23-22	tests/stdout/cases/S23-22.zor	run	0	expected/S23-22.stdout	-	qualified disambiguation binding B
+S23-23	tests/stdout/cases/S23-23.zor	run	0	expected/S23-23.stdout	-	qualified disambiguation A and B
+S23-24	tests/stdout/cases/S23-24.zor	run	0	expected/S23-24.stdout	-	qualified multi-field
+S23-25	tests/stdout/cases/S23-25.zor	run	0	expected/S23-25.stdout	-	qualified named MAX arg
+S23-26	tests/stdout/cases/S23-26.zor	run	0	expected/S23-26.stdout	-	qualified named MIN_POSITIVE arg
+S23-27	tests/stdout/cases/S23-27.zor	run	0	expected/S23-27.stdout	-	qualified integer member arg
+S23-28	tests/stdout/cases/S23-28.zor	run	0	expected/S23-28.stdout	-	qualified negative integer member arg
+S23-29	tests/stdout/cases/S23-29.zor	run	0	expected/S23-29.stdout	-	qualified f32 payload
+S23-30	tests/stdout/cases/S23-30.zor	run	0	expected/S23-30.stdout	-	qualified zero-arg struct field
+S23-31	tests/stdout/cases/S23-31.zor	run	0	expected/S23-31.stdout	-	qualified zero-arg tuple
+S23-32	tests/stdout/cases/S23-32.zor	run	0	expected/S23-32.stdout	-	qualified zero-arg multi-arg
+S23-33	tests/stdout/cases/S23-33.zor	run	0	expected/S23-33.stdout	-	qualified enum-in-enum struct
+S23-34	tests/stdout/cases/S23-34.zor	run	0	expected/S23-34.stdout	-	qualified zero-arg annotated binding
+S23-35	tests/stdout/cases/S23-35.zor	run	0	expected/S23-35.stdout	-	qualified multi-arg mixed
+S23-36	tests/stdout/cases/S23-36.zor	run	0	expected/S23-36.stdout	-	qualified array zero-arg first
+S23-37	tests/stdout/cases/S23-37.zor	run	0	expected/S23-37.stdout	-	qualified tuple special
+S23-38	tests/stdout/cases/S23-38.zor	run	0	expected/S23-38.stdout	-	qualified multi-arg string
+S23-39	tests/stdout/cases/S23-39.zor	run	0	expected/S23-39.stdout	-	qualified scalar disambiguation B
+S23-40	tests/stdout/cases/S23-40.zor	run	0	expected/S23-40.stdout	-	qualified struct integer member arg
