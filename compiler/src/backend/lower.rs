@@ -853,6 +853,8 @@ fn lower_value(
             let AstTy::Named(en) = &t else {
                 return Err(SubsetError::new(l, c, "lower：枚举构造类型记录不符"));
             };
+            // L2r：限定名只用于解析；输出与裸变体一致（非限定变体名）。
+            let var = variant.rsplit_once("::").map(|(_, b)| b).unwrap_or(variant.as_str());
             let decl = b
                 .prog
                 .enums
@@ -862,8 +864,8 @@ fn lower_value(
             let (_, payload, _, _) = decl
                 .variants
                 .iter()
-                .find(|(n, _, _, _)| n == variant)
-                .ok_or_else(|| SubsetError::new(l, c, format!("lower：enum '{}' 无变体 '{}'", en, variant)))?;
+                .find(|(n, _, _, _)| n.as_str() == var)
+                .ok_or_else(|| SubsetError::new(l, c, format!("lower：enum '{}' 无变体 '{}'", en, var)))?;
             if payload.len() != args.len() {
                 return Err(SubsetError::new(l, c, "lower：枚举变体载荷数量不符"));
             }
@@ -871,7 +873,7 @@ fn lower_value(
             for a in args {
                 vals.push(lower_value(a, b, scope, values)?);
             }
-            Ok(Value::Enum { variant: variant.clone(), payload: vals })
+            Ok(Value::Enum { variant: var.to_string(), payload: vals })
         }
         Ex::Field(base, fname, fl, fc) => {
             let base_val = lower_value(base, b, scope, values)?;

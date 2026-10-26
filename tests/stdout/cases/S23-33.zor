@@ -1,0 +1,4 @@
+enum Inner { I(i64) }
+enum Outer { O(Inner) }
+struct S { o: Outer }
+fn main() { println(S { o: Outer::O(Inner::I(1)) }); }

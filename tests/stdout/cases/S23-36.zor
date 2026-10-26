@@ -1,0 +1,2 @@
+enum E { V(f64), N() }
+fn main() { let a: [E; 2] = [E::N(), E::V(1.5)]; println(a); }

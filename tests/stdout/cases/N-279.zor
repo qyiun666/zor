@@ -1,0 +1,2 @@
+struct S { f: i64 }
+fn main() { println(S::V(1)); }

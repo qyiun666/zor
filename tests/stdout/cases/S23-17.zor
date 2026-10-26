@@ -1,0 +1,3 @@
+enum Inner { I(i64) }
+enum Outer { O(Inner) }
+fn main() { println(O(I(1))); }

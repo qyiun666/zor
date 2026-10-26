@@ -231,16 +231,17 @@ fn width_and_payload_kind_are_strict() {
 }
 
 #[test]
-fn unary_minus_and_path_syntax_stay_fail_closed() {
+fn unary_minus_stays_fail_closed_and_qualified_path_is_supported() {
     assert_rc1(
         "unary",
         "enum E { V(f64) }\nfn main() {\n    println(V(-f64::NAN));\n}\n",
         "一元 '-' 不接受特殊值",
     );
-    assert_rc1(
-        "path",
+    // L2r：`E::V(...)` 限定构造转正（复用裸变体通道）。
+    assert_runs(
         "enum E { V(f64) }\nfn main() {\n    let e = E::V(f64::NAN);\n    println(1);\n}\n",
-        "E1101",
+        "path-l2r",
+        b"1\n",
     );
 }
 

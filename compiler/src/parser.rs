@@ -204,8 +204,9 @@ impl Parser {
     fn diag_at(&mut self, code: &str, l: usize, c: usize, msg: impl Into<String>) {
         self.diags.push(Diag::new(code, l, c, msg));
     }
-    /// L2h／L2o／L2p／L2q：`::` 支持六个特殊值、八个命名有限浮点常量与十个整型成员
-    /// （共 24 形式）；其余成员形态统一 E1101。单一发点，便于 e1101_catalog 守卫只记 +1。
+    /// L2h／L2o／L2p／L2q：浮点 `::` 支持六个特殊值、八个命名有限浮点常量与十个整型成员
+    /// （共 24 形式）；L2r：非浮点单层 `Ident::Ident` 的畸形形态亦经此发点。
+    /// 其余 `::` 形态统一 E1101；单一发点，便于 e1101_catalog 守卫只记 +1。
     fn err_float_member(&mut self, l: usize, c: usize, msg: impl Into<String>) {
         self.diag_at("E1101", l, c, msg);
     }
@@ -727,6 +728,25 @@ impl Parser {
                         Ex::Path(s, l, c)
                     }
                 }
+            }
+            // L2r：单层 `Enum::Variant` 限定构造（仅表达式原子；`f32|f64::` 已由前序分支截获）。
+            // 限定名统一以 `Ex::Path("E::V")` 承载，由 check 在 Call callee 位解析；
+            // 裸 `E::V`（无括号）作为值由 check 走既有 unknown identifier → E1101。
+            Tok::Ident(s)
+                if matches!(self.peek(), Tok::Colon)
+                    && matches!(self.peek_at(1), Tok::Colon) =>
+            {
+                self.bump();
+                self.bump();
+                let (ml, mc) = self.at();
+                let member = match self.bump() {
+                    Tok::Ident(m) => m,
+                    t => {
+                        self.err_float_member(ml, mc, format!("'{}::' 后需成员名，found {:?}", s, t));
+                        return Ex::Path(s, l, c);
+                    }
+                };
+                Ex::Path(format!("{}::{}", s, member), l, c)
             }
             Tok::Ident(s) => Ex::Path(s, l, c),
             Tok::LParen => {
