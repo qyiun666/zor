@@ -267,16 +267,17 @@ fn nested_width_and_kind_are_strict() {
 }
 
 #[test]
-fn nested_arity_path_box_and_arith_stay_fail_closed() {
+fn nested_arity_box_and_arith_stay_fail_closed_and_qualified_path_is_supported() {
     assert_rc1(
         "arity",
         "enum E { V(f64, f64) }\nstruct S { e: E }\nfn main() {\n    println(S { e: V(f64::NAN) });\n}\n",
         "E1601",
     );
-    assert_rc1(
-        "path",
+    // L2r：`E::V(...)` 在 struct 字段位转正；特殊值载荷按既有容器脊规则可打印。
+    assert_runs(
         "enum E { V(f64) }\nstruct S { e: E }\nfn main() {\n    println(S { e: E::V(f64::NAN) });\n}\n",
-        "E1101",
+        "path-l2r",
+        b"S { e: V(nan) }\n",
     );
     assert_rc1(
         "box",

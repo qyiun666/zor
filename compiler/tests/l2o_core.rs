@@ -261,7 +261,7 @@ fn unary_minus_and_arithmetic_stay_fail_closed() {
 }
 
 #[test]
-fn reverse_direction_box_enum_and_path_stay_fail_closed() {
+fn reverse_direction_and_box_enum_stay_fail_closed_and_qualified_path_is_supported() {
     assert_rc1(
         "reverse",
         "struct P { f: f64 }\nenum E { V(P, f64) }\nfn main() {\n    println(V(P { f: f64::MAX }, 1.5));\n}\n",
@@ -272,10 +272,11 @@ fn reverse_direction_box_enum_and_path_stay_fail_closed() {
         "enum E { V(f64) }\nfn main() {\n    let b: Box<E> = box V(f64::MAX);\n    println(*b);\n}\n",
         "let 类型标注",
     );
-    assert_rc1(
-        "path",
+    // L2r：`E::V(...)` 限定构造转正。
+    assert_runs(
         "enum E { V(f64) }\nfn main() {\n    let e = E::V(f64::MAX);\n    println(e);\n}\n",
-        "E1101",
+        "path-l2r",
+        b"V(1.7976931348623157e+308)\n",
     );
 }
 
