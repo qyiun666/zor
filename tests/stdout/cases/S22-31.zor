@@ -1,0 +1,1 @@
+fn main() { let a: [i32; 2] = [f32::MAX_EXP, f32::MIN_EXP]; println(a); }

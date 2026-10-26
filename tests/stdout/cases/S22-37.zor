@@ -1,0 +1,3 @@
+struct S { e: E }
+enum E { V(i32) }
+fn main() { println(S { e: V(f32::MANTISSA_DIGITS) }); }
