@@ -118,6 +118,8 @@ pub enum ConstValue {
 pub enum BoxConst {
     Bits(i128),
     Composite(ConstValue),
+    /// L2v：运行期枚举变量副本（tag＋union 初始化配方＋打印值树）。
+    EnumLive { init: EnumInit, value: Value },
 }
 
 /// 载荷 typedef 定义（lower 按首次使用序登记，emit 在 main 之前发射）。
@@ -253,7 +255,7 @@ impl ArithOp {
 }
 
 /// 整型算术表达式树：操作数同宽（check 已判），节点带源位置。
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum IntExpr {
     Const(i128),
     Local(LocalId),
@@ -285,16 +287,37 @@ pub enum StrArg {
     Bytes(Vec<u8>),
 }
 
+/// L2v：枚举副本的字段物化配方（常量或运行期整型表达式）。
+#[derive(Clone, Debug, PartialEq)]
+pub enum EnumFieldInit {
+    Const(ConstValue),
+    Int(IntExpr),
+}
+
+/// L2v：枚举副本的 tag＋union 初始化配方。
+#[derive(Clone, Debug, PartialEq)]
+pub struct EnumInit {
+    pub name: String,
+    pub tag: u32,
+    pub variant: String,
+    pub fields: Vec<(Ty, EnumFieldInit)>,
+}
+
 /// L2d 打印值树：结构在编译期确定；运行期整型叶子引用已求值的局部。
 /// 可打印复合全部是 Copy，树不承载所有权／drop 语义。
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Int { ty: IntTy, expr: IntExpr },
     Bytes(Vec<u8>),
     Tuple(Vec<Value>),
     Array(Vec<Value>),
     Struct { name: String, fields: Vec<(String, Value)> },
-    Enum { variant: String, payload: Vec<Value> },
+    Enum {
+        variant: String,
+        payload: Vec<Value>,
+        /// L2v：可物化配方（构造时生成；常量树来源为 None）。
+        init: Option<EnumInit>,
+    },
 }
 
 /// L2c 打印实参：字符串／字节串、三宽度运行期整型、编译期格式化字节。

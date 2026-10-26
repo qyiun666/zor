@@ -340,6 +340,14 @@ fn let_init_kind(
                 }
                 return Ok(BindingKind::Box(payload));
             }
+            // L2v：变量枚举载荷（`box e`；Copy 语义）——仅标注 Box<enum> 且字段全标量。
+            if let (Some(p), Ex::Path(..)) = (&ann_payload, inner.as_ref()) {
+                if is_enum_payload_ty(p, prog)
+                    && matches!(types.expr_ty(init), Some(Ty::BoxTy(t)) if **t == *p)
+                {
+                    return Ok(BindingKind::Box(p.clone()));
+                }
+            }
             // L2k：复合字面量载荷（常量树；变量即 fail-closed）。
             // L2t：枚举常量载荷（`box V(..)`／`box E::V(..)`）同走复合通道。
             if let Some(p) = &ann_payload {
@@ -549,6 +557,10 @@ fn box_reinit_ok(
             matches!(x.as_ref(), Ex::Lit(Lit::Float(_), _, _))
                 && matches!(p.as_ref(), Ty::Prim("f32") | Ty::Prim("f64"))
         }
+        // L2v：变量枚举重初始化（Copy；类型表二次核对）。
+        Ex::Path(..) => {
+            is_enum_payload_ty(p, prog) && types.expr_ty(inner) == Some(p.as_ref())
+        }
         Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..) => {
             is_composite_payload_ty(p) && l2k_payload_ty(p, prog) && payload_init_ok(inner, types, prog)
         }
@@ -559,6 +571,12 @@ fn box_reinit_ok(
 /// L2k：复合载荷类型（struct／定长数组）——标量顶层面不扩。
 fn is_composite_payload_ty(t: &Ty) -> bool {
     matches!(t, Ty::Named(_) | Ty::Arr(..))
+}
+
+/// L2v：枚举载荷类型（Box<enum> 变量通道）——命名枚举且字段全标量。
+fn is_enum_payload_ty(t: &Ty, prog: &Prog) -> bool {
+    matches!(t, Ty::Named(n) if prog.enums.iter().any(|e| &e.name == n))
+        && l2k_payload_ty(t, prog)
 }
 
 /// L2k Box 复合载荷白名单（深递归）：8 整型宽度／bool／f32／f64／struct／定长数组；
