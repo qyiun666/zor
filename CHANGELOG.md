@@ -4,6 +4,42 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.17] - 2026-10-26
+
+内部验证里程碑，非可用语言版本：本版为 L2r「限定枚举变体构造」——在 0.3.16 的十个整型常量之上，开放单层限定枚举变体构造 `Enum::Variant(args...)`（含零实参 `Enum::Variant()`）；单位变体作值（`E::W` 不带括号）不纳入；限定形式输出与裸变体**逐字节一致**（`E::V(1.5)`→`V(1.5)`、`E::N()`→`N`、`Outer::O(Inner::I(1))`→`O(I(1))`）；限定符必须是已声明枚举、变体必须属于该枚举，裸变体首匹配语义零改；不新增 E 码／关键字／语法／运行期能力，无堆／drop／ASAN 变化；E1101 编目保持 30。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：支持位置与裸变体同矩阵（标量 `println`／绑定／struct 字段／数组／元组／多实参／既有嵌套／enum-in-enum）；`E::V(args...)` 与 `E::N()` 均复用既有枚举构造通道；消歧 `B::V(1.5)` 解析到 B，`let x: B = B::V(1.5)` 成功，`let x: A = B::V(1.5)` E1201；裸 `V(1.5)` 首匹配不变。仍 fail-closed：裸 `E::V`／单位变体 `E::W` 作值 E1101；多级路径／模块／关联项／关联函数／非枚举限定 E1101；未知枚举／非枚举／变体不属于该枚举 E1101；错元数 E1601；跨宽 E1201；整→浮点 E1202；bool→浮点 E1201；`Box<enum>`／含 enum 字段 Box／嵌套 Box／变量载荷／反方向 N-217／218 维持既有拦截；`(E::V)(1)` 属既有 parser 泛化，不宣称、不单测。E1101 编目 30（lexer 3／parser 20／check 7）；不新增 E 码／关键字／语法；无堆／drop／ASAN。计数：P=**40**、Q=**18**、Ret=**7**（N-96／172／173／195／211／230／246，仅执行面；源／TSV／各代 baseline 字节零改、ID 不复用）；Q 码位 E1101×8／E1601×2／E1201×3／E1202×1／`let 类型标注`×4；R=**390**（350＋40）、G=**239**（228−7＋18）、T=**646**、A=**650**、N=**759**（701＋40＋18）；`l2r-baseline` cases **759**／files **1163**／unique **1163**；旧 13 基线 162／209、188／246、206／275、247／327、297／398、345／466、417／590、461／660、506／734、554／816、599／891、645／963、701／1062 与 `l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 均零改；分代活跃 L2I=26／L2L=14／L2M=15／L2N=14／L2O=10／L2P=15／L2Q=16／L2R=18。ASAN K=0（无新增堆路径、默认 manifest 48／41／7 零改）；Linux x86_64 为唯一终证，macOS 仅辅助；无安装／打包／性能承诺。
+
+### Added
+
+- **限定枚举变体构造 `E::V(args...)`**：单层 `Enum::Variant(args...)`，含零实参 `Enum::Variant()`；限定符须为已声明枚举、变体须属于该枚举；输出与裸变体逐字节一致（枚举名不进输出）；消歧仅经限定路径，裸变体首匹配不变；A 档位置与裸变体同矩阵。
+- **`l2r-baseline` 第十四基线**：`stdout-contract` 在 `l2q` 之后校验 `l2r-baseline`（759／1163／1163），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿；旧 13 基线字节零改。
+
+### Changed
+
+- **计数与资产**：Stage-1 P=40 正例、Q=18 负控；Ret=7 仅执行面（N-96／172／173／195／211／230／246）；R 350→390、G 228→239、T 595→646、A 599→650、N 701→759、M 1062→1163；`l2r-baseline.tsv` 759 条（760 行含表头）、`.sha256` 1163 行；分代活跃 L2I=26／L2L=14／L2M=15／L2N=14／L2O=10／L2P=15／L2Q=16／L2R=18；Q 码位 E1101×8／E1601×2／E1201×3／E1202×1／`let 类型标注`×4。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.16` 落至 `0.3.17`；`compiler/Cargo.toml:5` description 版本串同步；`Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.17`。
+- **CI**：十四基线并存；无新 job／YAML／ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2r-01：**PASS**——feature head `302e809`（PR #170）；CI run `40284149176`；`baseline`／`stdout-contract`／`runtime-codes`／`asan-linux`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2r-baseline|cases=759 files=1163 unique=1163 fail=0`；`PASS|stdout-contract|runtime=390 negative=239 fail=0 ran=390/239`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；`PASS|asan-l2k|cases=6 fail=0 ran=6/6`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：十四基线判词全 PASS；ASAN 第二 manifest **6/6**、默认 manifest **48／41／7** 零改；P 40/40（两轮）、六档 `-O*` **240/240**、Q 18/18（含 `let 类型标注` 4/4）、7/7 翻转、locale **40/40 SAME**；`cargo test --release --locked` **448 passed／0 failed**（`l2r_core` 9）；E1101 编目 **30**；全 job `SKIP|`／`FAIL|` 0 行。
+- 计数口径：P=**40**／Q=**18**／Ret=**7**／R=**390**／G=**239**／T=**646**／A=**650**／N=**759**／M=**1163**。
+- 证据：产品签署 `shared/ZOR-L2r-Stage2-S23会签-产品-v1-signed.md`（71 行／6238 B，sha256 `1d34dbd2…acc62`）；QA Stage-2 报告 `shared/ZOR-L2r-Stage2-验证报告-质量-v1.md`（94 行／6075 B，sha256 `49164ca5…79e1`）；QA 会签输入 `0261493a…1751`（152 行）；矩阵 v2 `fa0e1aaf…aaca`（152 行）；`l2r-baseline.tsv` `f4af075f…dec38ac`；`l2r-baseline.sha256` `4503b5cd…266e397`；PR #170 **114 files**（QA 101＋核心 10＋CI 4，含 1 处重叠）。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **单位变体作值**：`E::W`（不带括号）不纳入，裸 `E::W` 维持 E1101；零载荷一律 `E::W()`，输出 `W`；裸 `N()` 为既有能力。
+- **`(E::V)(1)` 括号化 callee**：属既有 parser 泛化自然通过，本版不宣称、不单测；若后续要作为能力须单列裁定。
+- **⑤／② 未纳入**：`Box<enum>`／含 enum 字段 Box／嵌套 Box／变量载荷／反方向 N-217／218 维持 fail-closed；⑤ Box 常量性边界、② `Box<enum>` 结转后续切片。
+- **既有文案**：L2q 遗留 `check.rs:654` 一元负号「仅直接打印」括注仍按 Known issue 跟踪（④b／文案片），本版未改。
+- **E1101 编目**：保持 30（lexer 3／parser 20／check 7）；若后续新增发点，须先列数量／位置／理由并经产品＋QA 同意，不得静默扩面。
+- **版本语境**：0.3.16 及更早节的 fail-closed／结转表述按版本语境保留、不回改；历史节逐字节零改。
+- **ASAN**：K=0（无新增 ASAN 用例、默认 manifest 48／41／7 零改）不等于「已证无泄漏」。
+- **平台／发布／性能**：Linux x86_64 唯一终证，macOS 仅辅助；零 tag／Release，不构成安装或环境可用性承诺；不出性能数字、不作性能承诺。
+
 ## [0.3.16] - 2026-10-26
 
 内部验证里程碑，非可用语言版本：本版为 L2q「十整型常量」——在 0.3.15 的 `MIN_POSITIVE` 之上，新增 `MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` × f64／f32 共 **10 个整型常量成员**；按 ZOR 既有「整数字面量」语义接入（无标注默认 `i64`、有整型标注时收敛、与同值十进制整数字面量逐字节一致），`MIN_EXP` 的值本身为负（-1021／-125），不是一元负号表达式；同时完成 ④a E1101 支持面枚举与陈旧版本串同步（零行为变更），并把 `l2q-baseline` 接入 `stdout-contract`，形成 `l2e`～`l2q` 十三基线 fail-closed 门禁。R2 按产品 v1.1／v1.2 口径改判：命名整型成员 → 浮点标量 `Box` 载荷与整数字面量同码 **E1201**（N-268 改判），N-115／N-116 红线保持；⑤ `Box<struct>`／`Box<[T;N]>` 内含命名整型成员归后续切片，本版不测试、不宣称。按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
