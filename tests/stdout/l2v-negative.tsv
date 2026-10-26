@@ -1,0 +1,20 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-356	tests/stdout/cases/N-356.zor	1	none	box 载荷须为字面量常量	zor: runtime error	expression payload box V(x)
+N-357	tests/stdout/cases/N-357.zor	1	none	box 载荷须为字面量常量	zor: runtime error	expression payload box V(1+2)
+N-358	tests/stdout/cases/N-358.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated box e
+N-359	tests/stdout/cases/N-359.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-360	tests/stdout/cases/N-360.zor	1	none	let 类型标注	zor: runtime error	Box composite enum field
+N-361	tests/stdout/cases/N-361.zor	1	none	let 类型标注	zor: runtime error	Box array enum element
+N-362	tests/stdout/cases/N-362.zor	1	none	let 类型标注	zor: runtime error	enum variant with Box field
+N-363	tests/stdout/cases/N-363.zor	1	none	let 类型标注	zor: runtime error	enum variant with struct field
+N-364	tests/stdout/cases/N-364.zor	1	none	let 类型标注	zor: runtime error	enum variant with array field
+N-365	tests/stdout/cases/N-365.zor	1	none	let 类型标注	zor: runtime error	enum variant with enum field
+N-366	tests/stdout/cases/N-366.zor	1	none	let 类型标注	zor: runtime error	enum variant with tuple field
+N-367	tests/stdout/cases/N-367.zor	1	none	let 类型标注	zor: runtime error	enum variant with unit field
+N-368	tests/stdout/cases/N-368.zor	1	none	box 载荷非整型字面量	zor: runtime error	non-enum variable payload
+N-369	tests/stdout/cases/N-369.zor	1	none	解引用源不是 Box 绑定	zor: runtime error	let v = *b
+N-370	tests/stdout/cases/N-370.zor	1	none	println 实参不可打印	zor: runtime error	println box itself
+N-371	tests/stdout/cases/N-371.zor	1	none	println 实参不可打印	zor: runtime error	println tuple containing deref
+N-372	tests/stdout/cases/N-372.zor	1	none	E2301	zor: runtime error	double unbox
+N-373	tests/stdout/cases/N-373.zor	1	none	E2301	zor: runtime error	use after unbox
+N-374	tests/stdout/cases/N-374.zor	1	none	E2101	zor: runtime error	use after move

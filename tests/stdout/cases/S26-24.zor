@@ -1,0 +1,8 @@
+enum E { V(f64) }
+fn main() {
+    let x = f64::NEG_INFINITY;
+    let e = V(x);
+    let b: Box<E> = box e;
+    println(*b);
+    println(e);
+}
