@@ -179,15 +179,6 @@ fn enum_struct_array_tuple_multi_arg() {
 }
 
 #[test]
-fn box_composite_payloads() {
-    assert_runs(
-        "struct S { a: i16, b: u8 }\nfn main() {\n    let b: Box<S> = box S { a: f64::MAX_EXP, b: f32::DIGITS };\n    println(*b);\n    let c: Box<[i64; 2]> = box [f64::MAX_EXP, f64::MIN_EXP];\n    println(*c);\n}\n",
-        "box-composite",
-        b"S { a: 1024, b: 6 }\n[1024, -1021]\n",
-    );
-}
-
-#[test]
 fn integer_expressions() {
     assert_runs(
         "fn main() {\n    println(f64::MAX_EXP + f64::DIGITS);\n    println(f64::MAX_EXP - f64::DIGITS);\n    println(f64::MAX_EXP / f64::RADIX);\n    println(f64::MAX_EXP % f64::DIGITS);\n    println(-f64::RADIX);\n    println(-f64::MIN_EXP);\n    let a: i64 = 1;\n    println(a + f64::MAX_EXP);\n    let b: i16 = -f64::RADIX;\n    println(b);\n    let c: i16 = -f64::MIN_EXP;\n    println(c);\n}\n",

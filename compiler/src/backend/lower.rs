@@ -1365,15 +1365,6 @@ fn const_value(
             }
             Ok(ConstValue::Int(n))
         }
-        // L2q：具名整型常量（含负值）按声明宽度直接判定。
-        Ex::Lit(Lit::IntConst(v), il, ic) => {
-            let irt = ast_to_ir(want)
-                .ok_or_else(|| SubsetError::new(l, c, "lower：box 载荷叶子类型不在 codegen 子集"))?;
-            if !int_in_range(&irt, *v) {
-                return Err(SubsetError::new(*il, *ic, "lower：整型字面量超出声明宽度"));
-            }
-            Ok(ConstValue::Int(*v))
-        }
         Ex::Lit(Lit::Float(v), fl, fc) => match want {
             AstTy::Prim("f32") => Ok(ConstValue::F32Bits((*v as f32).to_bits())),
             AstTy::Prim("f64") => Ok(ConstValue::F64Bits(v.to_bits())),
