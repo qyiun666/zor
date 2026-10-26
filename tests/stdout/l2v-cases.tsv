@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S26-01	tests/stdout/cases/S26-01.zor	run	0	expected/S26-01.stdout	-	Box<E> from i64 variable; Copy
+S26-02	tests/stdout/cases/S26-02.zor	run	0	expected/S26-02.stdout	-	Box<E> from f64 variable
+S26-03	tests/stdout/cases/S26-03.zor	run	0	expected/S26-03.stdout	-	Box<E> from bool variable
+S26-04	tests/stdout/cases/S26-04.zor	run	0	expected/S26-04.stdout	-	zero-field enum variable
+S26-05	tests/stdout/cases/S26-05.zor	run	0	expected/S26-05.stdout	-	multi-field enum variable
+S26-06	tests/stdout/cases/S26-06.zor	run	0	expected/S26-06.stdout	-	mixed scalar fields
+S26-07	tests/stdout/cases/S26-07.zor	run	0	expected/S26-07.stdout	-	qualified enum variable
+S26-08	tests/stdout/cases/S26-08.zor	run	0	expected/S26-08.stdout	-	runtime IntExpr field
+S26-09	tests/stdout/cases/S26-09.zor	run	0	expected/S26-09.stdout	-	runtime f64 variable field
+S26-10	tests/stdout/cases/S26-10.zor	run	0	expected/S26-10.stdout	-	runtime special NAN
+S26-11	tests/stdout/cases/S26-11.zor	run	0	expected/S26-11.stdout	-	runtime named MAX
+S26-12	tests/stdout/cases/S26-12.zor	run	0	expected/S26-12.stdout	-	runtime integer member
+S26-13	tests/stdout/cases/S26-13.zor	run	0	expected/S26-13.stdout	-	variable reinit i64; e2 usable
+S26-14	tests/stdout/cases/S26-14.zor	run	0	expected/S26-14.stdout	-	variable reinit f64
+S26-15	tests/stdout/cases/S26-15.zor	run	0	expected/S26-15.stdout	-	Box move; e still usable
+S26-16	tests/stdout/cases/S26-16.zor	run	0	expected/S26-16.stdout	-	unbox; e still usable
+S26-17	tests/stdout/cases/S26-17.zor	run	0	expected/S26-17.stdout	-	two Boxes from same Copy e
+S26-18	tests/stdout/cases/S26-18.zor	run	0	expected/S26-18.stdout	-	i8 negative variable
+S26-19	tests/stdout/cases/S26-19.zor	run	0	expected/S26-19.stdout	-	u64 max variable
+S26-20	tests/stdout/cases/S26-20.zor	run	0	expected/S26-20.stdout	-	f32 variable
+S26-21	tests/stdout/cases/S26-21.zor	run	0	expected/S26-21.stdout	-	annotated enum variable
+S26-22	tests/stdout/cases/S26-22.zor	run	0	expected/S26-22.stdout	-	qualified variable with named MAX
+S26-23	tests/stdout/cases/S26-23.zor	run	0	expected/S26-23.stdout	-	zero-field variable reinit across variants
+S26-24	tests/stdout/cases/S26-24.zor	run	0	expected/S26-24.stdout	-	runtime NEG_INFINITY
