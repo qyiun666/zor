@@ -1,0 +1,6 @@
+enum N { A() }
+fn main() {
+    let b: Box<N> = box A();
+    println(*b);
+    unbox b;
+}

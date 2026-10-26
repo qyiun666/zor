@@ -1,0 +1,26 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-321	tests/stdout/cases/N-321.zor	1	none	box 载荷须为字面量常量	zor: runtime error	variable enum payload
+N-322	tests/stdout/cases/N-322.zor	1	none	box 载荷须为字面量常量	zor: runtime error	expression enum payload
+N-323	tests/stdout/cases/N-323.zor	1	none	赋值语句	zor: runtime error	variable enum reinit
+N-324	tests/stdout/cases/N-324.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-325	tests/stdout/cases/N-325.zor	1	none	let 类型标注	zor: runtime error	Box composite enum field
+N-326	tests/stdout/cases/N-326.zor	1	none	let 类型标注	zor: runtime error	Box array enum element
+N-327	tests/stdout/cases/N-327.zor	1	none	let 类型标注	zor: runtime error	enum variant with Box field
+N-328	tests/stdout/cases/N-328.zor	1	none	let 类型标注	zor: runtime error	enum variant with struct field
+N-329	tests/stdout/cases/N-329.zor	1	none	let 类型标注	zor: runtime error	enum variant with array field
+N-330	tests/stdout/cases/N-330.zor	1	none	let 类型标注	zor: runtime error	enum variant with enum field
+N-331	tests/stdout/cases/N-331.zor	1	none	let 类型标注	zor: runtime error	enum variant with tuple field
+N-332	tests/stdout/cases/N-332.zor	1	none	let 类型标注	zor: runtime error	enum variant with unit field
+N-333	tests/stdout/cases/N-333.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated Box<enum>
+N-334	tests/stdout/cases/N-334.zor	1	none	解引用源不是 Box 绑定	zor: runtime error	let v = *b
+N-335	tests/stdout/cases/N-335.zor	1	none	println 实参不可打印	zor: runtime error	println box itself
+N-336	tests/stdout/cases/N-336.zor	1	none	println 实参不可打印	zor: runtime error	println tuple containing deref
+N-337	tests/stdout/cases/N-337.zor	1	none	E2301	zor: runtime error	double unbox
+N-338	tests/stdout/cases/N-338.zor	1	none	E2301	zor: runtime error	use after unbox
+N-339	tests/stdout/cases/N-339.zor	1	none	E2101	zor: runtime error	use after move
+N-340	tests/stdout/cases/N-340.zor	1	none	E1201	zor: runtime error	cross-width variant arg
+N-341	tests/stdout/cases/N-341.zor	1	none	E1202	zor: runtime error	int to float variant arg
+N-342	tests/stdout/cases/N-342.zor	1	none	E1201	zor: runtime error	bool to float variant arg
+N-343	tests/stdout/cases/N-343.zor	1	none	E1201	zor: runtime error	non-matching enum value
+N-344	tests/stdout/cases/N-344.zor	1	none	E1201	zor: runtime error	unknown variant
+N-345	tests/stdout/cases/N-345.zor	1	none	E1601	zor: runtime error	wrong variant arity
