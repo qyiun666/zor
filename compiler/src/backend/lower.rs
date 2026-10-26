@@ -128,7 +128,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                         continue;
                     }
                     let id = LocalId(locals.len() as u32);
-                    let local_ty = let_type(types, init, *l, *c)?;
+                    let local_ty = let_type(types, prog, init, *l, *c)?;
                     match init {
                         Ex::Lit(Lit::Str(s), _, _) => {
                             let n = match local_ty {
@@ -167,7 +167,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     Some(AstTy::BoxTy(p)) => (**p).clone(),
                                     _ => return Err(SubsetError::new(*l, *c, "lower：box 复合载荷缺少标注")),
                                 };
-                                let cv = const_value(inner, &payload_ast, types, prog)?;
+                                let cv = const_value(inner, &payload_ast, types, &slots, &scope, prog)?;
                                 register_payload(&payload, prog, &mut payload_defs)?;
                                 body.push(Stmt::BindBox {
                                     local: id,
@@ -461,7 +461,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     Some(AstTy::BoxTy(p)) => (**p).clone(),
                                     _ => return Err(SubsetError::new(*al, *ac, "lower：box 复合载荷缺少标注")),
                                 };
-                                let cv = const_value(inner, &payload_ast, types, prog)?;
+                                let cv = const_value(inner, &payload_ast, types, &slots, &scope, prog)?;
                                 register_payload(&payload, prog, &mut payload_defs)?;
                                 body.push(Stmt::BindBoxAssign {
                                     local: ia,
@@ -1227,7 +1227,7 @@ fn require_box(slots: &[Slot], id: LocalId, line: usize, col: usize) -> Result<(
 }
 
 /// 绑定类型：check 的 `let` 类型表 → IR 类型。
-fn let_type(types: &TypeTable, init: &Ex, l: usize, c: usize) -> Result<Ty, SubsetError> {
+fn let_type(types: &TypeTable, prog: &Prog, init: &Ex, l: usize, c: usize) -> Result<Ty, SubsetError> {
     let t = types
         .let_ty(l, c)
         .ok_or_else(|| SubsetError::new(l, c, "lower：let 缺少 type table 记录"))?;
@@ -1235,7 +1235,7 @@ fn let_type(types: &TypeTable, init: &Ex, l: usize, c: usize) -> Result<Ty, Subs
         .expr_ty(init)
         .ok_or_else(|| SubsetError::new(l, c, "lower：let 初值缺少 type table 记录"))?;
     if let AstTy::BoxTy(p) = t {
-        if let Some(payload) = box_payload_ir_ty(p) {
+        if let Some(payload) = box_payload_ir_ty(p, prog) {
             if is_composite_payload(&payload) {
                 // L2k：复合载荷标注无 `ast_to_ir` 映射，按 AST 精确相等核对。
                 if init_t != t {
@@ -1307,11 +1307,12 @@ fn ast_to_ir(t: &AstTy) -> Option<Ty> {
 
 /// L2k：仅 struct／定长数组载荷进入复合常量树通道。
 fn is_composite_payload(t: &Ty) -> bool {
-    matches!(t, Ty::Struct(_) | Ty::Array(..))
+    matches!(t, Ty::Struct(_) | Ty::Array(..) | Ty::Enum(_))
 }
 
 /// L2k：Box 载荷的 IR 类型（标量沿用 `ast_to_ir`，复合在此展开）。
-fn box_payload_ir_ty(t: &AstTy) -> Option<Ty> {
+/// L2t：`Named` 需按 `Prog` 区分 enum 与 struct。
+fn box_payload_ir_ty(t: &AstTy, prog: &Prog) -> Option<Ty> {
     match t {
         AstTy::Prim(p) => match *p {
             "i8" => Some(Ty::I8),
@@ -1327,9 +1328,13 @@ fn box_payload_ir_ty(t: &AstTy) -> Option<Ty> {
             "bool" => Some(Ty::Bool),
             _ => None,
         },
-        AstTy::Named(n) => Some(Ty::Struct(n.clone())),
+        AstTy::Named(n) => Some(if prog.enums.iter().any(|e| &e.name == n) {
+            Ty::Enum(n.clone())
+        } else {
+            Ty::Struct(n.clone())
+        }),
         AstTy::Arr(elem, n) if !matches!(elem.as_ref(), AstTy::Prim("byte")) => {
-            Some(Ty::Array(Box::new(box_payload_ir_ty(elem)?), *n))
+            Some(Ty::Array(Box::new(box_payload_ir_ty(elem, prog)?), *n))
         }
         _ => None,
     }
@@ -1347,6 +1352,8 @@ fn const_value(
     e: &Ex,
     want: &AstTy,
     types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
     prog: &Prog,
 ) -> Result<ConstValue, SubsetError> {
     let (l, c) = subset::expr_span(e);
@@ -1394,6 +1401,82 @@ fn const_value(
             AstTy::Prim("bool") => Ok(ConstValue::Bool(*v)),
             _ => Err(SubsetError::new(l, c, "lower：bool 初值类型与标注不符")),
         },
+        // L2t：枚举常量变体（字段仅标量；常量子集）。
+        Ex::Call(callee, args, cl, cc) => {
+            let AstTy::Named(en) = want else {
+                return Err(SubsetError::new(*cl, *cc, "lower：枚举构造类型与标注不符"));
+            };
+            let decl = prog
+                .enums
+                .iter()
+                .find(|e| &e.name == en)
+                .ok_or_else(|| SubsetError::new(*cl, *cc, format!("lower：未知 enum '{}'", en)))?;
+            let Ex::Path(v, _, _) = callee.as_ref() else {
+                return Err(SubsetError::new(*cl, *cc, "lower：枚举构造形态"));
+            };
+            let var = match v.rsplit_once("::") {
+                Some((q, r)) if q == en.as_str() => r,
+                Some(_) => {
+                    return Err(SubsetError::new(*cl, *cc, "lower：枚举限定名与标注不符"));
+                }
+                None => v.as_str(),
+            };
+            let Some((tag, (_, payload, _, _))) = decl
+                .variants
+                .iter()
+                .enumerate()
+                .find(|(_, (n, _, _, _))| n.as_str() == var)
+            else {
+                return Err(SubsetError::new(
+                    *cl,
+                    *cc,
+                    format!("lower：enum '{}' 无变体 '{}'", en, var),
+                ));
+            };
+            if payload.len() != args.len() {
+                return Err(SubsetError::new(*cl, *cc, "lower：枚举变体载荷数量不符"));
+            }
+            let mut fields = Vec::with_capacity(args.len());
+            for (a, (fty, _, _)) in args.iter().zip(payload.iter()) {
+                let ir = box_payload_ir_ty(fty, prog)
+                    .ok_or_else(|| SubsetError::new(*cl, *cc, "lower：枚举字段类型不在载荷白名单"))?;
+                if !matches!(
+                    ir,
+                    Ty::I8
+                        | Ty::I16
+                        | Ty::I32
+                        | Ty::I64
+                        | Ty::U8
+                        | Ty::U16
+                        | Ty::U32
+                        | Ty::U64
+                        | Ty::Bool
+                        | Ty::F32
+                        | Ty::F64
+                ) {
+                    return Err(SubsetError::new(*cl, *cc, "lower：枚举字段类型不在载荷白名单"));
+                }
+                let (al, ac) = subset::expr_span(a);
+                let val = const_scalar(a, &ir, types, slots, scope)
+                    .map_err(|_| SubsetError::new(al, ac, "box 载荷须为字面量常量"))?;
+                let cv = match val {
+                    ConstVal::Int(n) => ConstValue::Int(n),
+                    ConstVal::Bool(b) => ConstValue::Bool(b),
+                    ConstVal::F32(v) => ConstValue::F32Bits(v.to_bits()),
+                    ConstVal::F64(v) => ConstValue::F64Bits(v.to_bits()),
+                    ConstVal::F32Special(k) => ConstValue::F32Bits(special_f32(k).to_bits()),
+                    ConstVal::F64Special(k) => ConstValue::F64Bits(special_f64(k).to_bits()),
+                    _ => return Err(SubsetError::new(al, ac, "box 载荷须为字面量常量")),
+                };
+                fields.push((ir, cv));
+            }
+            Ok(ConstValue::Enum {
+                name: en.clone(),
+                tag: tag as u32,
+                variant: var.to_string(),
+                fields,
+            })
+        }
         Ex::Un(op, inner, ul, uc) if op == "-" => {
             let inner_ty = types
                 .expr_ty(inner)
@@ -1422,7 +1505,7 @@ fn const_value(
                 }
                 return Ok(ConstValue::Int(n));
             }
-            match const_value(inner, want, types, prog)? {
+            match const_value(inner, want, types, slots, scope, prog)? {
                 ConstValue::Int(n) => {
                     if !matches!(
                         want,
@@ -1462,9 +1545,9 @@ fn const_value(
                     .iter()
                     .find(|(n, _)| n == fname)
                     .ok_or_else(|| SubsetError::new(*rl, *rc, format!("lower：结构体字段 '{}' 未初始化", fname)))?;
-                let f_ir = box_payload_ir_ty(fty)
+                let f_ir = box_payload_ir_ty(fty, prog)
                     .ok_or_else(|| SubsetError::new(*rl, *rc, format!("lower：字段 '{}' 类型不在载荷白名单", fname)))?;
-                let cv = const_value(&v.1, fty, types, prog)?;
+                let cv = const_value(&v.1, fty, types, slots, scope, prog)?;
                 out.push((fname.clone(), f_ir, cv));
             }
             if out.len() != fields.len() {
@@ -1479,11 +1562,11 @@ fn const_value(
             if *n != es.len() as u64 {
                 return Err(SubsetError::new(*al, *ac, "lower：数组元素数量与标注不符"));
             }
-            let elem_ir = box_payload_ir_ty(elem)
+            let elem_ir = box_payload_ir_ty(elem, prog)
                 .ok_or_else(|| SubsetError::new(*al, *ac, "lower：数组元素类型不在载荷白名单"))?;
             let mut out = Vec::with_capacity(es.len());
             for x in es {
-                out.push(const_value(x, elem, types, prog)?);
+                out.push(const_value(x, elem, types, slots, scope, prog)?);
             }
             Ok(ConstValue::Array { elem: elem_ir, values: out })
         }
@@ -1505,7 +1588,7 @@ fn register_payload(
             let decl = struct_decl(prog, name)?;
             let mut fields = Vec::with_capacity(decl.fields.len());
             for (fname, fty, _, _) in &decl.fields {
-                let ir = box_payload_ir_ty(fty)
+                let ir = box_payload_ir_ty(fty, prog)
                     .ok_or_else(|| SubsetError::new(0, 0, format!("lower：字段 '{}' 类型不在载荷白名单", fname)))?;
                 register_payload(&ir, prog, defs)?;
                 let cty = payload_c_ty(&ir)
@@ -1514,7 +1597,9 @@ fn register_payload(
             }
             let def_name = payload_c_ty(t).expect("struct payload c type");
             if !defs.iter().any(|d| match d {
-                PayloadDef::Struct { name, .. } | PayloadDef::Array { name, .. } => name == &def_name,
+                PayloadDef::Struct { name, .. }
+                | PayloadDef::Array { name, .. }
+                | PayloadDef::Enum { c_name: name, .. } => name == &def_name,
             }) {
                 defs.push(PayloadDef::Struct { name: def_name, fields });
             }
@@ -1525,13 +1610,43 @@ fn register_payload(
             let elem_cty = payload_c_ty(elem)
                 .ok_or_else(|| SubsetError::new(0, 0, "lower：数组元素缺少 C 类型"))?;
             if !defs.iter().any(|d| match d {
-                PayloadDef::Struct { name, .. } | PayloadDef::Array { name, .. } => name == &def_name,
+                PayloadDef::Struct { name, .. }
+                | PayloadDef::Array { name, .. }
+                | PayloadDef::Enum { c_name: name, .. } => name == &def_name,
             }) {
                 defs.push(PayloadDef::Array {
                     name: def_name,
                     elem: elem_cty,
                     len: *n,
                 });
+            }
+        }
+        // L2t：枚举载荷 typedef（tag＋union；变体字段仅标量）。
+        Ty::Enum(name) => {
+            let decl = prog
+                .enums
+                .iter()
+                .find(|e| &e.name == name)
+                .ok_or_else(|| SubsetError::new(0, 0, format!("lower：未知 enum '{}'", name)))?;
+            let mut variants = Vec::with_capacity(decl.variants.len());
+            for (tag, (_, payload, _, _)) in decl.variants.iter().enumerate() {
+                let mut fields = Vec::with_capacity(payload.len());
+                for (i, (fty, _, _)) in payload.iter().enumerate() {
+                    let ir = box_payload_ir_ty(fty, prog)
+                        .ok_or_else(|| SubsetError::new(0, 0, "lower：枚举字段类型不在载荷白名单"))?;
+                    let cty = payload_c_ty(&ir)
+                        .ok_or_else(|| SubsetError::new(0, 0, "lower：枚举字段缺少 C 类型"))?;
+                    fields.push((format!("f{}", i), cty));
+                }
+                variants.push((tag as u32, fields));
+            }
+            let c_name = payload_c_ty(t).expect("enum payload c type");
+            if !defs.iter().any(|d| match d {
+                PayloadDef::Struct { name, .. }
+                | PayloadDef::Array { name, .. }
+                | PayloadDef::Enum { c_name: name, .. } => name == &c_name,
+            }) {
+                defs.push(PayloadDef::Enum { c_name, variants });
             }
         }
         _ => {}
@@ -1575,6 +1690,14 @@ fn value_of_const(v: &ConstValue, t: &Ty) -> Result<Value, SubsetError> {
                 out.push(value_of_const(x, elem)?);
             }
             Ok(Value::Array(out))
+        }
+        // L2t：枚举常量 → 既有枚举打印树（变体名非限定；零载荷打印变体名）。
+        (ConstValue::Enum { name, variant, fields, .. }, Ty::Enum(want)) if name == want => {
+            let mut out = Vec::with_capacity(fields.len());
+            for (fty, fv) in fields {
+                out.push(value_of_const(fv, fty)?);
+            }
+            Ok(Value::Enum { variant: variant.clone(), payload: out })
         }
         _ => Err(SubsetError::new(0, 0, "lower：复合载荷常量与类型不符")),
     }
