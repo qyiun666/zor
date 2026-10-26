@@ -1,0 +1,1 @@
+fn main() { println("v", f64::RADIX, f32::MANTISSA_DIGITS); }

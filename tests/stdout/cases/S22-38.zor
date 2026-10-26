@@ -1,0 +1,2 @@
+enum E { V(i16) }
+fn main() { let a: [E; 2] = [V(f64::MIN_EXP), V(f32::MIN_EXP)]; println(a); }
