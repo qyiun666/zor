@@ -813,11 +813,19 @@ impl<'a> Ck<'a> {
                         }
                         return ret;
                     }
-                    // enum 变体构造 Variant(..)：n 为变体名
-                    let hit: Option<(String, Vec<Ty>)> = self
-                        .enums
-                        .iter()
-                        .find_map(|(en, vs)| vs.get(n).map(|pl| (en.clone(), pl.clone())));
+                    // enum 变体构造 Variant(..)：n 为变体名。
+                    // L2r：单层 `Enum::Variant` 限定构造；限定符须为已声明 enum、
+                    // 变体须属于该 enum；裸变体首匹配语义零改。未命中落到下方既有 E1101 发点。
+                    let hit: Option<(String, Vec<Ty>)> = match n.split_once("::") {
+                        Some((en, var)) => self
+                            .enums
+                            .get(en)
+                            .and_then(|vs| vs.get(var).map(|pl| (en.to_string(), pl.clone()))),
+                        None => self
+                            .enums
+                            .iter()
+                            .find_map(|(en, vs)| vs.get(n).map(|pl| (en.clone(), pl.clone()))),
+                    };
                     if let Some((en, pl)) = hit {
                         if pl.len() != args.len() {
                             self.d("E1601", *l, *c, format!("变体 '{}' 载荷 {}，实参 {}", n, pl.len(), args.len()));

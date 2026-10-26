@@ -278,16 +278,17 @@ fn width_and_kind_are_strict_per_field() {
 }
 
 #[test]
-fn arity_path_box_and_arith_stay_fail_closed() {
+fn arity_box_and_arith_stay_fail_closed_and_qualified_path_is_supported() {
     assert_rc1(
         "arity",
         "enum E { V(f64, f64, f64) }\nfn main() {\n    println(V(f64::NAN, 1.5));\n}\n",
         "E1601",
     );
-    assert_rc1(
-        "path",
+    // L2r：`E::V(...)` 限定构造转正。
+    assert_runs(
         "enum E { V(f64, f64) }\nfn main() {\n    let e = E::V(f64::NAN, 1.5);\n    println(1);\n}\n",
-        "E1101",
+        "path-l2r",
+        b"1\n",
     );
     assert_rc1(
         "box",

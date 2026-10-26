@@ -712,7 +712,13 @@ fn supported_value_expr_in(
             let Some(e) = prog.enums.iter().find(|e| &e.name == en) else {
                 return false;
             };
-            let Some((_, payload, _, _)) = e.variants.iter().find(|(n, _, _, _)| n == v) else {
+            // L2r：单层限定名去限定后按变体名查；限定符须与 type table 的 enum 一致。
+            let var = match v.split_once("::") {
+                Some((q, r)) if q == en.as_str() => r,
+                Some(_) => return false,
+                None => v.as_str(),
+            };
+            let Some((_, payload, _, _)) = e.variants.iter().find(|(n, _, _, _)| n.as_str() == var) else {
                 return false;
             };
             if payload.len() != args.len() {
