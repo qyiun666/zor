@@ -12,8 +12,8 @@
 
 use super::float_fmt;
 use super::ir::{
-    payload_c_ty, ArithOp, BoxConst, BoxIntTy, ConstValue, Func, IntExpr, IntTy, Local, LocalId,
-    PayloadDef, PrintArg, Program, Stmt, StrArg, Ty, Value,
+    payload_c_ty, ArithOp, BoxConst, BoxIntTy, ConstValue, EnumFieldInit, EnumInit, Func, IntExpr,
+    IntTy, Local, LocalId, PayloadDef, PrintArg, Program, Stmt, StrArg, Ty, Value,
 };
 use super::subset::{self, SubsetError};
 use crate::parser::{Ex, FloatSpecialKind, FloatWidth, Lit, Prog, St, Ty as AstTy};
@@ -34,6 +34,8 @@ enum ConstVal {
     F64Special(FloatSpecialKind),
     /// L2k：Box 复合载荷的编译期常量树（仅 Box 槽位使用）。
     Composite(ConstValue),
+    /// L2v：运行期枚举变量副本的打印值树（仅 Box<enum> 变量载荷使用）。
+    EnumLive(Value),
 }
 
 /// L2a 局部槽位状态：`live` 是静态可判的 owner 活跃位。
@@ -163,23 +165,32 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             };
                             if is_composite_payload(&payload) {
                                 // L2k：复合常量载荷——一棵常量树同时承载存储初始化与打印投影。
+                                // L2v：`box e` 变量载荷——EnumLive 配方＋打印值树（Copy）。
                                 let payload_ast = match types.let_ty(*l, *c) {
                                     Some(AstTy::BoxTy(p)) => (**p).clone(),
                                     _ => return Err(SubsetError::new(*l, *c, "lower：box 复合载荷缺少标注")),
                                 };
-                                let cv = const_value(inner, &payload_ast, types, &slots, &scope, prog)?;
+                                let (box_const, konst) = box_enum_live_or_const(
+                                    inner,
+                                    &payload_ast,
+                                    types,
+                                    &slots,
+                                    &scope,
+                                    &values,
+                                    prog,
+                                )?;
                                 register_payload(&payload, prog, &mut payload_defs)?;
                                 body.push(Stmt::BindBox {
                                     local: id,
                                     ty: payload.clone(),
-                                    value: BoxConst::Composite(cv.clone()),
+                                    value: box_const,
                                     line: *l,
                                     col: *c,
                                 });
                                 slots.push(Slot {
                                     ty: local_ty,
                                     live: true,
-                                    konst: Some(ConstVal::Composite(cv)),
+                                    konst: Some(konst),
                                     bytes: None,
                                 });
                                 let slot = slots.last().expect("slot pushed").clone();
@@ -457,23 +468,32 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             let drop_dst = is_live(&slots, ia);
                             if is_composite_payload(&payload) {
                                 // L2k：复合载荷重初始化（旧值按 drop_dst 释放一次）。
+                                // L2v：变量枚举载荷同样走 EnumLive。
                                 let payload_ast = match types.expr_ty(rhs) {
                                     Some(AstTy::BoxTy(p)) => (**p).clone(),
                                     _ => return Err(SubsetError::new(*al, *ac, "lower：box 复合载荷缺少标注")),
                                 };
-                                let cv = const_value(inner, &payload_ast, types, &slots, &scope, prog)?;
+                                let (box_const, konst) = box_enum_live_or_const(
+                                    inner,
+                                    &payload_ast,
+                                    types,
+                                    &slots,
+                                    &scope,
+                                    &values,
+                                    prog,
+                                )?;
                                 register_payload(&payload, prog, &mut payload_defs)?;
                                 body.push(Stmt::BindBoxAssign {
                                     local: ia,
                                     ty: payload,
-                                    value: BoxConst::Composite(cv.clone()),
+                                    value: box_const,
                                     drop_dst,
                                     line: *al,
                                     col: *ac,
                                 });
                                 set_live(&mut slots, ia, true);
                                 if let Some(slot) = slots.get_mut(ia.0 as usize) {
-                                    slot.konst = Some(ConstVal::Composite(cv));
+                                    slot.konst = Some(konst);
                                 }
                                 continue;
                             }
@@ -633,6 +653,8 @@ fn print_arg(
             if is_composite_payload(&payload) {
                 let cv = match b.slots.get(src.0 as usize).and_then(|s| s.konst.clone()) {
                     Some(ConstVal::Composite(cv)) => cv,
+                    // L2v：运行期枚举副本的打印值树。
+                    Some(ConstVal::EnumLive(v)) => return Ok(PrintArg::Composite(v)),
                     _ => return Err(SubsetError::new(*dl, *dc, "lower：Box 复合载荷缺少编译期值")),
                 };
                 return Ok(PrintArg::Composite(value_of_const(&cv, &payload)?));
@@ -759,13 +781,13 @@ fn lower_value(
             // L2k：复合载荷投影（常量树；不读堆，不建复合临时量）。
             if let Some(Ty::Box(p)) = &src_ty {
                 if is_composite_payload(p) {
-                    let cv = match b.slots.get(src.0 as usize).and_then(|s| s.konst.clone()) {
-                        Some(ConstVal::Composite(cv)) => cv,
+                    match b.slots.get(src.0 as usize).and_then(|s| s.konst.clone()) {
+                        Some(ConstVal::Composite(cv)) => return value_of_const(&cv, p),
+                        Some(ConstVal::EnumLive(v)) => return Ok(v),
                         _ => {
                             return Err(SubsetError::new(*dl, *dc, "lower：Box 复合载荷缺少编译期值"))
                         }
-                    };
-                    return value_of_const(&cv, p);
+                    }
                 }
             }
             if src_ty != Some(Ty::Box(Box::new(Ty::I64))) {
@@ -873,7 +895,18 @@ fn lower_value(
             for a in args {
                 vals.push(lower_value(a, b, scope, values)?);
             }
-            Ok(Value::Enum { variant: var.to_string(), payload: vals })
+            // L2v：为枚举值生成物化配方（仅含标量字段；失败则 init=None，box e fail-closed）。
+            let init = build_enum_init(
+                callee,
+                args,
+                &t,
+                &vals,
+                b.types,
+                b.slots.as_slice(),
+                scope,
+                b.prog,
+            );
+            Ok(Value::Enum { variant: var.to_string(), payload: vals, init })
         }
         Ex::Field(base, fname, fl, fc) => {
             let base_val = lower_value(base, b, scope, values)?;
@@ -1340,6 +1373,128 @@ fn box_payload_ir_ty(t: &AstTy, prog: &Prog) -> Option<Ty> {
     }
 }
 
+/// L2v：`box e` 分派——变量枚举走 EnumLive 堆副本配方，其余沿用常量树。
+/// 变量值缺失配方（init=None）时回落到常量通道，以既有判词 fail-closed。
+fn box_enum_live_or_const(
+    inner: &Ex,
+    payload_ast: &AstTy,
+    types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
+    values: &HashMap<String, Value>,
+    prog: &Prog,
+) -> Result<(BoxConst, ConstVal), SubsetError> {
+    if let Ex::Path(n, nl, nc) = inner {
+        if let Some(Value::Enum { init: Some(init), .. }) = values.get(n) {
+            let AstTy::Named(want) = payload_ast else {
+                return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷标注非枚举"));
+            };
+            if &init.name != want {
+                return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷类型与标注不符"));
+            }
+            // 二次防线：`e` 的节点类型必须与标注载荷一致。
+            if types.expr_ty(inner) != Some(payload_ast) {
+                return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷类型记录不符"));
+            }
+            if init.fields.iter().any(|(t, _)| !is_enum_scalar_field_ir(t)) {
+                return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷字段不在标量白名单"));
+            }
+            let value = values
+                .get(n)
+                .expect("enum value present")
+                .clone();
+            let box_const = BoxConst::EnumLive { init: init.clone(), value: value.clone() };
+            return Ok((box_const, ConstVal::EnumLive(value)));
+        }
+    }
+    let cv = const_value(inner, payload_ast, types, slots, scope, prog)?;
+    Ok((BoxConst::Composite(cv.clone()), ConstVal::Composite(cv)))
+}
+
+/// L2v：枚举值物化配方（tag＋逐字段初始化）。仅标量字段可生成；
+/// 无法生成时返回 None（值仍可打印，但 `box e` 将 fail-closed）。
+fn build_enum_init(
+    callee: &Ex,
+    args: &[Ex],
+    t: &AstTy,
+    vals: &[Value],
+    types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
+    prog: &Prog,
+) -> Option<EnumInit> {
+    let Ex::Path(variant, _, _) = callee else { return None };
+    let AstTy::Named(en) = t else { return None };
+    let decl = prog.enums.iter().find(|e| &e.name == en)?;
+    let var = match variant.rsplit_once("::") {
+        Some((q, r)) if q == en.as_str() => r,
+        Some(_) => return None,
+        None => variant.as_str(),
+    };
+    let (tag, (_, payload, _, _)) = decl
+        .variants
+        .iter()
+        .enumerate()
+        .find(|(_, (n, _, _, _))| n.as_str() == var)?;
+    if payload.len() != args.len() || vals.len() != args.len() {
+        return None;
+    }
+    let mut fields = Vec::with_capacity(args.len());
+    for ((fty, _, _), (arg, val)) in payload.iter().zip(args.iter().zip(vals.iter())) {
+        let ir = box_payload_ir_ty(fty, prog)?;
+        if !is_enum_scalar_field_ir(&ir) {
+            return None;
+        }
+        match ir_int_ty(&ir) {
+            Some(_) => {
+                let Value::Int { expr, .. } = val else { return None };
+                fields.push((ir, EnumFieldInit::Int(expr.clone())));
+            }
+            None => {
+                let cv = constval_to_constvalue(&const_scalar(arg, &ir, types, slots, scope).ok()?)?;
+                fields.push((ir, EnumFieldInit::Const(cv)));
+            }
+        }
+    }
+    Some(EnumInit {
+        name: en.clone(),
+        tag: tag as u32,
+        variant: var.to_string(),
+        fields,
+    })
+}
+
+/// L2v：编译期标量 → 物化常量树叶子（Unit／复合不参与枚举字段）。
+fn constval_to_constvalue(v: &ConstVal) -> Option<ConstValue> {
+    match v {
+        ConstVal::Int(n) => Some(ConstValue::Int(*n)),
+        ConstVal::Bool(b) => Some(ConstValue::Bool(*b)),
+        ConstVal::F32(f) => Some(ConstValue::F32Bits(f.to_bits())),
+        ConstVal::F64(f) => Some(ConstValue::F64Bits(f.to_bits())),
+        ConstVal::F32Special(k) => Some(ConstValue::F32Bits(special_f32(*k).to_bits())),
+        ConstVal::F64Special(k) => Some(ConstValue::F64Bits(special_f64(*k).to_bits())),
+        _ => None,
+    }
+}
+
+/// L2v：枚举字段物化白名单（与 L2t 标量载荷一致）。
+fn is_enum_scalar_field_ir(t: &Ty) -> bool {
+    matches!(
+        t,
+        Ty::I8
+            | Ty::I16
+            | Ty::I32
+            | Ty::I64
+            | Ty::U8
+            | Ty::U16
+            | Ty::U32
+            | Ty::U64
+            | Ty::Bool
+            | Ty::F32
+            | Ty::F64
+    )
+}
+
 fn struct_decl<'a>(prog: &'a Prog, name: &str) -> Result<&'a crate::parser::StructDecl, SubsetError> {
     prog.structs
         .iter()
@@ -1697,7 +1852,7 @@ fn value_of_const(v: &ConstValue, t: &Ty) -> Result<Value, SubsetError> {
             for (fty, fv) in fields {
                 out.push(value_of_const(fv, fty)?);
             }
-            Ok(Value::Enum { variant: variant.clone(), payload: out })
+            Ok(Value::Enum { variant: variant.clone(), payload: out, init: None })
         }
         _ => Err(SubsetError::new(0, 0, "lower：复合载荷常量与类型不符")),
     }

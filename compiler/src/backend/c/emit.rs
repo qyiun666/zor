@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 
 use super::super::ir::{
-    payload_c_ty, ArithOp, BoxConst, BoxIntTy, ConstValue, Func, IntExpr, IntTy, LocalId,
-    PayloadDef, PrintArg, Program, Stmt, StrArg, Ty, Value,
+    payload_c_ty, ArithOp, BoxConst, BoxIntTy, ConstValue, EnumFieldInit, EnumInit, Func, IntExpr,
+    IntTy, LocalId, PayloadDef, PrintArg, Program, Stmt, StrArg, Ty, Value,
 };
 use crate::backend::OverflowMode;
 
@@ -210,7 +210,7 @@ fn flatten_value(
             }
             push_bytes_part(parts, out, counter, b" }");
         }
-        Value::Enum { variant, payload } => {
+        Value::Enum { variant, payload, .. } => {
             if payload.is_empty() {
                 push_bytes_part(parts, out, counter, variant.as_bytes());
                 return;
@@ -381,14 +381,14 @@ fn emit_func(out: &mut String, f: &Func, source_path: &str, overflow: OverflowMo
             }
             Stmt::BindBox { local, ty, value, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
-                emit_alloc_payload(out, local, ty, value);
+                emit_alloc_payload(out, local, ty, value, &mut tmp_counter, overflow);
             }
             Stmt::BindBoxAssign { local, ty, value, drop_dst, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
                 if *drop_dst {
                     emit_free_live(out, local);
                 }
-                emit_alloc_payload(out, local, ty, value);
+                emit_alloc_payload(out, local, ty, value, &mut tmp_counter, overflow);
             }
             Stmt::BindDeref { local, src: boxed, line, .. } => {
                 let _ = writeln!(out, "#line {} \"{}\"", line, src);
@@ -670,13 +670,76 @@ fn emit_alloc_box(out: &mut String, id: &LocalId, ty: BoxIntTy, value: i128) {
 }
 
 /// L2k：按载荷常量分派——标量保持既有 C 文本，复合走 typedef + 复合初始化。
-fn emit_alloc_payload(out: &mut String, id: &LocalId, ty: &Ty, value: &BoxConst) {
+/// L2v：变量枚举载荷按物化配方初始化（运行期整型字段复用 `emit_int_expr`）。
+fn emit_alloc_payload(
+    out: &mut String,
+    id: &LocalId,
+    ty: &Ty,
+    value: &BoxConst,
+    tmp_counter: &mut usize,
+    overflow: OverflowMode,
+) {
     match value {
         BoxConst::Bits(v) => {
             let bty = box_ty_of(ty).expect("scalar box payload width");
             emit_alloc_box(out, id, bty, *v);
         }
         BoxConst::Composite(cv) => emit_alloc_composite(out, id, ty, cv),
+        BoxConst::EnumLive { init, .. } => {
+            emit_alloc_enum_live(out, id, ty, init, tmp_counter, overflow)
+        }
+    }
+}
+
+/// L2v：枚举变量副本落堆——tag＋union 按配方逐字段初始化；无递归析构。
+fn emit_alloc_enum_live(
+    out: &mut String,
+    id: &LocalId,
+    ty: &Ty,
+    init: &EnumInit,
+    tmp_counter: &mut usize,
+    overflow: OverflowMode,
+) {
+    let cty = payload_c_ty(ty).expect("enum payload c type");
+    let _ = writeln!(
+        out,
+        "    zor_box_{} = ({} *)zor_alloc(sizeof({}));",
+        id.0, cty, cty
+    );
+    if init.fields.is_empty() {
+        let _ = writeln!(out, "    *zor_box_{} = ({}){{ .tag = {} }};", id.0, cty, init.tag);
+    } else {
+        let mut parts = Vec::with_capacity(init.fields.len());
+        for (i, (fty, fv)) in init.fields.iter().enumerate() {
+            let lit = match fv {
+                EnumFieldInit::Const(cv) => leaf_literal(fty, cv),
+                EnumFieldInit::Int(expr) => {
+                    let ity = enum_field_int_ty(fty).expect("runtime enum field width");
+                    emit_int_expr(out, expr, ity, overflow, tmp_counter)
+                }
+            };
+            parts.push(format!(".f{} = {}", i, lit));
+        }
+        let _ = writeln!(
+            out,
+            "    *zor_box_{} = ({}){{ .tag = {}, .u.v{} = {{ {} }} }};",
+            id.0,
+            cty,
+            init.tag,
+            init.tag,
+            parts.join(", ")
+        );
+    }
+    let _ = writeln!(out, "    zor_live_{} = 1;", id.0);
+}
+
+/// 物化配方中运行期整型字段的宽度（lower 已按白名单收窄）。
+fn enum_field_int_ty(t: &Ty) -> Option<IntTy> {
+    match t {
+        Ty::I64 => Some(IntTy::I64),
+        Ty::U8 => Some(IntTy::U8),
+        Ty::U32 => Some(IntTy::U32),
+        _ => None,
     }
 }
 
