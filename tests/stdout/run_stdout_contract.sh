@@ -16,7 +16,8 @@
 #   显式 FAIL 优先；任一段 FAIL → 脚本 rc=1。
 #
 # 判据：
-#   - 静态：310 runtime（65+6+9+9+19+18+49+24+27+32+28+24）＋221 negative（12+11+14+28+27+23+23+16+16+15+14+22）＋17 CLI＝548；new-cases 120（锁定）；
+#   - 静态资产：310 runtime（65+6+9+9+19+18+49+24+27+32+28+24）＋221 negative（12+11+14+28+27+23+23+16+16+15+14+22）＋17 CLI＝548；new-cases 120（锁定）；
+#     L2q 执行面退休后活跃 310／215／17＝542（N-237～242 退出负控执行，静态 l2p-negative 仍 22 行）；
 #     L2g 活跃负控排除 N-21～N-25（退休清单；l2f 资产零改、静态仍校验 20 行）；L2h 新增 S11-01～09／N-50～81（N-81 仅执行面退休）；
 #     L2i 新增 S12-01～19／N-82～112（N-94 仅执行面退休）；L2j 新增 S13-01～18／N-113～142；schema／路径／重复／expected 缺件（Stage-1 阶段新增 expected 缺件为预期）。
 #     L2k 新增 S14-01～31／S15-01～18／N-143～165；Ret=12（N-26/27/31/32/93/95/117～120/125/126）仅执行面退休；schema／路径／重复／expected 缺件（Stage-1 阶段新增 expected 缺件为预期）。
@@ -25,6 +26,8 @@
 #     L2n 新增 S19-01～32／N-204～219；Ret=2（N-184／N-200 仅执行面退休，l2l／l2m 资产字节零改）；schema／路径／重复／expected 缺件（Stage-1 阶段新增 expected 缺件为预期）。
 #     L2o 新增 S20-01～28／N-220～236；Ret=9（N-72/73/78/110/140/178/179/198/212 仅执行面退休，六代资产字节零改）；schema／路径／重复／expected 缺件（Stage-1 阶段新增 expected 缺件为预期）。
 #     L2p 新增 S21-01～24／N-237～258；Ret=3（N-220／N-233／N-235 仅执行面退休，l2o 资产字节零改）；schema／路径／重复／expected 缺件（Stage-1 阶段新增 expected 缺件为预期）。
+#     L2q Stage-1 新增 S22-01～40／N-259～274（资产已入，TSV 接线与 P／Q 冻结计数由 Stage-3 工具链按裁定件 §7 接入）；
+#     Ret=6（N-237～242 仅执行面退休，l2p 源／TSV／l2p-baseline 字节零改）；本阶段活跃 310／215／17＝542。
 #   - 旧资产快照：legacy-snapshot.sha256 逐文件 sha256；l2c-baseline.sha256 锁 68 条未变用例；
 #     旧五值／runtime-codes／manifest 计数复核。
 #   - runtime：两轮构建＋运行；stdout 逐字节 cmp；run 模式 stderr 0 B；terminate 模式 rc=101 且只判 stdout。
@@ -106,12 +109,15 @@ EXPECT_NEGATIVE_L2N_ACTIVE=15
 EXPECT_NEGATIVE_L2O=17
 EXPECT_NEGATIVE_L2O_ACTIVE=14
 EXPECT_NEGATIVE_L2P=22
-EXPECT_NEGATIVE=221
+# L2q Stage-1：N-237～242 仅执行面退休（l2p 静态资产仍 22 行、l2p-baseline 零改）。
+EXPECT_NEGATIVE_L2P_ACTIVE=16
+EXPECT_NEGATIVE=215
 EXPECT_CLI=17
 EXPECT_NEW_CASES=120
-EXPECT_TOTAL=548
+EXPECT_TOTAL=542
 # 退休清单：仅退出活跃负控执行；源文件、l2f/l2h/l2i/l2j/l2k/l2l/l2m/l2n/l2o-negative.tsv 与各代基线零改。
-RETIRED_NEGATIVE_RE='^(N-2[1-5]|N-26|N-27|N-31|N-32|N-81|N-93|N-94|N-95|N-11[7-9]|N-120|N-125|N-126|N-183|N-184|N-200|N-72|N-73|N-78|N-110|N-140|N-178|N-179|N-198|N-212|N-220|N-233|N-235)$'
+# L2q：N-237～242（MAX_EXP／MIN_EXP／MANTISSA_DIGITS／DIGITS／RADIX×f64 与 f32 MAX_EXP）转为整型常量正例，仅在执行面退休。
+RETIRED_NEGATIVE_RE='^(N-2[1-5]|N-26|N-27|N-31|N-32|N-81|N-93|N-94|N-95|N-11[7-9]|N-120|N-125|N-126|N-183|N-184|N-200|N-72|N-73|N-78|N-110|N-140|N-178|N-179|N-198|N-212|N-220|N-233|N-235|N-23[7-9]|N-24[0-2])$'
 RUNTIME_ALL=""
 NEGATIVE_ALL=""
 
@@ -151,11 +157,15 @@ if [ $((EXPECT_NEGATIVE_L2O - 3)) -ne "$EXPECT_NEGATIVE_L2O_ACTIVE" ]; then
   echo "[stdout-contract] L2o 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2O-3 != $EXPECT_NEGATIVE_L2O_ACTIVE（N-220／N-233／N-235 退休）" >&2
   exit 2
 fi
+if [ $((EXPECT_NEGATIVE_L2P - 6)) -ne "$EXPECT_NEGATIVE_L2P_ACTIVE" ]; then
+  echo "[stdout-contract] L2p 活跃负控常量不自洽：$EXPECT_NEGATIVE_L2P-6 != $EXPECT_NEGATIVE_L2P_ACTIVE（L2q 退休 N-237～242）" >&2
+  exit 2
+fi
 if [ $((EXPECT_RUNTIME_LEGACY + EXPECT_RUNTIME_L2F + EXPECT_RUNTIME_L2G + EXPECT_RUNTIME_L2H + EXPECT_RUNTIME_L2I + EXPECT_RUNTIME_L2J + EXPECT_RUNTIME_L2K + EXPECT_RUNTIME_L2L + EXPECT_RUNTIME_L2M + EXPECT_RUNTIME_L2N + EXPECT_RUNTIME_L2O + EXPECT_RUNTIME_L2P)) -ne "$EXPECT_RUNTIME" ]; then
   echo "[stdout-contract] 分组合并 runtime 常量不自洽（期望 $EXPECT_RUNTIME）" >&2
   exit 2
 fi
-if [ $((EXPECT_NEGATIVE_LEGACY + EXPECT_NEGATIVE_L2F_ACTIVE + EXPECT_NEGATIVE_L2G + EXPECT_NEGATIVE_L2H_ACTIVE + EXPECT_NEGATIVE_L2I_ACTIVE + EXPECT_NEGATIVE_L2J_ACTIVE + EXPECT_NEGATIVE_L2K + EXPECT_NEGATIVE_L2L_ACTIVE + EXPECT_NEGATIVE_L2M_ACTIVE + EXPECT_NEGATIVE_L2N_ACTIVE + EXPECT_NEGATIVE_L2O_ACTIVE + EXPECT_NEGATIVE_L2P)) -ne "$EXPECT_NEGATIVE" ]; then
+if [ $((EXPECT_NEGATIVE_LEGACY + EXPECT_NEGATIVE_L2F_ACTIVE + EXPECT_NEGATIVE_L2G + EXPECT_NEGATIVE_L2H_ACTIVE + EXPECT_NEGATIVE_L2I_ACTIVE + EXPECT_NEGATIVE_L2J_ACTIVE + EXPECT_NEGATIVE_L2K + EXPECT_NEGATIVE_L2L_ACTIVE + EXPECT_NEGATIVE_L2M_ACTIVE + EXPECT_NEGATIVE_L2N_ACTIVE + EXPECT_NEGATIVE_L2O_ACTIVE + EXPECT_NEGATIVE_L2P_ACTIVE)) -ne "$EXPECT_NEGATIVE" ]; then
   echo "[stdout-contract] 分组合并 negative 常量不自洽（期望 $EXPECT_NEGATIVE）" >&2
   exit 2
 fi

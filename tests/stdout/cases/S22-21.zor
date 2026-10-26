@@ -1,0 +1,1 @@
+fn main() { let b: Box<i32> = box f32::MAX_EXP; println(*b); }
