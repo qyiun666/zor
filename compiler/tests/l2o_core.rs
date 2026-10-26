@@ -225,9 +225,9 @@ fn width_is_strict_for_constants() {
 
 #[test]
 fn other_float_members_stay_e1101() {
-    // L2p：`MIN_POSITIVE` 已转正（见 l2p_core）；其余成员与裸名仍 E1101。
+    // L2p：`MIN_POSITIVE` 已转正（见 l2p_core）；L2q：`MAX_EXP` 已转正（见 l2q_core）；
+    // 其余未列名成员与裸名仍 E1101。
     for (tag, member) in [
-        ("max-exp", "MAX_EXP"),
         ("dig", "DIG"),
         ("neg-nan", "NEG_NAN"),
         ("nan-call", "NAN(1)"),

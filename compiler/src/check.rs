@@ -651,14 +651,22 @@ impl<'a> Ck<'a> {
                                 *l,
                                 *c,
                                 format!(
-                                    "一元 '-' 不接受特殊值 '{}'（含绑定后读取；0.3.7 仅直接打印）",
+                                    "一元 '-' 不接受特殊值 '{}'（含绑定后读取；仅直接打印）",
                                     t.display()
                                 ),
                             );
                             return t;
                         }
                         // L2c：负字面量按期望宽度收敛（含补码最小值），不新增 E 码。
-                        if let Ex::Lit(Lit::Int(v), ll, lc) = a.as_ref() {
+                        // L2q：具名整型常量同口径（有符号值；无符号仅 `-0`）。
+                        let int_operand: Option<(u128, Option<i128>, usize, usize)> = match a.as_ref() {
+                            Ex::Lit(Lit::Int(v), ll, lc) => Some((*v, None, *ll, *lc)),
+                            Ex::Lit(Lit::IntConst(v), ll, lc) => {
+                                Some((v.unsigned_abs(), Some(*v), *ll, *lc))
+                            }
+                            _ => None,
+                        };
+                        if let Some((mag, named, ll, lc)) = int_operand {
                             let target: Option<Ty> = match expect {
                                 Some(Ty::Prim(p)) if int_bits(p).is_some() => Some(Ty::Prim(*p)),
                                 Some(Ty::Bad) => Some(Ty::Bad),
@@ -667,13 +675,20 @@ impl<'a> Ck<'a> {
                             };
                             if let Some(t) = target {
                                 if let Ty::Prim(p) = &t {
-                                    if int_bits(p).is_some() && !neg_int_fits(p, *v) {
-                                        self.d(
-                                            "E1201",
-                                            *ll,
-                                            *lc,
-                                            format!("字面量 -{} 超出 '{}' 范围", v, p),
-                                        );
+                                    if int_bits(p).is_some() {
+                                        let fits = match named {
+                                            None => neg_int_fits(p, mag),
+                                            Some(v) if v < 0 => fits_int_i128(p, v),
+                                            Some(_) => neg_int_fits(p, mag),
+                                        };
+                                        if !fits {
+                                            self.d(
+                                                "E1201",
+                                                ll,
+                                                lc,
+                                                format!("字面量 -{} 超出 '{}' 范围", mag, p),
+                                            );
+                                        }
                                     }
                                 }
                                 self.types.insert_expr(a, t.clone());
@@ -716,7 +731,12 @@ impl<'a> Ck<'a> {
                 // `Box<f32> = box 1` 仍为 E1201（N-115／N-116 红线）。
                 let payload_expect = match expect {
                     Some(Ty::BoxTy(p)) => match p.as_ref() {
-                        Ty::Prim("f32") | Ty::Prim("f64") if float_literal_form(inner) => {
+                        Ty::Prim("f32") | Ty::Prim("f64")
+                            if float_literal_form(inner)
+                                || matches!(inner.as_ref(), Ex::Lit(Lit::IntConst(_), _, _)) =>
+                        {
+                            // L2q：具名整型常量作浮点 Box 载荷须落 E1202（裁定 §4.3）；
+                            // `box 1` 等整数字面量仍维持 E1201（N-115／N-116 红线）。
                             Some((**p).clone())
                         }
                         Ty::Named(n) if self.structs.contains_key(n) => Some((**p).clone()),
@@ -927,6 +947,25 @@ impl<'a> Ck<'a> {
                     }
                 }
             }
+            // L2q ③b：具名整型常量按整数字面量语义定型（含负值；不新增 E 码）。
+            Lit::IntConst(v) => {
+                match expect {
+                    Some(Ty::Prim(p)) if int_bits(p).is_some() => {
+                        if !fits_int_i128(p, *v) { self.d("E1201", l, c, format!("字面量 {} 超出 '{}' 范围", v, p)); }
+                        Ty::Prim(p)
+                    }
+                    Some(Ty::Prim(p)) if matches!(*p, "f32" | "f64") => {
+                        self.d("E1202", l, c, format!("禁止隐式数值转换：整型常量 {} 标注于浮点型 '{}'", v, p));
+                        Ty::Prim(p)
+                    }
+                    Some(Ty::Bad) => Ty::Bad,
+                    Some(x) => { self.d("E1201", l, c, format!("类型不匹配：整型常量无法赋于 '{}'", x.display())); x.clone() }
+                    None => {
+                        if *v < i64::MIN as i128 || *v > i64::MAX as i128 { self.d("E1201", l, c, format!("字面量 {} 超出默认 i64", v)); }
+                        Ty::Prim("i64")
+                    }
+                }
+            }
             Lit::Float(v) => {
                 match expect {
                     Some(Ty::Prim(p)) if matches!(*p, "f32" | "f64") => Ty::Prim(p),
@@ -969,7 +1008,7 @@ impl<'a> Ck<'a> {
                 Ty::Prim("bool")
             }
             "==" | "!=" => {
-                let lit_side = |x: &Ex| matches!(x, Ex::Lit(Lit::Int(_) | Lit::Float(_), _, _));
+                let lit_side = |x: &Ex| matches!(x, Ex::Lit(Lit::Int(_) | Lit::IntConst(_) | Lit::Float(_), _, _));
                 let (t, o) = if lit_side(a) != lit_side(b) {
                     let (typed, lit) = if lit_side(a) { (b, a) } else { (a, b) };
                     let tt = self.check_expr(typed, None, env);
@@ -987,7 +1026,7 @@ impl<'a> Ck<'a> {
                 Ty::Prim("bool")
             }
             "<" | "<=" | ">" | ">=" => {
-                let lit_side = |x: &Ex| matches!(x, Ex::Lit(Lit::Int(_) | Lit::Float(_), _, _));
+                let lit_side = |x: &Ex| matches!(x, Ex::Lit(Lit::Int(_) | Lit::IntConst(_) | Lit::Float(_), _, _));
                 let (t, o) = if lit_side(a) != lit_side(b) {
                     let (typed, lit) = if lit_side(a) { (b, a) } else { (a, b) };
                     let tt = self.check_expr(typed, None, env);
@@ -1007,7 +1046,7 @@ impl<'a> Ck<'a> {
             }
             _ => {
                 // + - * / %
-                let lit_side = |x: &Ex| matches!(x, Ex::Lit(Lit::Int(_) | Lit::Float(_), _, _));
+                let lit_side = |x: &Ex| matches!(x, Ex::Lit(Lit::Int(_) | Lit::IntConst(_) | Lit::Float(_), _, _));
                 let (t, o) = if lit_side(a) != lit_side(b) {
                     let (typed, lit) = if lit_side(a) { (b, a) } else { (a, b) };
                     let tt = self.check_expr(typed, None, env);
@@ -1155,6 +1194,21 @@ fn fits_int(p: &str, v: u128) -> bool {
     match p {
         "i8" => v <= 127, "i16" => v <= 32767, "i32" => v <= i32::MAX as u128, "i64" => v <= i64::MAX as u128,
         "u8" | "byte" => v <= u8::MAX as u128, "u16" => v <= u16::MAX as u128, "u32" => v <= u32::MAX as u128, "u64" => v <= u64::MAX as u128,
+        _ => true,
+    }
+}
+
+/// L2q：具名整型常量的有符号范围判定（含负值；无符号仅接受非负）。
+fn fits_int_i128(p: &str, v: i128) -> bool {
+    match p {
+        "i8" => (-128..=127).contains(&v),
+        "i16" => (-32768..=32767).contains(&v),
+        "i32" => (i32::MIN as i128..=i32::MAX as i128).contains(&v),
+        "i64" => (i64::MIN as i128..=i64::MAX as i128).contains(&v),
+        "u8" | "byte" => (0..=u8::MAX as i128).contains(&v),
+        "u16" => (0..=u16::MAX as i128).contains(&v),
+        "u32" => (0..=u32::MAX as i128).contains(&v),
+        "u64" => (0..=u64::MAX as i128).contains(&v),
         _ => true,
     }
 }
