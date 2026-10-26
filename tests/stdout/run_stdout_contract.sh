@@ -1039,7 +1039,15 @@ run_negative() {
       if grep -Eq '(^|[^A-Za-z0-9_])error:|undeclared identifier' "$work/stderr"; then
         so_fail_msg "$cid r$round stderr 命中 cc 失败文本"; ok=0
       fi
-      if ! grep -qF -- "$contains" "$work/stderr"; then so_fail_msg "$cid r$round stderr 缺判词 '$contains'"; ok=0; fi
+      if [ "$cid" = "N-290" ]; then
+        # L2t R1（产品补件 ZOR-L2t-Stage1-R1R4裁定-产品-v1，sha256 e68c2699…ab2c）：
+        # N-290 保持活跃、l2r-negative.tsv 字节冻结；判词随 Box<enum> 支持面演进，
+        # 仅此单 ID 显式允许两个精确 fail-closed token（不使用正则或全局放宽）。
+        if ! grep -qF -- "box 载荷须为字面量常量" "$work/stderr" \
+           && ! grep -qF -- "let 类型标注" "$work/stderr"; then
+          so_fail_msg "$cid r$round stderr 缺判词（N-290 显式允许列表）"; ok=0
+        fi
+      elif ! grep -qF -- "$contains" "$work/stderr"; then so_fail_msg "$cid r$round stderr 缺判词 '$contains'"; ok=0; fi
       if [ -n "$notc" ] && grep -qF -- "$notc" "$work/stderr"; then so_fail_msg "$cid r$round stderr 含禁词 '$notc'"; ok=0; fi
       local sha; sha="$(sha256_of "$work/stderr")"
       if [ "$round" = 1 ]; then prev_rc="$rc"; prev_sha="$sha"; else
