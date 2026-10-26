@@ -1,0 +1,8 @@
+enum N { A(), B() }
+fn main() {
+    let b: Box<N> = box A();
+    let e2 = B();
+    b = box e2;
+    println(*b);
+    println(e2);
+}
