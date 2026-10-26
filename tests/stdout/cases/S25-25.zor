@@ -1,0 +1,7 @@
+enum N { A() }
+fn main() {
+    let a: Box<N> = box A();
+    let b: Box<N> = box N::A();
+    println(*a);
+    println(*b);
+}

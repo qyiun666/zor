@@ -1,0 +1,4 @@
+case_id	source_path	expect_rc	mode	expect_stdout_sha256	kind	notes
+S25-ASAN-01	tests/stdout/cases/S25-ASAN-01.zor	0	build-run	2e3cd9fee5eedc557d23a67c0e3ceae989ee9bf976d16e7adf78385740573dc6	positive	Box<enum> 构造＋作用域 drop（L2t K=1）
+S25-ASAN-02	tests/stdout/cases/S25-ASAN-02.zor	0	build-run	06f961b802bc46ee168555f066d28f4f0e9afdf3f88174c1ee6f9de004fc30a0	positive	Box<enum> unbox（L2t K=2）
+S25-ASAN-03	tests/stdout/cases/S25-ASAN-03.zor	0	build-run	cf71b5fb9ae5438fcc945705fd12da492649b2d7e1d5a40c8951a2d5f64dc50a	positive	Box<enum> 常量重初始化（L2t K=3）

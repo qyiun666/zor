@@ -9,7 +9,8 @@
 #       与 ci/asan/run_asan.sh，不新增 job／workflow YAML 结构／ruleset。
 #
 # 判据（任一不满足＝FAIL，strict 不 SKIP）：
-#   1. manifest 恰 6 行；七列 schema；无 CR／空行；case_id／source_path 唯一；
+#   1. 默认合并 manifest 恰 9 行（l2k 原 6 + l2t 新增 3，l2k 文件字节零改）；
+#      七列 schema；无 CR／空行；case_id／source_path 唯一；
 #      mode 仅 build-run；expect_rc=0；source 为 tests/ 下普通相对文件（非 symlink）。
 #   2. expect_stdout_sha256 必须是 64hex；空值判 FAIL reason=expected_pending
 #      （Stage-1 尚未捕获 expected，fail-closed；禁止占位哈希／静默通过）。
@@ -28,8 +29,8 @@
 #   ASAN_TIMEOUT  单次运行超时秒数（默认 30）
 #
 # 输出契约：
-#   PASS|asan-l2k|validate-only cases=6 static=ok
-#   PASS|asan-l2k|cases=6 fail=0 ran=6/6
+#   PASS|asan-l2k|validate-only cases=9 static=ok
+#   PASS|asan-l2k|cases=9 fail=0 ran=9/9
 #   FAIL|asan-l2k|...（显式失败优先）
 
 set -uo pipefail
@@ -37,8 +38,8 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REPO_ROOT_REAL="$(cd "$REPO_ROOT" && pwd -P)"
 DEFAULT_MANIFEST="$REPO_ROOT/tests/runtime/l2k-asan-manifest.tsv"
-EXPECT_ROWS=6
-EXPECT_RUN=6
+EXPECT_ROWS=9
+EXPECT_RUN=9
 MANIFEST="$DEFAULT_MANIFEST"
 ZORC="${ZORC_BIN:-zorcc}"
 OUT_DIR=""
@@ -70,6 +71,21 @@ case "$MANIFEST" in
   /*) ;;
   *) MANIFEST="$REPO_ROOT/$MANIFEST" ;;
 esac
+
+# L2t CI-01：保持 l2k 原 6 例 manifest 字节零改（旧 15 基线锁定其哈希），
+# 运行时与新增 l2t-asan-manifest.tsv（3 例）合并为 9 例；K=3。
+L2T_MANIFEST="$REPO_ROOT/tests/runtime/l2t-asan-manifest.tsv"
+COMBINED_MANIFEST=""
+if [ "$MANIFEST" = "$DEFAULT_MANIFEST" ]; then
+  [ -f "$L2T_MANIFEST" ] || { echo "[asan-l2k] 缺 L2t ASAN manifest：$L2T_MANIFEST" >&2; exit 2; }
+  l2t_header="$(head -n1 "$L2T_MANIFEST")"
+  l2t_expected_header=$'case_id\tsource_path\texpect_rc\tmode\texpect_stdout_sha256\tkind\tnotes'
+  [ "$l2t_header" = "$l2t_expected_header" ] || { echo "[asan-l2k] L2t manifest 表头不精确" >&2; exit 2; }
+  COMBINED_MANIFEST="$(mktemp "${TMPDIR:-/tmp}/l2k-asan-manifest.XXXXXX")" || { echo "[asan-l2k] 无法创建临时 manifest" >&2; exit 2; }
+  { head -n1 "$DEFAULT_MANIFEST"; tail -n +2 "$DEFAULT_MANIFEST"; tail -n +2 "$L2T_MANIFEST"; } > "$COMBINED_MANIFEST"
+  MANIFEST="$COMBINED_MANIFEST"
+  trap 'rm -f "$COMBINED_MANIFEST"' EXIT
+fi
 
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then

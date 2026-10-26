@@ -279,10 +279,11 @@ fn nested_arity_box_and_arith_stay_fail_closed_and_qualified_path_is_supported()
         "path-l2r",
         b"S { e: V(nan) }\n",
     );
-    assert_rc1(
-        "box",
+    // L2t：`Box<E>` 常量子集转正（正例矩阵见 l2t_core）。
+    assert_runs(
         "enum E { V(f64) }\nfn main() {\n    let b: Box<E> = box V(1.5);\n    println(*b);\n}\n",
-        "let 类型标注",
+        "box-l2t",
+        b"V(1.5)\n",
     );
     assert_rc1(
         "arith",

@@ -1,0 +1,2 @@
+enum E { V(f64) }
+fn main() { let b: Box<Box<E>> = box box E::V(1.5); println(*b); }
