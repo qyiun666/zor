@@ -1,0 +1,1 @@
+fn main() { let E = 1; println(E::V(1.5)); }
