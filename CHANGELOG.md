@@ -4,6 +4,43 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.20] - 2026-10-26
+
+内部验证里程碑，非可用语言版本：本版为 L2u「④b-A 诊断文本层」——诊断文本与 `Box<?>` 收敛切片，**无新增语言能力、无新增 E 码／关键字／AC、无运行期行为变化**。D1 将一元负号拒绝特殊值的文案由「（含绑定后读取；仅直接打印）」收敛为「（含绑定后读取）」，E1201 与前缀保留；D2 在 `compatible()` 对 `BoxTy(Bad)` 做归并——载荷已为 `Ty::Bad` 时不再派生外层 Box 不匹配，使 `Box<i64> ← f64::NAN/MAX` 仅报 E1202、`Box<E> ← W(1)` 仅报 E1101，同时保留合法 Box 不匹配 E1201（`Box<f64>←1024`、`Box<A>←B 值`、跨宽）；D5 将 `compiler/scripts/e1101_catalog.sh` 期望 29 修正为 30（lexer 3／parser 20／check 7）。新增 `l2u-baseline` 第十七基线（894／1379／1379）；P=0／Q=10／Ret=0；R=462／G=296／T=775／A=779／N=894；ASAN 6+3=9 与默认 manifest 48／41／7 零改；T-4 结构／render／JSON 不变；按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：D1 影响 12 条既有负控（N-63/64/65、N-107/108、N-141、N-170、N-191、N-207、N-229、N-251、N-317），仅 stderr 文本变化、E1201 不变；D2 仅 `Ty::Bad` 触发（必伴随既有诊断），合法 Box 不匹配 E1201 保留；三条执行面单 ID 覆盖：N-344 E1201→E1101、N-315 E1201→E1202、N-290 仅接受新 token，历史 TSV／baseline 字节零改、不退休；Q=10（N-346～N-355）新增 .zor 负控，码位 E1201×5／E1202×2／E1101×3；N-290 与 `e1101_catalog.sh` total=30 作为执行面／工具 gate 单独验证。计数：P=**0**、Q=**10**、Ret=**0**；R=**462**、G=**296**、T=**775**、A=**779**、N=**894**；`l2u-baseline` cases **894**／files **1379**／unique **1379**；旧 16 基线 162／209、188／246、206／275、247／327、297／398、345／466、417／590、461／660、506／734、554／816、599／891、645／963、701／1062、759／1163、827／1274、884／1367 与 `l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 均零改；分代活跃 L2U=10（旧分代不变）。E1101 编目 30；Linux x86_64 为唯一终证，macOS 无 LSAN 不作终证；无安装／打包／性能承诺。
+
+### Added
+
+- **L2u 负控 N-346～N-355（Q=10）**：D1 新文案；`Box<i64>←f64::NAN/MAX` 仅 E1202；`Box<E>←W(1)`／`E::W(1)`／`X::V(1)` 仅 E1101；合法 Box 不匹配与枚举字段跨宽单条 E1201。
+- **`l2u-baseline` 第十七基线**：`stdout-contract` 在 `l2t` 之后校验 `l2u-baseline`（894／1379／1379），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿；旧 16 基线字节零改。
+
+### Changed
+
+- **D1 文案**：`check.rs` 一元负号拒绝特殊值文案改为「一元 '-' 不接受特殊值 '{}'（含绑定后读取）」，E1201 与前缀保留；12 条既有负控仅文本变化。
+- **D2 `Box<?>` 收敛**：`compatible()` 对 `BoxTy(Bad)` 归并，仅 `Ty::Bad` 触发；`Box<i64>←f64::NAN/MAX` 仅 E1202、`Box<E>←W(1)` 仅 E1101；合法 Box 不匹配 E1201 保留。
+- **D5 编目脚本**：`compiler/scripts/e1101_catalog.sh` 期望 29→30；实跑 total 30（3／20／7），E1101 编目仍 30。
+- **计数与资产**：Q=10、P=0、Ret=0；R 462、G 286→296、T 765→775、A 769→779、N 884→894、M 1367→1379；`l2u-baseline.tsv` 894 条（895 行含表头）、`.sha256` 1379 行；L2U=10。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.19` 落至 `0.3.20`；`compiler/Cargo.toml:5` description 版本串同步；`Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.20`。
+- **CI**：十七基线并存；无新 job／YAML／ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2u-01：**PASS**——integration head `47d338d`（PR #187）；CI run `40319739085`；`baseline`／`stdout-contract`／`runtime-codes`／`asan-linux`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2u-baseline|cases=894 files=1379 unique=1379 fail=0`；`PASS|stdout-contract|runtime=462 negative=296 fail=0 ran=462/296`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；`PASS|asan-l2k|cases=9 fail=0 ran=9/9`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：十七基线判词全 PASS；ASAN **9/9**（6+3；ASAN/LSAN 零报告）；Q **10/10**（N-346～N-355）；N-290 gate 仅新 token；`e1101_catalog.sh` total 30；全量 383 例复扫 D1／D2／D3 均 0、无误吞；`cargo test --release --locked` **464 passed／0 failed**（`l2u_diag` 6）；E1101 编目 **30**；T-4 无 golden 更新；全 job `SKIP|`／`FAIL|` 0 行。
+- 计数口径：P=**0**／Q=**10**／Ret=**0**／R=**462**／G=**296**／T=**775**／A=**779**／N=**894**／M=**1379**。
+- 证据：产品签署 `shared/ZOR-L2u-Stage2-S26会签-产品-v1-signed.md`（76 行／6564 B，sha256 `bb4fdcd9…40fe`）；QA Stage-2 报告 `shared/ZOR-L2u-Stage2-验证报告-质量-v1.md`（88 行／6145 B，sha256 `771fc299…ad5f`）；QA 会签输入（105 行／6901 B，sha256 `d6e5f6e4…568b`）；`l2u-baseline.tsv` `adadfde5…f00f253`；`l2u-baseline.sha256` `33435532…17f028d8`；`l2u-negative.tsv` `8e672ddb…6de035f`；PR #187 **18 files**（核心 3＋QA 11＋CI 4）。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **三条单 ID 执行面覆盖**：N-344 E1201→E1101、N-315 E1201→E1202、N-290 仅新 token；历史 TSV／baseline 字节零改、不退休；N-290 自 L2u head 起不再接受旧 token。
+- **D2 范围**：仅 `Ty::Bad` 触发；Q6／Q7／Q8 锁定合法 Box 不匹配 E1201；全量复扫无误吞；不改变 `Ty::Bad` 全局 `?` 行为。
+- **Q1 断言口径**：`l2u-negative.tsv` 以新文案为 token；E1201 实测存在并由既有 12 条 D1 用例覆盖。
+- **平台／ASAN**：macOS 无 LSAN，不作 ASAN 终证；终证为 Linux CI 9/9；默认 manifest 48／41／7、l2k 6、l2t 3 零改。
+- **版本语境**：0.3.19 及更早节的表述按版本语境保留、不回改；历史节逐字节零改；0.3.20 为诊断文本层，无新增语言能力，账本／README 不得写成能力版本。
+- **发布**：零 tag／Release，不构成安装或环境可用性承诺；不出性能数字。
+
 ## [0.3.19] - 2026-10-26
 
 内部验证里程碑，非可用语言版本：本版为 L2t「`Box<enum>` 常量枚举载荷子集」——在 0.3.18 的 Box 常量性边界之上，开放标注绑定 `let b: Box<E> = box V(...)`／`box E::V(...)` 的**编译期常量枚举载荷**（零／单／多字段；字段仅标量：8 整型／bool／f32／f64＋有限／特殊值／命名常量／整型成员）；C 端以 tag＋union 布局承载，`println(*b)`／移动／常量重初始化／`unbox`／作用域 drop 一次；**不递归析构**；变量／表达式枚举载荷、嵌套 Box、Box 复合含 enum、enum-in-enum、无标注绑定、`let v=*b`／`println(b)` 维持 fail-closed。Ret=6（N-146／203／231／254／287／303，仅执行面）；ASAN K=3（新建 `l2t-asan-manifest.tsv` 3 例＋`l2k-asan-manifest.tsv` 原 6 例零改，观测 6+3=9；默认 manifest 48／41／7 零改）；`l2t-baseline` 第十六基线；按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
