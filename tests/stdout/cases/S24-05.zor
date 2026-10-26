@@ -1,0 +1,1 @@
+fn main() { let b: Box<u8> = box 6; println(*b); }

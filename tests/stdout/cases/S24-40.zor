@@ -1,0 +1,1 @@
+fn main() { let b: Box<[i64; 2]> = box [1, 2]; b = box [f64::MAX_EXP, f64::MIN_EXP]; println(*b); }
