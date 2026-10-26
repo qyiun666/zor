@@ -731,12 +731,7 @@ impl<'a> Ck<'a> {
                 // `Box<f32> = box 1` 仍为 E1201（N-115／N-116 红线）。
                 let payload_expect = match expect {
                     Some(Ty::BoxTy(p)) => match p.as_ref() {
-                        Ty::Prim("f32") | Ty::Prim("f64")
-                            if float_literal_form(inner)
-                                || matches!(inner.as_ref(), Ex::Lit(Lit::IntConst(_), _, _)) =>
-                        {
-                            // L2q：具名整型常量作浮点 Box 载荷须落 E1202（裁定 §4.3）；
-                            // `box 1` 等整数字面量仍维持 E1201（N-115／N-116 红线）。
+                        Ty::Prim("f32") | Ty::Prim("f64") if float_literal_form(inner) => {
                             Some((**p).clone())
                         }
                         Ty::Named(n) if self.structs.contains_key(n) => Some((**p).clone()),

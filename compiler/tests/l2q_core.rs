@@ -2,9 +2,10 @@
 //! `MAX_EXP`／`MIN_EXP`／`MANTISSA_DIGITS`／`DIGITS`／`RADIX` × f64／f32。
 //!
 //! 覆盖：标量、绑定（含整型标注收敛与拷贝）、Box 标量载荷与重初始化、
-//! 枚举、struct／数组／元组、多实参、Box 复合嵌套、整型表达式（负号／算术）、
+//! 枚举、struct／数组／元组、多实参、整型表达式（负号／算术）、
 //! 常量↔同值字面量同构；未列名成员与成员调用 E1101、整型常量→浮点标注 E1202、
-//! 负值／越界 E1201、浮点成员→整型标注 E1202 回归，以及六档 `-O*` 稳定性。
+//! 负值／越界 E1201、标量 Box 浮点载荷 E1201、浮点成员→整型标注 E1202 回归，
+//! 以及六档 `-O*` 稳定性。Box 复合载荷含成员按裁定 §3 归 ⑤：不测试、不宣称。
 //! 只依赖宿主 `cc`；不访问网络。
 
 use std::fs;
@@ -232,15 +233,21 @@ fn float_annotation_is_e1202() {
         "enum E { V(f32) }\nfn main() {\n    println(V(f64::MAX_EXP));\n}\n",
         "E1202",
     );
+}
+
+/// 裁定 v1.1 R2：标量 Box 浮点载荷不下推浮点期望——成员与整数字面量同码 E1201
+/// （N-115／N-116 红线；N-268 改判 E1201）。
+#[test]
+fn box_float_payload_is_e1201() {
     assert_rc1(
         "box-f32",
         "fn main() {\n    let b: Box<f32> = box f64::MAX_EXP;\n    println(*b);\n}\n",
-        "E1202",
+        "E1201",
     );
     assert_rc1(
         "box-f64",
         "fn main() {\n    let b: Box<f64> = box f32::MIN_EXP;\n    println(*b);\n}\n",
-        "E1202",
+        "E1201",
     );
 }
 
@@ -290,6 +297,12 @@ fn range_violations_are_e1201() {
         "unary-i8-min-exp",
         "fn main() {\n    let x: i8 = -f64::MIN_EXP;\n    println(x);\n}\n",
         "E1201",
+    );
+    // 源形态区分：成员可作标量 Box 载荷，一元负号形态仍 fail-closed（N-19／N-41 口径）。
+    assert_rc1(
+        "box-neg-min-exp",
+        "fn main() {\n    let b: Box<i16> = box -f64::MIN_EXP;\n    println(*b);\n}\n",
+        "box 载荷非整型字面量",
     );
 }
 

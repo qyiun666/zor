@@ -598,7 +598,7 @@ fn payload_init_ok(e: &Ex, types: &TypeTable, prog: &Prog) -> bool {
         return false;
     }
     match e {
-        Ex::Lit(Lit::Int(_) | Lit::Float(_) | Lit::Bool(_), _, _) => true,
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_) | Lit::Float(_) | Lit::Bool(_), _, _) => true,
         Ex::FloatSpecial(..) => true,
         Ex::Un(op, x, _, _) if op == "-" || op == "!" => payload_init_ok(x, types, prog),
         Ex::Record(_, fields, _, _) => fields.iter().all(|(_, v)| payload_init_ok(v, types, prog)),
