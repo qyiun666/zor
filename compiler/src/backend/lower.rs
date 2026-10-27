@@ -1457,6 +1457,9 @@ fn live_value(
     if let Some(cv) = live_enum_leaf(e, want, types, values, prog)? {
         return Ok(Some(cv));
     }
+    if let Some(cv) = live_scalar_leaf(e, want, types, slots, scope)? {
+        return Ok(Some(cv));
+    }
     match (e, want) {
         (Ex::Record(name, fields, rl, rc), AstTy::Named(want_name)) if name == want_name => {
             let decl = struct_decl(prog, name)?;
@@ -1532,6 +1535,46 @@ fn live_enum_leaf(
         return Ok(None);
     }
     Ok(Some(ConstValue::EnumLive { init: init.clone(), value }))
+}
+
+/// L2z：复合树内标量变量叶——同型槽位优先取编译期常量；
+/// 无常量但有运行期载体（i64／u8／u32）时生成 `ScalarLive`；
+/// 无运行期载体的 deref 派生宽度返回 None（维持 fail-closed）。
+fn live_scalar_leaf(
+    e: &Ex,
+    want: &AstTy,
+    types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
+) -> Result<Option<ConstValue>, SubsetError> {
+    let Ex::Path(n, nl, nc) = e else {
+        return Ok(None);
+    };
+    if types.expr_ty(e) != Some(want) {
+        return Ok(None);
+    }
+    let Some(ir) = ast_to_ir(want) else {
+        return Ok(None);
+    };
+    if !is_enum_scalar_field_ir(&ir) {
+        return Ok(None);
+    }
+    let id = lookup(scope, n, *nl, *nc)?;
+    let slot = slots
+        .get(id.0 as usize)
+        .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：复合成员槽位缺失"))?;
+    if slot.ty != ir {
+        return Ok(None);
+    }
+    if let Some(val) = &slot.konst {
+        let cv = constval_to_constvalue(val)
+            .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：复合成员标量常量形态不支持"))?;
+        return Ok(Some(cv));
+    }
+    if let Some(ty) = ir_int_ty(&ir) {
+        return Ok(Some(ConstValue::ScalarLive { ty, expr: IntExpr::Local(id) }));
+    }
+    Ok(None)
 }
 
 /// L2v：枚举值物化配方（tag＋逐字段初始化）。仅标量字段可生成；
@@ -1979,6 +2022,10 @@ fn value_of_const(v: &ConstValue, t: &Ty) -> Result<Value, SubsetError> {
         }
         // L2x：一层变量枚举叶 → 既有打印值树。
         (ConstValue::EnumLive { value, .. }, Ty::Enum(_)) => Ok(value.clone()),
+        // L2z：复合树内运行期标量变量叶 → 既有整型打印树。
+        (ConstValue::ScalarLive { ty, expr }, t) if ir_int_ty(t) == Some(*ty) => {
+            Ok(Value::Int { ty: *ty, expr: expr.clone() })
+        }
         _ => Err(SubsetError::new(0, 0, "lower：复合载荷常量与类型不符")),
     }
 }

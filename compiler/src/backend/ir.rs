@@ -115,6 +115,8 @@ pub enum ConstValue {
     /// L2x／L2y：live enum 叶（任意既有 struct／array 深度；
     /// 打印投影为 value，初始化投影为 init）。
     EnumLive { init: EnumInit, value: Value },
+    /// L2z：复合树内运行期标量变量叶（仅 i64／u8／u32；其余宽度常量化）。
+    ScalarLive { ty: IntTy, expr: IntExpr },
 }
 
 /// Box 载荷常量：标量保留既有 i128 位型通道（C 文本零漂移），
