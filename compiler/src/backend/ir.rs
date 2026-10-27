@@ -127,6 +127,8 @@ pub enum BoxConst {
     Composite(ConstValue),
     /// L2v：运行期枚举变量副本（tag＋union 初始化配方＋打印值树）。
     EnumLive { init: EnumInit, value: Value },
+    /// L3a：顶层标量变量载荷（仅 i64／u8／u32 运行期载体；其余宽度常量化）。
+    ScalarLive { ty: IntTy, expr: IntExpr },
 }
 
 /// 载荷 typedef 定义（lower 按首次使用序登记，emit 在 main 之前发射）。

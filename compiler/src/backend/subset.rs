@@ -146,10 +146,23 @@ fn check_block(
                         Some(BindingKind::Str)
                     }
                     Some(Ty::BoxTy(inner)) => match l2f_payload_ty(inner) {
-                        // L2k：浮点载荷标注仅在特殊值／有限浮点字面量成立；其余沿用原判词。
+                        // L2k：浮点载荷标注仅在特殊值／有限浮点字面量成立；
+                        // L3a：浮点标量变量（Path）同样成立；其余沿用原判词。
                         Some(p)
                             if matches!(p, Ty::Prim("f32") | Ty::Prim("f64"))
-                                && !float_payload_init(init) =>
+                                && !float_payload_init(init)
+                                && !matches!(
+                                    init,
+                                    Ex::Box(b, _, _)
+                                        if matches!(
+                                            b.as_ref(),
+                                            Ex::Path(n, _, _)
+                                                if matches!(
+                                                    bindings.get(n),
+                                                    Some(BindingKind::F32 | BindingKind::F64)
+                                                )
+                                        )
+                                ) =>
                         {
                             return Err(SubsetError::new(
                                 *l,
@@ -349,6 +362,15 @@ fn let_init_kind(
                     return Ok(BindingKind::Box(p.clone()));
                 }
             }
+            // L3a：顶层标量变量载荷（Copy；bool／整棵载荷／表达式仍 fail-closed）。
+            if let (Some(p), Ex::Path(n, _, _)) = (&ann_payload, inner.as_ref()) {
+                if l2f_payload_ty(p).is_some()
+                    && scalar_binding_matches(p, n, bindings)
+                    && matches!(types.expr_ty(init), Some(Ty::BoxTy(t)) if **t == *p)
+                {
+                    return Ok(BindingKind::Box(p.clone()));
+                }
+            }
             // L2k：复合字面量载荷（常量树；变量即 fail-closed）。
             // L2t：枚举常量载荷（`box V(..)`／`box E::V(..)`）同走复合通道。
             // L2x：一层变量 enum 叶（struct 直接字段／array 直接元素）走 live 闸。
@@ -525,6 +547,15 @@ fn l2f_payload_binding(t: &Ty) -> Option<BindingKind> {
     }
 }
 
+/// L3a：顶层标量 Box 变量载荷——标注宽度与绑定种类一致（bool／byte 不在白名单）。
+fn scalar_binding_matches(p: &Ty, n: &str, bindings: &HashMap<String, BindingKind>) -> bool {
+    let Ty::Prim(pname) = p else {
+        return false;
+    };
+    l2f_payload_ty(p).is_some()
+        && prim_kind(pname).is_some_and(|k| bindings.get(n) == Some(&k))
+}
+
 fn is_box_i64(k: &BindingKind) -> bool {
     matches!(k, BindingKind::Box(t) if t == &Ty::Prim("i64"))
 }
@@ -564,8 +595,12 @@ fn box_reinit_ok(
                 && matches!(p.as_ref(), Ty::Prim("f32") | Ty::Prim("f64"))
         }
         // L2v：变量枚举重初始化（Copy；类型表二次核对）。
-        Ex::Path(..) => {
-            is_enum_payload_ty(p, prog) && types.expr_ty(inner) == Some(p.as_ref())
+        // L3a：顶层标量变量重初始化（Copy；bool／整棵载荷仍 false）。
+        Ex::Path(n, _, _) => {
+            (is_enum_payload_ty(p, prog) && types.expr_ty(inner) == Some(p.as_ref()))
+                || (l2f_payload_ty(p).is_some()
+                    && scalar_binding_matches(p, n, bindings)
+                    && types.expr_ty(inner) == Some(p.as_ref()))
         }
         Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..) => {
             is_composite_payload_ty(p)

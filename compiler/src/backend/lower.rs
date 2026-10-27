@@ -202,16 +202,12 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             let ty = box_int_ty(&payload).ok_or_else(|| {
                                 SubsetError::new(*l, *c, "lower：box 载荷类型非 8 个整型宽度之一")
                             })?;
-                            let (value, konst) = if matches!(payload, Ty::F32 | Ty::F64) {
-                                let val = const_scalar(inner, &payload, types, &slots, &scope)?;
-                                (box_float_bits(&val, ty)?, Some(val))
-                            } else {
-                                (box_lit(inner, ty)?, None)
-                            };
+                            let (value, konst) =
+                                scalar_box_value(inner, &payload, ty, types, &slots, &scope)?;
                             body.push(Stmt::BindBox {
                                 local: id,
                                 ty: payload,
-                                value: BoxConst::Bits(value),
+                                value,
                                 line: *l,
                                 col: *c,
                             });
@@ -500,16 +496,12 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             let ty = box_int_ty(&payload).ok_or_else(|| {
                                 SubsetError::new(*al, *ac, "lower：box 载荷类型非 8 个整型宽度之一")
                             })?;
-                            let (value, konst) = if matches!(payload, Ty::F32 | Ty::F64) {
-                                let val = const_scalar(inner, &payload, types, &slots, &scope)?;
-                                (box_float_bits(&val, ty)?, Some(val))
-                            } else {
-                                (box_lit(inner, ty)?, None)
-                            };
+                            let (value, konst) =
+                                scalar_box_value(inner, &payload, ty, types, &slots, &scope)?;
                             body.push(Stmt::BindBoxAssign {
                                 local: ia,
                                 ty: payload,
-                                value: BoxConst::Bits(value),
+                                value,
                                 drop_dst,
                                 line: *al,
                                 col: *ac,
@@ -2176,6 +2168,51 @@ fn box_float_bits(val: &ConstVal, ty: BoxIntTy) -> Result<i128, SubsetError> {
         (ConstVal::F64(v), BoxIntTy::F64) => Ok(v.to_bits() as i128),
         _ => Err(SubsetError::new(0, 0, "lower：Box 浮点载荷位型不符")),
     }
+}
+
+/// L3a：顶层标量 Box 取值——变量 Path 优先（编译期常量转位型；运行期
+/// i64／u8／u32 生成 ScalarLive）；无载体的 deref 派生宽度报既有判词。
+fn scalar_box_value(
+    e: &Ex,
+    payload: &Ty,
+    ty: BoxIntTy,
+    types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
+) -> Result<(BoxConst, Option<ConstVal>), SubsetError> {
+    if let Ex::Path(n, nl, nc) = e {
+        let id = lookup(scope, n, *nl, *nc)?;
+        let slot = slots
+            .get(id.0 as usize)
+            .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：box 标量载荷槽位缺失"))?;
+        if &slot.ty != payload {
+            return Err(SubsetError::new(*nl, *nc, "box 载荷非整型字面量"));
+        }
+        if let Some(val) = &slot.konst {
+            if matches!(payload, Ty::F32 | Ty::F64) {
+                return Ok((BoxConst::Bits(box_float_bits(val, ty)?), Some(val.clone())));
+            }
+            let ConstVal::Int(n) = val else {
+                return Err(SubsetError::new(*nl, *nc, "box 载荷非整型字面量"));
+            };
+            return Ok((BoxConst::Bits(*n), None));
+        }
+        if let Some(ity) = ir_int_ty(payload) {
+            return Ok((
+                BoxConst::ScalarLive {
+                    ty: ity,
+                    expr: IntExpr::Local(id),
+                },
+                None,
+            ));
+        }
+        return Err(SubsetError::new(*nl, *nc, "box 载荷非整型字面量"));
+    }
+    if matches!(payload, Ty::F32 | Ty::F64) {
+        let val = const_scalar(e, payload, types, slots, scope)?;
+        return Ok((BoxConst::Bits(box_float_bits(&val, ty)?), Some(val)));
+    }
+    Ok((BoxConst::Bits(box_lit(e, ty)?), None))
 }
 
 fn box_lit(e: &Ex, ty: BoxIntTy) -> Result<i128, SubsetError> {
