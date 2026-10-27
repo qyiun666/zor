@@ -2,5 +2,6 @@ enum E { V(i64) }
 fn main() {
     let b: Box<[E; 0]> = box [];
     println(*b);
-    println([]);
+    let empty: [E; 0] = [];
+    println(empty);
 }
