@@ -1,0 +1,3 @@
+case_id	source_path	expect_rc	mode	expect_stdout_sha256	kind	notes
+S29-ASAN-01	tests/stdout/cases/S29-ASAN-01.zor	0	build-run	8a13fe494599d5f0aba2b458194bbdf7852269486dc715ffa4f5f613a8437882	positive	Box<S2{inner:S1{e:e}}> 嵌套变量 enum 叶＋drop（L2y K=1）
+S29-ASAN-02	tests/stdout/cases/S29-ASAN-02.zor	0	build-run	cea5486f68b12b76bf63ccd09c7344494fcb06e0a7e4e244230e23696ee97806	positive	Box<[S;2]> 变量叶＋嵌套重初始化＋drop（L2y K=2）

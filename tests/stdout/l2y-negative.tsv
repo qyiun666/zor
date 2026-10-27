@@ -1,0 +1,18 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-411	tests/stdout/cases/N-411.zor	1	none	box 载荷须为字面量常量	zor: runtime error	nested expression construct leaf
+N-412	tests/stdout/cases/N-412.zor	1	none	box 载荷须为字面量常量	zor: runtime error	nested expression arithmetic leaf
+N-413	tests/stdout/cases/N-413.zor	1	none	box 载荷须为字面量常量	zor: runtime error	nested expression in struct array
+N-414	tests/stdout/cases/N-414.zor	1	none	box 载荷须为字面量常量	zor: runtime error	variable scalar leaf
+N-415	tests/stdout/cases/N-415.zor	1	none	box 载荷须为字面量常量	zor: runtime error	nested variable scalar leaf
+N-416	tests/stdout/cases/N-416.zor	1	none	box 载荷须为字面量常量	zor: runtime error	whole variable payload
+N-417	tests/stdout/cases/N-417.zor	1	none	赋值语句	zor: runtime error	variable scalar reinit
+N-418	tests/stdout/cases/N-418.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-419	tests/stdout/cases/N-419.zor	1	none	let 初始化复合值不可打印或形态不支持	zor: runtime error	enum with Box field
+N-420	tests/stdout/cases/N-420.zor	1	none	let 类型标注	zor: runtime error	seen same-type repeat
+N-421	tests/stdout/cases/N-421.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated nested Box
+N-422	tests/stdout/cases/N-422.zor	1	none	解引用源不是 Box 绑定	zor: runtime error	let v = *b
+N-423	tests/stdout/cases/N-423.zor	1	none	println 实参不可打印	zor: runtime error	println box itself
+N-424	tests/stdout/cases/N-424.zor	1	none	E2301	zor: runtime error	double unbox
+N-425	tests/stdout/cases/N-425.zor	1	none	E2101	zor: runtime error	use after move
+N-426	tests/stdout/cases/N-426.zor	1	none	box 载荷须为字面量常量	zor: runtime error	nested array expression leaf
+N-427	tests/stdout/cases/N-427.zor	1	none	box 载荷须为字面量常量	zor: runtime error	array of structs variable scalar leaf
