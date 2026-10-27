@@ -255,15 +255,16 @@ fn scalar_leaves_run_and_whole_payload_stays_fail_closed() {
         "array-scalar-one",
         b"[1]\n",
     );
-    assert_rc1(
-        "whole-struct",
+    // L3b：顶层整棵常量复合变量载荷已开放（原负控翻转）。
+    assert_runs(
         "struct S { x: i64 }\nfn main() {\n    let s = S { x: 1 };\n    let b: Box<S> = box s;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "whole-struct",
+        b"S { x: 1 }\n",
     );
-    assert_rc1(
-        "whole-array",
+    assert_runs(
         "fn main() {\n    let a: [i64; 3] = [1, 2, 3];\n    let b: Box<[i64; 3]> = box a;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "whole-array",
+        b"[1, 2, 3]\n",
     );
     // L2z：标量复合重初始化已开放（原同源负控翻转）。
     assert_runs(

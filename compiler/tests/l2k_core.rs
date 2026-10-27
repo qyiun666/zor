@@ -378,15 +378,16 @@ fn byte_array_payloads_and_nested_byte_arrays_stay_fail_closed() {
 
 #[test]
 fn variable_and_non_constant_payloads_stay_fail_closed() {
-    assert_rc1(
-        "variable-struct",
+    // L3b：顶层整棵常量复合变量载荷已开放（原负控翻转）。
+    assert_runs(
         "struct P { x: i64 }\nfn main() {\n    let p = P { x: 1 };\n    let b: Box<P> = box p;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "variable-struct",
+        b"P { x: 1 }\n",
     );
-    assert_rc1(
-        "variable-array",
+    assert_runs(
         "fn main() {\n    let a: [i64;3] = [1, 2, 3];\n    let b: Box<[i64;3]> = box a;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "variable-array",
+        b"[1, 2, 3]\n",
     );
     // L2z：复合树内变量标量叶已开放（原同源负控翻转）。
     assert_runs(

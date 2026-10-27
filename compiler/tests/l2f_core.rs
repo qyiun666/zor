@@ -206,7 +206,18 @@ fn invalid_typed_box_forms_are_rc1_and_fail_closed() {
         "n20",
         b"1\n",
     );
-    let cases: [(&str, &str, &str); 12] = [
+    // L3b：顶层整棵常量复合变量载荷已开放（原 n31／n32 负控翻转）。
+    assert_runs(
+        "struct P { x: i64 }\nfn main() {\n    let p = P { x: 1 };\n    let b: Box<P> = box p;\n    println(*b);\n}\n",
+        "n31",
+        b"P { x: 1 }\n",
+    );
+    assert_runs(
+        "fn main() {\n    let a: [i64; 3] = [1, 2, 3];\n    let b: Box<[i64; 3]> = box a;\n    println(*b);\n}\n",
+        "n32",
+        b"[1, 2, 3]\n",
+    );
+    let cases: [(&str, &str, &str); 10] = [
         (
             "n16",
             "fn main() {\n    let b: Box<u8> = box 256;\n    println(*b);\n}\n",
@@ -241,16 +252,6 @@ fn invalid_typed_box_forms_are_rc1_and_fail_closed() {
             "n30",
             "fn main() {\n    let b: Box<unit> = box ();\n    println(*b);\n}\n",
             "let 类型标注",
-        ),
-        (
-            "n31",
-            "struct P { x: i64 }\nfn main() {\n    let p = P { x: 1 };\n    let b: Box<P> = box p;\n    println(*b);\n}\n",
-            "box 载荷须为字面量常量",
-        ),
-        (
-            "n32",
-            "fn main() {\n    let a: [i64; 3] = [1, 2, 3];\n    let b: Box<[i64; 3]> = box a;\n    println(*b);\n}\n",
-            "box 载荷须为字面量常量",
         ),
         (
             "n33",

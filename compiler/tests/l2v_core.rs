@@ -230,10 +230,11 @@ fn variable_payload_boundaries_stay_fail_closed() {
         "non-enum-variable",
         b"1\n",
     );
-    assert_rc1(
-        "struct-variable",
+    // L3b：顶层整棵常量复合变量载荷已开放（原负控翻转）。
+    assert_runs(
         "struct S { x: i64 }\nfn main() {\n    let s = S { x: 1 };\n    let b: Box<S> = box s;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "struct-variable",
+        b"S { x: 1 }\n",
     );
     assert_rc1(
         "enum-struct-field",

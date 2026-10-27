@@ -249,15 +249,16 @@ fn unannotated_and_nested_box_forms_stay_fail_closed() {
         "E1201",
     );
     // L2k：字面量复合载荷已支持；变量载荷维持 fail-closed（见新 token 负控）。
-    assert_rc1(
-        "box-array-variable",
+    // L3b：顶层整棵常量复合变量载荷已开放（原负控翻转）。
+    assert_runs(
         "fn main() {\n    let a: [i8; 3] = [1, 2, 3];\n    let b: Box<[i8; 3]> = box a;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "box-array-variable",
+        b"[1, 2, 3]\n",
     );
-    assert_rc1(
-        "box-struct-variable",
+    assert_runs(
         "struct S { x: i8 }\nfn main() {\n    let s = S { x: 1 };\n    let b: Box<S> = box s;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "box-struct-variable",
+        b"S { x: 1 }\n",
     );
     assert_rc1(
         "box-bool",
