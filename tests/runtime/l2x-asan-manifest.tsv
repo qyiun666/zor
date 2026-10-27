@@ -1,0 +1,3 @@
+case_id	source_path	expect_rc	mode	expect_stdout_sha256	kind	notes
+S28-ASAN-01	tests/stdout/cases/S28-ASAN-01.zor	0	build-run	e00c9a75a4de2ea7d5447d8c7d152d1894559f1ab0724326f63e094a62357386	positive	Box<S{e:e}> 一层变量 enum 叶＋drop（L2x K=1）
+S28-ASAN-02	tests/stdout/cases/S28-ASAN-02.zor	0	build-run	fd6b8c31cb972014a635220e6d0e7e29a596a39259f06b3d580da3f3b37ba65a	positive	Box<[E;2]> 变量元素＋数组重初始化＋drop（L2x K=2）
