@@ -256,7 +256,8 @@ fn check_block(
                             (Some(BindingKind::Box(t)), Some(Ty::BoxTy(p))) => t == p.as_ref(),
                             _ => false,
                         };
-                        same_payload && box_reinit_ok(inner, types.expr_ty(rhs), types, prog)
+                        same_payload
+                            && box_reinit_ok(inner, types.expr_ty(rhs), bindings, types, prog)
                     }
                     _ => false,
                 };
@@ -350,13 +351,17 @@ fn let_init_kind(
             }
             // L2k：复合字面量载荷（常量树；变量即 fail-closed）。
             // L2t：枚举常量载荷（`box V(..)`／`box E::V(..)`）同走复合通道。
+            // L2x：一层变量 enum 叶（struct 直接字段／array 直接元素）走 live 闸。
             if let Some(p) = &ann_payload {
                 if is_composite_payload_ty(p) && l2k_payload_ty(p, prog) {
                     let literal = matches!(
                         inner.as_ref(),
                         Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..)
                     );
-                    if !literal || !payload_init_ok(inner, types, prog) {
+                    let ok = literal
+                        && (payload_init_ok(inner, types, prog)
+                            || one_level_live_ok(inner, p, bindings, types, prog));
+                    if !ok {
                         return Err(SubsetError::new(*il, *ic, "box 载荷须为字面量常量"));
                     }
                     match types.expr_ty(init) {
@@ -544,6 +549,7 @@ fn float_payload_init(init: &Ex) -> bool {
 fn box_reinit_ok(
     inner: &Ex,
     payload: Option<&Ty>,
+    bindings: &HashMap<String, BindingKind>,
     types: &TypeTable,
     prog: &Prog,
 ) -> bool {
@@ -562,7 +568,10 @@ fn box_reinit_ok(
             is_enum_payload_ty(p, prog) && types.expr_ty(inner) == Some(p.as_ref())
         }
         Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..) => {
-            is_composite_payload_ty(p) && l2k_payload_ty(p, prog) && payload_init_ok(inner, types, prog)
+            is_composite_payload_ty(p)
+                && l2k_payload_ty(p, prog)
+                && (payload_init_ok(inner, types, prog)
+                    || one_level_live_ok(inner, p, bindings, types, prog))
         }
         _ => false,
     }
@@ -577,6 +586,65 @@ fn is_composite_payload_ty(t: &Ty) -> bool {
 fn is_enum_payload_ty(t: &Ty, prog: &Prog) -> bool {
     matches!(t, Ty::Named(n) if prog.enums.iter().any(|e| &e.name == n))
         && l2k_payload_ty(t, prog)
+}
+
+/// L2x：一层 live 复合形态——struct 直接 enum 字段／array 直接 enum 元素为变量。
+/// 嵌套子树仍走 `payload_init_ok`（其拒绝变量），故不会放行嵌套变量叶。
+fn one_level_live_ok(
+    e: &Ex,
+    payload: &Ty,
+    bindings: &HashMap<String, BindingKind>,
+    types: &TypeTable,
+    prog: &Prog,
+) -> bool {
+    match payload {
+        Ty::Named(name) => {
+            let Ex::Record(_, fields, _, _) = e else {
+                return false;
+            };
+            let Some(decl) = prog.structs.iter().find(|s| &s.name == name) else {
+                return false;
+            };
+            decl.fields.iter().all(|(fname, fty, _, _)| {
+                let Some((_, v)) = fields.iter().find(|(n, _)| n == fname) else {
+                    return false;
+                };
+                payload_init_ok(v, types, prog)
+                    || live_enum_leaf_ok(v, fty, bindings, types, prog)
+            })
+        }
+        Ty::Arr(elem, n) => {
+            let Ex::ArrLit(es, _, _) = e else {
+                return false;
+            };
+            es.len() as u64 == *n
+                && es.iter().all(|x| {
+                    payload_init_ok(x, types, prog)
+                        || live_enum_leaf_ok(x, elem, bindings, types, prog)
+                })
+        }
+        _ => false,
+    }
+}
+
+/// L2x：直接 enum 变量叶——Path 绑定为同型枚举值（Copy），enum 字段全标量。
+fn live_enum_leaf_ok(
+    e: &Ex,
+    want: &Ty,
+    bindings: &HashMap<String, BindingKind>,
+    types: &TypeTable,
+    prog: &Prog,
+) -> bool {
+    if !is_enum_payload_ty(want, prog) {
+        return false;
+    }
+    let Ex::Path(n, _, _) = e else {
+        return false;
+    };
+    if types.expr_ty(e) != Some(want) {
+        return false;
+    }
+    matches!(bindings.get(n), Some(BindingKind::Composite(t)) if t == want)
 }
 
 /// L2k Box 复合载荷白名单（深递归）：8 整型宽度／bool／f32／f64／struct／定长数组；
