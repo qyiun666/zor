@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S30-01	tests/stdout/cases/S30-01.zor	run	0	expected/S30-01.stdout	-	i64 variable scalar leaf
+S30-02	tests/stdout/cases/S30-02.zor	run	0	expected/S30-02.stdout	-	u8 runtime scalar leaf
+S30-03	tests/stdout/cases/S30-03.zor	run	0	expected/S30-03.stdout	-	u32 runtime scalar leaf
+S30-04	tests/stdout/cases/S30-04.zor	run	0	expected/S30-04.stdout	-	i8 compile-time scalar leaf
+S30-05	tests/stdout/cases/S30-05.zor	run	0	expected/S30-05.stdout	-	i16 compile-time scalar leaf
+S30-06	tests/stdout/cases/S30-06.zor	run	0	expected/S30-06.stdout	-	i32 compile-time scalar leaf
+S30-07	tests/stdout/cases/S30-07.zor	run	0	expected/S30-07.stdout	-	u16 compile-time scalar leaf
+S30-08	tests/stdout/cases/S30-08.zor	run	0	expected/S30-08.stdout	-	u64 compile-time scalar leaf
+S30-09	tests/stdout/cases/S30-09.zor	run	0	expected/S30-09.stdout	-	bool scalar leaf
+S30-10	tests/stdout/cases/S30-10.zor	run	0	expected/S30-10.stdout	-	f32 scalar leaf
+S30-11	tests/stdout/cases/S30-11.zor	run	0	expected/S30-11.stdout	-	f64 named MAX leaf
+S30-12	tests/stdout/cases/S30-12.zor	run	0	expected/S30-12.stdout	-	array two variable scalars
+S30-13	tests/stdout/cases/S30-13.zor	run	0	expected/S30-13.stdout	-	array constant + variable
+S30-14	tests/stdout/cases/S30-14.zor	run	0	expected/S30-14.stdout	-	nested struct scalar leaf
+S30-15	tests/stdout/cases/S30-15.zor	run	0	expected/S30-15.stdout	-	struct array field variable scalars
+S30-16	tests/stdout/cases/S30-16.zor	run	0	expected/S30-16.stdout	-	struct array variable scalars
+S30-17	tests/stdout/cases/S30-17.zor	run	0	expected/S30-17.stdout	-	nested array variable scalars
+S30-18	tests/stdout/cases/S30-18.zor	run	0	expected/S30-18.stdout	-	scalar composite reinit struct
+S30-19	tests/stdout/cases/S30-19.zor	run	0	expected/S30-19.stdout	-	scalar composite reinit array
+S30-20	tests/stdout/cases/S30-20.zor	run	0	expected/S30-20.stdout	-	Box move
+S30-21	tests/stdout/cases/S30-21.zor	run	0	expected/S30-21.stdout	-	unbox
+S30-22	tests/stdout/cases/S30-22.zor	run	0	expected/S30-22.stdout	-	variable enum + variable scalar in struct
+S30-23	tests/stdout/cases/S30-23.zor	run	0	expected/S30-23.stdout	-	struct array scalar reinit
+S30-24	tests/stdout/cases/S30-24.zor	run	0	expected/S30-24.stdout	-	deep array variable scalar

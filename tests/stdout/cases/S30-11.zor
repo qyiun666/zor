@@ -1,0 +1,8 @@
+struct S { x: f64 }
+fn main() {
+    let x: f64 = f64::MAX;
+    let b: Box<S> = box S { x: x };
+    println(*b);
+    println(S { x: x });
+    println(x);
+}
