@@ -684,7 +684,9 @@ fn emit_alloc_payload(
             let bty = box_ty_of(ty).expect("scalar box payload width");
             emit_alloc_box(out, id, bty, *v);
         }
-        BoxConst::Composite(cv) => emit_alloc_composite(out, id, ty, cv),
+        BoxConst::Composite(cv) => {
+            emit_alloc_composite(out, id, ty, cv, tmp_counter, overflow)
+        }
         BoxConst::EnumLive { init, .. } => {
             emit_alloc_enum_live(out, id, ty, init, tmp_counter, overflow)
         }
@@ -744,7 +746,14 @@ fn enum_field_int_ty(t: &Ty) -> Option<IntTy> {
 }
 
 /// L2k：复合载荷落堆。struct 整体复合字面量赋值；数组逐元素赋值（C 不允许数组整体赋值）。
-fn emit_alloc_composite(out: &mut String, id: &LocalId, ty: &Ty, cv: &ConstValue) {
+fn emit_alloc_composite(
+    out: &mut String,
+    id: &LocalId,
+    ty: &Ty,
+    cv: &ConstValue,
+    tmp_counter: &mut usize,
+    overflow: OverflowMode,
+) {
     let cty = payload_c_ty(ty).expect("composite payload c type");
     let _ = writeln!(
         out,
@@ -753,11 +762,20 @@ fn emit_alloc_composite(out: &mut String, id: &LocalId, ty: &Ty, cv: &ConstValue
     );
     match (ty, cv) {
         (Ty::Struct(_), ConstValue::Struct { .. }) => {
-            let _ = writeln!(out, "    *zor_box_{} = ({}){};", id.0, cty, init_braced(ty, cv));
+            let init = init_braced(ty, cv, out, tmp_counter, overflow);
+            let _ = writeln!(out, "    *zor_box_{} = ({}){};", id.0, cty, init);
         }
         (Ty::Array(_, n), ConstValue::Array { values, .. }) => {
             debug_assert_eq!(*n, values.len() as u64);
-            emit_array_init(out, id, &format!("(*zor_box_{})", id.0), ty, values);
+            emit_array_init(
+                out,
+                id,
+                &format!("(*zor_box_{})", id.0),
+                ty,
+                values,
+                tmp_counter,
+                overflow,
+            );
         }
         // L2t：枚举载荷（tag＋union；字段仅标量；零载荷仅初始化 tag）。
         (Ty::Enum(_), ConstValue::Enum { tag, fields, .. }) => {
@@ -785,7 +803,15 @@ fn emit_alloc_composite(out: &mut String, id: &LocalId, ty: &Ty, cv: &ConstValue
 }
 
 /// 数组逐元素初始化：元素为数组时继续下钻（数组不可整体赋值）。
-fn emit_array_init(out: &mut String, id: &LocalId, prefix: &str, ty: &Ty, vs: &[ConstValue]) {
+fn emit_array_init(
+    out: &mut String,
+    id: &LocalId,
+    prefix: &str,
+    ty: &Ty,
+    vs: &[ConstValue],
+    tmp_counter: &mut usize,
+    overflow: OverflowMode,
+) {
     let _ = id;
     let Ty::Array(elem, _) = ty else {
         return;
@@ -793,23 +819,40 @@ fn emit_array_init(out: &mut String, id: &LocalId, prefix: &str, ty: &Ty, vs: &[
     for (i, v) in vs.iter().enumerate() {
         let lvalue = format!("{prefix}[{i}]");
         match (elem.as_ref(), v) {
-            (Ty::Array(..), ConstValue::Array { values, .. }) => {
-                emit_array_init(out, id, &lvalue, elem, values)
-            }
+            (Ty::Array(..), ConstValue::Array { values, .. }) => emit_array_init(
+                out,
+                id,
+                &lvalue,
+                elem,
+                values,
+                tmp_counter,
+                overflow,
+            ),
             _ => {
-                let _ = writeln!(out, "    {lvalue} = {};", init_expr(elem, v));
+                let rhs = init_expr(elem, v, out, tmp_counter, overflow);
+                let _ = writeln!(out, "    {lvalue} = {rhs};");
             }
         }
     }
 }
 
 /// 初始化上下文（`=` 右侧／花括号内）合法写法；struct 返回 `{ .f = ... }`。
-fn init_braced(ty: &Ty, cv: &ConstValue) -> String {
+fn init_braced(
+    ty: &Ty,
+    cv: &ConstValue,
+    out: &mut String,
+    tmp_counter: &mut usize,
+    overflow: OverflowMode,
+) -> String {
     match (ty, cv) {
         (Ty::Struct(_), ConstValue::Struct { fields, .. }) => {
             let mut parts = Vec::with_capacity(fields.len());
             for (fname, fty, fv) in fields {
-                parts.push(format!(".{} = {}", fname, init_braced(fty, fv)));
+                parts.push(format!(
+                    ".{} = {}",
+                    fname,
+                    init_braced(fty, fv, out, tmp_counter, overflow)
+                ));
             }
             format!("{{ {} }}", parts.join(", "))
         }
@@ -817,37 +860,60 @@ fn init_braced(ty: &Ty, cv: &ConstValue) -> String {
         (Ty::Array(elem, _), ConstValue::Array { values, .. }) => {
             let mut parts = Vec::with_capacity(values.len());
             for v in values {
-                parts.push(init_braced(elem, v));
+                parts.push(init_braced(elem, v, out, tmp_counter, overflow));
             }
             format!("{{ {} }}", parts.join(", "))
         }
-        // L2w：嵌套 enum 叶子（struct 字段／array 元素）。
+        // L2w：嵌套常量 enum 叶子（struct 字段／array 元素）。
         (Ty::Enum(_), ConstValue::Enum { tag, fields, .. }) => enum_init_braced(*tag, fields),
+        // L2x：一层变量 enum 叶（struct 字段）。
+        (Ty::Enum(_), ConstValue::EnumLive { init, .. }) => {
+            enum_init_braced_live(init, out, tmp_counter, overflow)
+        }
         _ => leaf_literal(ty, cv),
     }
 }
 
 /// 赋值表达式右值；struct 用复合字面量，数组不可赋值（调用方下钻）。
-fn init_expr(ty: &Ty, cv: &ConstValue) -> String {
+fn init_expr(
+    ty: &Ty,
+    cv: &ConstValue,
+    out: &mut String,
+    tmp_counter: &mut usize,
+    overflow: OverflowMode,
+) -> String {
     match ty {
         Ty::Struct(_) => {
             let cty = payload_c_ty(ty).expect("struct payload c type");
-            format!("({}){}", cty, init_braced(ty, cv))
+            format!(
+                "({}){}",
+                cty,
+                init_braced(ty, cv, out, tmp_counter, overflow)
+            )
         }
         Ty::Array(..) => unreachable!("array init must descend element-wise"),
-        // L2w：数组元素位置的 enum 需要带类型的复合字面量。
+        // L2w／L2x：数组元素位置的 enum 需要带类型的复合字面量。
         Ty::Enum(_) => {
-            let ConstValue::Enum { tag, fields, .. } = cv else {
-                unreachable!("enum payload shape")
-            };
             let cty = payload_c_ty(ty).expect("enum payload c type");
-            format!("({}){}", cty, enum_init_braced(*tag, fields))
+            match cv {
+                ConstValue::Enum { tag, fields, .. } => {
+                    format!("({}){}", cty, enum_init_braced(*tag, fields))
+                }
+                ConstValue::EnumLive { init, .. } => {
+                    format!(
+                        "({}){}",
+                        cty,
+                        enum_init_braced_live(init, out, tmp_counter, overflow)
+                    )
+                }
+                _ => unreachable!("enum payload shape"),
+            }
         }
         _ => leaf_literal(ty, cv),
     }
 }
 
-/// L2w：enum 初始化花括号（tag＋union；零载荷仅初始化 tag）。
+/// L2w：常量 enum 初始化花括号（tag＋union；零载荷仅初始化 tag）。
 fn enum_init_braced(tag: u32, fields: &[(Ty, ConstValue)]) -> String {
     if fields.is_empty() {
         format!("{{ .tag = {} }}", tag)
@@ -858,6 +924,35 @@ fn enum_init_braced(tag: u32, fields: &[(Ty, ConstValue)]) -> String {
         }
         format!("{{ .tag = {}, .u.v{} = {{ {} }} }}", tag, tag, parts.join(", "))
     }
+}
+
+/// L2x：变量 enum 初始化花括号（tag＋union；运行期字段复用 emit_int_expr）。
+fn enum_init_braced_live(
+    init: &EnumInit,
+    out: &mut String,
+    tmp_counter: &mut usize,
+    overflow: OverflowMode,
+) -> String {
+    if init.fields.is_empty() {
+        return format!("{{ .tag = {} }}", init.tag);
+    }
+    let mut parts = Vec::with_capacity(init.fields.len());
+    for (i, (fty, fv)) in init.fields.iter().enumerate() {
+        let lit = match fv {
+            EnumFieldInit::Const(cv) => leaf_literal(fty, cv),
+            EnumFieldInit::Int(expr) => {
+                let ity = enum_field_int_ty(fty).expect("runtime enum field width");
+                emit_int_expr(out, expr, ity, overflow, tmp_counter)
+            }
+        };
+        parts.push(format!(".f{} = {}", i, lit));
+    }
+    format!(
+        "{{ .tag = {}, .u.v{} = {{ {} }} }}",
+        init.tag,
+        init.tag,
+        parts.join(", ")
+    )
 }
 
 fn leaf_literal(ty: &Ty, cv: &ConstValue) -> String {

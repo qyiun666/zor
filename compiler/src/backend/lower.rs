@@ -1407,8 +1407,115 @@ fn box_enum_live_or_const(
             return Ok((box_const, ConstVal::EnumLive(value)));
         }
     }
-    let cv = const_value(inner, payload_ast, types, slots, scope, prog)?;
-    Ok((BoxConst::Composite(cv.clone()), ConstVal::Composite(cv)))
+    let const_result = const_value(inner, payload_ast, types, slots, scope, prog);
+    let const_err = match const_result {
+        Ok(cv) => return Ok((BoxConst::Composite(cv.clone()), ConstVal::Composite(cv))),
+        Err(e) => e,
+    };
+    // L2x：一层变量 enum 叶——常量通道失败后回落 live 构建；失败仍报原常量判词。
+    match composite_value_live_one_level(inner, payload_ast, types, slots, scope, values, prog) {
+        Ok(cv) => Ok((BoxConst::Composite(cv.clone()), ConstVal::Composite(cv))),
+        Err(_) => Err(const_err),
+    }
+}
+
+/// L2x：一层 live 复合树——常量叶优先，struct 直接字段／array 直接元素可为
+/// 变量 enum 叶（EnumLive）；嵌套子树仍走常量通道（变量即 fail-closed）。
+fn composite_value_live_one_level(
+    e: &Ex,
+    want: &AstTy,
+    types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
+    values: &HashMap<String, Value>,
+    prog: &Prog,
+) -> Result<ConstValue, SubsetError> {
+    let (l, c) = subset::expr_span(e);
+    let recorded = types
+        .expr_ty(e)
+        .ok_or_else(|| SubsetError::new(l, c, "lower：box 复合载荷缺少 type table 记录"))?;
+    if recorded != want {
+        return Err(SubsetError::new(l, c, "lower：box 复合载荷节点类型与标注不符"));
+    }
+    match (e, want) {
+        (Ex::Record(name, fields, rl, rc), AstTy::Named(want_name)) if name == want_name => {
+            let decl = struct_decl(prog, name)?;
+            let mut out = Vec::with_capacity(decl.fields.len());
+            for (fname, fty, _, _) in &decl.fields {
+                let (_, v) = fields
+                    .iter()
+                    .find(|(n, _)| n == fname)
+                    .ok_or_else(|| {
+                        SubsetError::new(*rl, *rc, format!("lower：结构体字段 '{}' 未初始化", fname))
+                    })?;
+                let ir = box_payload_ir_ty(fty, prog).ok_or_else(|| {
+                    SubsetError::new(*rl, *rc, format!("lower：字段 '{}' 类型不在载荷白名单", fname))
+                })?;
+                let cv = match live_enum_leaf(v, fty, types, values, prog)? {
+                    Some(cv) => cv,
+                    None => const_value(v, fty, types, slots, scope, prog)?,
+                };
+                out.push((fname.clone(), ir, cv));
+            }
+            if out.len() != fields.len() {
+                return Err(SubsetError::new(*rl, *rc, "lower：record 字段集合不符"));
+            }
+            Ok(ConstValue::Struct { name: name.clone(), fields: out })
+        }
+        (Ex::ArrLit(es, al, ac), AstTy::Arr(elem, n)) => {
+            if es.len() as u64 != *n {
+                return Err(SubsetError::new(*al, *ac, "lower：数组元素数量与标注不符"));
+            }
+            let ir = box_payload_ir_ty(elem, prog)
+                .ok_or_else(|| SubsetError::new(*al, *ac, "lower：数组元素类型不在载荷白名单"))?;
+            let mut out = Vec::with_capacity(es.len());
+            for x in es {
+                let cv = match live_enum_leaf(x, elem, types, values, prog)? {
+                    Some(cv) => cv,
+                    None => const_value(x, elem, types, slots, scope, prog)?,
+                };
+                out.push(cv);
+            }
+            Ok(ConstValue::Array { elem: ir, values: out })
+        }
+        _ => Err(SubsetError::new(l, c, "lower：box 复合载荷形态不符")),
+    }
+}
+
+/// L2x：直接 enum 变量叶——只接受 `values` 中的 Copy 枚举值（含 L2v 配方）。
+fn live_enum_leaf(
+    e: &Ex,
+    want: &AstTy,
+    types: &TypeTable,
+    values: &HashMap<String, Value>,
+    prog: &Prog,
+) -> Result<Option<ConstValue>, SubsetError> {
+    let Ex::Path(n, nl, nc) = e else {
+        return Ok(None);
+    };
+    let Some(Value::Enum { init: Some(init), .. }) = values.get(n) else {
+        return Ok(None);
+    };
+    let AstTy::Named(en) = want else {
+        return Ok(None);
+    };
+    if types.expr_ty(e) != Some(want) || &init.name != en {
+        return Ok(None);
+    }
+    if !prog.enums.iter().any(|x| &x.name == en) {
+        return Ok(None);
+    }
+    if init.fields.iter().any(|(t, _)| !is_enum_scalar_field_ir(t)) {
+        return Err(SubsetError::new(*nl, *nc, "lower：变量枚举字段不在标量白名单"));
+    }
+    let value = values.get(n).expect("enum value present").clone();
+    let Value::Enum { variant, .. } = &value else {
+        return Ok(None);
+    };
+    if variant != &init.variant {
+        return Ok(None);
+    }
+    Ok(Some(ConstValue::EnumLive { init: init.clone(), value }))
 }
 
 /// L2v：枚举值物化配方（tag＋逐字段初始化）。仅标量字段可生成；
@@ -1854,6 +1961,8 @@ fn value_of_const(v: &ConstValue, t: &Ty) -> Result<Value, SubsetError> {
             }
             Ok(Value::Enum { variant: variant.clone(), payload: out, init: None })
         }
+        // L2x：一层变量枚举叶 → 既有打印值树。
+        (ConstValue::EnumLive { value, .. }, Ty::Enum(_)) => Ok(value.clone()),
         _ => Err(SubsetError::new(0, 0, "lower：复合载荷常量与类型不符")),
     }
 }

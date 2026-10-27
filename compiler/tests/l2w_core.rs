@@ -187,10 +187,11 @@ fn constant_reinit_move_unbox_and_scope_drop() {
 
 #[test]
 fn variable_and_expression_leaves_stay_fail_closed() {
-    assert_rc1(
-        "variable-leaf",
+    // L2x：一层变量 enum 叶转正（struct 直接字段）；表达式／无标注仍 fail-closed。
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let e = V(1);\n    let b: Box<S> = box S { e: e };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "variable-leaf",
+        b"S { e: V(1) }\n",
     );
     assert_rc1(
         "expression-field",
@@ -202,10 +203,11 @@ fn variable_and_expression_leaves_stay_fail_closed() {
         "enum E { V(i64) }\nfn main() {\n    let b: Box<[E; 1]> = box [V(1 + 2)];\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "variable-reinit",
+    // L2x：一层变量复合重初始化转正。
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let b: Box<S> = box S { e: V(1) };\n    let e2 = V(2);\n    b = box S { e: e2 };\n    println(*b);\n}\n",
-        "赋值语句",
+        "variable-reinit",
+        b"S { e: V(2) }\n",
     );
     assert_rc1(
         "unannotated",
