@@ -1,0 +1,2 @@
+struct P { x: i64 }
+fn main() { let b: Box<P> = box P { x: 1 }; unbox b; unbox b; }

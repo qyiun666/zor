@@ -1,0 +1,8 @@
+struct I { x: i64 }
+struct P { inner: I, a: [i64; 2] }
+fn main() {
+    let p = P { inner: I { x: 1 }, a: [1, 2] };
+    let b: Box<P> = box p;
+    println(*b);
+    println(p);
+}

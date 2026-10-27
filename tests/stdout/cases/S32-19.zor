@@ -1,0 +1,9 @@
+enum E { V(i64), W(i64) }
+struct P { e: E, n: i64 }
+fn main() {
+    let b: Box<P> = box P { e: V(1), n: 7 };
+    let p2 = P { e: W(2), n: 8 };
+    b = box p2;
+    println(*b);
+    println(p2);
+}
