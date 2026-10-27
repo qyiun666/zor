@@ -1,0 +1,7 @@
+enum E { V(i64) }
+struct S { e: E, b: bool, f: f64 }
+fn main() {
+    let b: Box<S> = box S { e: V(1), b: true, f: 1.5 };
+    println(*b);
+    println(S { e: V(1), b: true, f: 1.5 });
+}

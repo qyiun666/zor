@@ -1,0 +1,7 @@
+enum E { A() }
+struct S { e: E }
+fn main() {
+    let b: Box<S> = box S { e: E::A() };
+    println(*b);
+    println(S { e: E::A() });
+}
