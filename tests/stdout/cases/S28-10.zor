@@ -1,0 +1,9 @@
+enum E { V(bool) }
+struct S { e: E }
+fn main() {
+    let e = V(true);
+    let b: Box<S> = box S { e: e };
+    println(*b);
+    println(S { e: e });
+    println(e);
+}

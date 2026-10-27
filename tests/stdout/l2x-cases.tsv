@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S28-01	tests/stdout/cases/S28-01.zor	run	0	expected/S28-01.stdout	-	single variable enum field; Copy
+S28-02	tests/stdout/cases/S28-02.zor	run	0	expected/S28-02.stdout	-	zero-field variable
+S28-03	tests/stdout/cases/S28-03.zor	run	0	expected/S28-03.stdout	-	qualified variable
+S28-04	tests/stdout/cases/S28-04.zor	run	0	expected/S28-04.stdout	-	multi-field variable
+S28-05	tests/stdout/cases/S28-05.zor	run	0	expected/S28-05.stdout	-	runtime IntExpr field
+S28-06	tests/stdout/cases/S28-06.zor	run	0	expected/S28-06.stdout	-	runtime arithmetic field
+S28-07	tests/stdout/cases/S28-07.zor	run	0	expected/S28-07.stdout	-	special NAN
+S28-08	tests/stdout/cases/S28-08.zor	run	0	expected/S28-08.stdout	-	named MAX
+S28-09	tests/stdout/cases/S28-09.zor	run	0	expected/S28-09.stdout	-	integer member
+S28-10	tests/stdout/cases/S28-10.zor	run	0	expected/S28-10.stdout	-	bool leaf
+S28-11	tests/stdout/cases/S28-11.zor	run	0	expected/S28-11.stdout	-	variable enum + constant scalar
+S28-12	tests/stdout/cases/S28-12.zor	run	0	expected/S28-12.stdout	-	two different enum variable fields
+S28-13	tests/stdout/cases/S28-13.zor	run	0	expected/S28-13.stdout	-	array two variable elements
+S28-14	tests/stdout/cases/S28-14.zor	run	0	expected/S28-14.stdout	-	array constant + variable
+S28-15	tests/stdout/cases/S28-15.zor	run	0	expected/S28-15.stdout	-	array variable + constant variant
+S28-16	tests/stdout/cases/S28-16.zor	run	0	expected/S28-16.stdout	-	array single variable
+S28-17	tests/stdout/cases/S28-17.zor	run	0	expected/S28-17.stdout	-	variable struct reinit
+S28-18	tests/stdout/cases/S28-18.zor	run	0	expected/S28-18.stdout	-	variable array reinit
+S28-19	tests/stdout/cases/S28-19.zor	run	0	expected/S28-19.stdout	-	mixed array reinit
+S28-20	tests/stdout/cases/S28-20.zor	run	0	expected/S28-20.stdout	-	Box move; e still usable
+S28-21	tests/stdout/cases/S28-21.zor	run	0	expected/S28-21.stdout	-	unbox; e still usable
+S28-22	tests/stdout/cases/S28-22.zor	run	0	expected/S28-22.stdout	-	variable enum + constant array subtree
+S28-23	tests/stdout/cases/S28-23.zor	run	0	expected/S28-23.stdout	-	runtime MAX in array
+S28-24	tests/stdout/cases/S28-24.zor	run	0	expected/S28-24.stdout	-	array two variables
