@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-393	tests/stdout/cases/N-393.zor	1	none	box 载荷须为字面量常量	zor: runtime error	expression construct leaf
+N-394	tests/stdout/cases/N-394.zor	1	none	box 载荷须为字面量常量	zor: runtime error	expression arithmetic leaf
+N-395	tests/stdout/cases/N-395.zor	1	none	box 载荷须为字面量常量	zor: runtime error	expression arithmetic in array
+N-396	tests/stdout/cases/N-396.zor	1	none	box 载荷须为字面量常量	zor: runtime error	nested variable leaf
+N-397	tests/stdout/cases/N-397.zor	1	none	box 载荷须为字面量常量	zor: runtime error	variable leaf inside enum array field
+N-398	tests/stdout/cases/N-398.zor	1	none	box 载荷须为字面量常量	zor: runtime error	variable leaves in array of structs
+N-399	tests/stdout/cases/N-399.zor	1	none	box 载荷非整型字面量	zor: runtime error	variable scalar leaf
+N-400	tests/stdout/cases/N-400.zor	1	none	box 载荷须为字面量常量	zor: runtime error	whole variable payload
+N-401	tests/stdout/cases/N-401.zor	1	none	赋值语句	zor: runtime error	variable scalar reinit
+N-402	tests/stdout/cases/N-402.zor	1	none	赋值语句	zor: runtime error	variable composite reinit
+N-403	tests/stdout/cases/N-403.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-404	tests/stdout/cases/N-404.zor	1	none	let 初始化复合值不可打印或形态不支持	zor: runtime error	enum with Box field
+N-405	tests/stdout/cases/N-405.zor	1	none	let 类型标注	zor: runtime error	seen same-type repeat
+N-406	tests/stdout/cases/N-406.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated composite Box
+N-407	tests/stdout/cases/N-407.zor	1	none	解引用源不是 Box 绑定	zor: runtime error	let v = *b
+N-408	tests/stdout/cases/N-408.zor	1	none	println 实参不可打印	zor: runtime error	println box itself
+N-409	tests/stdout/cases/N-409.zor	1	none	E2301	zor: runtime error	double unbox
+N-410	tests/stdout/cases/N-410.zor	1	none	E2101	zor: runtime error	use after move
