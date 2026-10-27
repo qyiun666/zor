@@ -1,0 +1,3 @@
+S2 { inner: S1 { e: V(1) }, c: T1 { e: W(9) } }
+S2 { inner: S1 { e: V(1) }, c: T1 { e: W(9) } }
+V(1)

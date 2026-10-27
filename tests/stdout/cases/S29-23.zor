@@ -1,0 +1,9 @@
+enum E { V(i64) }
+struct S { e: E }
+fn main() {
+    let e1 = V(1);
+    let b: Box<[S; 2]> = box [S { e: e1 }, S { e: V(9) }];
+    println(*b);
+    println([S { e: e1 }, S { e: V(9) }]);
+    println(e1);
+}
