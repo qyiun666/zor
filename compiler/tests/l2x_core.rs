@@ -209,30 +209,31 @@ fn array_runtime_and_mixed_leaf() {
 
 #[test]
 fn nested_variable_leaves_stay_fail_closed() {
-    assert_rc1(
-        "nested-struct",
+    // L2y：任意既有复合深度的变量 enum 叶转正（5 条）。
+    assert_runs(
         "enum E { V(i64) }\nstruct S1 { e: E }\nstruct S2 { inner: S1 }\nfn main() {\n    let e = V(1);\n    let b: Box<S2> = box S2 { inner: S1 { e: e } };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "nested-struct",
+        b"S2 { inner: S1 { e: V(1) } }\n",
     );
-    assert_rc1(
-        "struct-enum-array",
+    assert_runs(
         "enum E { V(i64) }\nstruct S { a: [E; 2] }\nfn main() {\n    let e1 = V(1);\n    let e2 = V(2);\n    let b: Box<S> = box S { a: [e1, e2] };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "struct-enum-array",
+        b"S { a: [V(1), V(2)] }\n",
     );
-    assert_rc1(
-        "array-of-struct",
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let e = V(1);\n    let b: Box<[S; 1]> = box [S { e: e }];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "array-of-struct",
+        b"[S { e: V(1) }]\n",
     );
-    assert_rc1(
-        "nested-reinit",
+    assert_runs(
         "enum E { V(i64) }\nstruct S1 { e: E }\nstruct S2 { inner: S1 }\nfn main() {\n    let b: Box<S2> = box S2 { inner: S1 { e: V(1) } };\n    let e = V(2);\n    b = box S2 { inner: S1 { e: e } };\n    println(*b);\n}\n",
-        "赋值语句",
+        "nested-reinit",
+        b"S2 { inner: S1 { e: V(2) } }\n",
     );
-    assert_rc1(
-        "array-struct-reinit",
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let b: Box<[S; 1]> = box [S { e: V(1) }];\n    let e = V(2);\n    b = box [S { e: e }];\n    println(*b);\n}\n",
-        "赋值语句",
+        "array-struct-reinit",
+        b"[S { e: V(2) }]\n",
     );
 }
 

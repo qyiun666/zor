@@ -1413,15 +1413,14 @@ fn box_enum_live_or_const(
         Err(e) => e,
     };
     // L2x：一层变量 enum 叶——常量通道失败后回落 live 构建；失败仍报原常量判词。
-    match composite_value_live_one_level(inner, payload_ast, types, slots, scope, values, prog) {
+    match composite_value_live(inner, payload_ast, types, slots, scope, values, prog) {
         Ok(cv) => Ok((BoxConst::Composite(cv.clone()), ConstVal::Composite(cv))),
         Err(_) => Err(const_err),
     }
 }
 
-/// L2x：一层 live 复合树——常量叶优先，struct 直接字段／array 直接元素可为
-/// 变量 enum 叶（EnumLive）；嵌套子树仍走常量通道（变量即 fail-closed）。
-fn composite_value_live_one_level(
+/// L2y：任意既有复合深度的 live 树——常量子树优先，enum 变量叶可为任意深度。
+fn composite_value_live(
     e: &Ex,
     want: &AstTy,
     types: &TypeTable,
@@ -1430,12 +1429,33 @@ fn composite_value_live_one_level(
     values: &HashMap<String, Value>,
     prog: &Prog,
 ) -> Result<ConstValue, SubsetError> {
+    live_value(e, want, types, slots, scope, values, prog)?
+        .ok_or_else(|| SubsetError::new(0, 0, "lower：box 复合载荷形态不符"))
+}
+
+/// 单节点 live 构建：常量子树 → 直接 enum 变量叶 → 递归 struct／array。
+/// 变量标量叶／表达式构造叶／整棵变量载荷在非 Record／ArrLit 形态返回 None。
+fn live_value(
+    e: &Ex,
+    want: &AstTy,
+    types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
+    values: &HashMap<String, Value>,
+    prog: &Prog,
+) -> Result<Option<ConstValue>, SubsetError> {
     let (l, c) = subset::expr_span(e);
     let recorded = types
         .expr_ty(e)
         .ok_or_else(|| SubsetError::new(l, c, "lower：box 复合载荷缺少 type table 记录"))?;
     if recorded != want {
         return Err(SubsetError::new(l, c, "lower：box 复合载荷节点类型与标注不符"));
+    }
+    if let Ok(cv) = const_value(e, want, types, slots, scope, prog) {
+        return Ok(Some(cv));
+    }
+    if let Some(cv) = live_enum_leaf(e, want, types, values, prog)? {
+        return Ok(Some(cv));
     }
     match (e, want) {
         (Ex::Record(name, fields, rl, rc), AstTy::Named(want_name)) if name == want_name => {
@@ -1451,16 +1471,14 @@ fn composite_value_live_one_level(
                 let ir = box_payload_ir_ty(fty, prog).ok_or_else(|| {
                     SubsetError::new(*rl, *rc, format!("lower：字段 '{}' 类型不在载荷白名单", fname))
                 })?;
-                let cv = match live_enum_leaf(v, fty, types, values, prog)? {
-                    Some(cv) => cv,
-                    None => const_value(v, fty, types, slots, scope, prog)?,
-                };
+                let cv = live_value(v, fty, types, slots, scope, values, prog)?
+                    .ok_or_else(|| SubsetError::new(*rl, *rc, "lower：box 复合载荷形态不符"))?;
                 out.push((fname.clone(), ir, cv));
             }
             if out.len() != fields.len() {
                 return Err(SubsetError::new(*rl, *rc, "lower：record 字段集合不符"));
             }
-            Ok(ConstValue::Struct { name: name.clone(), fields: out })
+            Ok(Some(ConstValue::Struct { name: name.clone(), fields: out }))
         }
         (Ex::ArrLit(es, al, ac), AstTy::Arr(elem, n)) => {
             if es.len() as u64 != *n {
@@ -1470,15 +1488,13 @@ fn composite_value_live_one_level(
                 .ok_or_else(|| SubsetError::new(*al, *ac, "lower：数组元素类型不在载荷白名单"))?;
             let mut out = Vec::with_capacity(es.len());
             for x in es {
-                let cv = match live_enum_leaf(x, elem, types, values, prog)? {
-                    Some(cv) => cv,
-                    None => const_value(x, elem, types, slots, scope, prog)?,
-                };
+                let cv = live_value(x, elem, types, slots, scope, values, prog)?
+                    .ok_or_else(|| SubsetError::new(*al, *ac, "lower：box 复合载荷形态不符"))?;
                 out.push(cv);
             }
-            Ok(ConstValue::Array { elem: ir, values: out })
+            Ok(Some(ConstValue::Array { elem: ir, values: out }))
         }
-        _ => Err(SubsetError::new(l, c, "lower：box 复合载荷形态不符")),
+        _ => Ok(None),
     }
 }
 
