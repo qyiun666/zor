@@ -190,10 +190,10 @@ fn runtime_enum_fields_at_depth() {
 
 #[test]
 fn nested_fail_closed_leaves() {
-    assert_rc1(
-        "nested-scalar",
+    assert_runs(
         "enum E { V(i64) }\nstruct S1 { e: E, x: i64 }\nstruct S2 { inner: S1 }\nfn main() {\n    let v: i64 = 1;\n    let b: Box<S2> = box S2 { inner: S1 { e: V(1), x: v } };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "nested-scalar",
+        b"S2 { inner: S1 { e: V(1), x: 1 } }\n",
     );
     assert_rc1(
         "nested-expression",
@@ -205,20 +205,20 @@ fn nested_fail_closed_leaves() {
         "enum E { V(i64) }\nstruct S1 { e: E }\nstruct S2 { inner: S1 }\nfn main() {\n    let s1 = S1 { e: V(1) };\n    let b: Box<S2> = box S2 { inner: s1 };\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "array-scalar-leaf",
+    assert_runs(
         "struct S { a: [i64; 1] }\nfn main() {\n    let v: i64 = 1;\n    let b: Box<S> = box S { a: [v] };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "array-scalar-leaf",
+        b"S { a: [1] }\n",
     );
     assert_rc1(
         "array-whole-payload",
         "struct S { a: [i64; 1] }\nfn main() {\n    let av: [i64; 1] = [1];\n    let b: Box<S> = box S { a: av };\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "nested-scalar-reinit",
+    assert_runs(
         "enum E { V(i64) }\nstruct S1 { e: E, x: i64 }\nstruct S2 { inner: S1 }\nfn main() {\n    let b: Box<S2> = box S2 { inner: S1 { e: V(1), x: 1 } };\n    let v: i64 = 2;\n    b = box S2 { inner: S1 { e: V(1), x: v } };\n    println(*b);\n}\n",
-        "赋值语句",
+        "nested-scalar-reinit",
+        b"S2 { inner: S1 { e: V(1), x: 2 } }\n",
     );
     assert_rc1(
         "nested-whole-reinit",
@@ -244,20 +244,20 @@ fn direct_fail_closed_leaves_and_reinit() {
         "enum E { V(i64) }\nfn main() {\n    let b: Box<[E; 1]> = box [V(1 + 2)];\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "struct-scalar-var",
+    assert_runs(
         "struct S { x: i64 }\nfn main() {\n    let v: i64 = 1;\n    let b: Box<S> = box S { x: v };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "struct-scalar-var",
+        b"S { x: 1 }\n",
     );
-    assert_rc1(
-        "array-scalar-var",
+    assert_runs(
         "fn main() {\n    let a: i64 = 1;\n    let c: i64 = 2;\n    let b: Box<[i64; 2]> = box [a, c];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "array-scalar-var",
+        b"[1, 2]\n",
     );
-    assert_rc1(
-        "array-scalar-one",
+    assert_runs(
         "fn main() {\n    let x: i64 = 1;\n    let b: Box<[i64; 1]> = box [x];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "array-scalar-one",
+        b"[1]\n",
     );
     assert_rc1(
         "whole-scalar-box",

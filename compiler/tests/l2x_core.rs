@@ -238,21 +238,22 @@ fn nested_variable_leaves_stay_fail_closed() {
 }
 
 #[test]
-fn variable_scalar_and_whole_payload_stay_fail_closed() {
-    assert_rc1(
-        "struct-scalar-var",
+fn scalar_leaves_run_and_whole_payload_stays_fail_closed() {
+    // L2z：复合树内变量标量叶已开放（原同源负控翻转）。
+    assert_runs(
         "struct S { x: i64 }\nfn main() {\n    let v: i64 = 1;\n    let b: Box<S> = box S { x: v };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "struct-scalar-var",
+        b"S { x: 1 }\n",
     );
-    assert_rc1(
-        "array-scalar-var",
+    assert_runs(
         "fn main() {\n    let a: i64 = 1;\n    let c: i64 = 2;\n    let b: Box<[i64; 2]> = box [a, c];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "array-scalar-var",
+        b"[1, 2]\n",
     );
-    assert_rc1(
-        "array-scalar-one",
+    assert_runs(
         "fn main() {\n    let x: i64 = 1;\n    let b: Box<[i64; 1]> = box [x];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "array-scalar-one",
+        b"[1]\n",
     );
     assert_rc1(
         "whole-struct",
@@ -264,10 +265,11 @@ fn variable_scalar_and_whole_payload_stay_fail_closed() {
         "fn main() {\n    let a: [i64; 3] = [1, 2, 3];\n    let b: Box<[i64; 3]> = box a;\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "scalar-reinit",
+    // L2z：标量复合重初始化已开放（原同源负控翻转）。
+    assert_runs(
         "fn main() {\n    let b: Box<[i64; 1]> = box [1];\n    let x: i64 = 2;\n    b = box [x];\n    println(*b);\n}\n",
-        "赋值语句",
+        "scalar-reinit",
+        b"[2]\n",
     );
 }
 
