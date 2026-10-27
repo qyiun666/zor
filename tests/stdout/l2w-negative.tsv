@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-375	tests/stdout/cases/N-375.zor	1	none	box 载荷须为字面量常量	zor: runtime error	variable expression enum leaf
+N-376	tests/stdout/cases/N-376.zor	1	none	box 载荷须为字面量常量	zor: runtime error	arithmetic enum leaf
+N-377	tests/stdout/cases/N-377.zor	1	none	box 载荷须为字面量常量	zor: runtime error	arithmetic enum leaf in array
+N-378	tests/stdout/cases/N-378.zor	1	none	let 类型标注	zor: runtime error	nested enum with Box field
+N-379	tests/stdout/cases/N-379.zor	1	none	let 类型标注	zor: runtime error	nested enum with struct field
+N-380	tests/stdout/cases/N-380.zor	1	none	let 类型标注	zor: runtime error	nested enum with array field
+N-381	tests/stdout/cases/N-381.zor	1	none	let 类型标注	zor: runtime error	nested enum with enum field
+N-382	tests/stdout/cases/N-382.zor	1	none	let 类型标注	zor: runtime error	nested enum with tuple field
+N-383	tests/stdout/cases/N-383.zor	1	none	let 类型标注	zor: runtime error	nested enum with unit field
+N-384	tests/stdout/cases/N-384.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-385	tests/stdout/cases/N-385.zor	1	none	let 类型标注	zor: runtime error	Box array of Box
+N-386	tests/stdout/cases/N-386.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated composite Box
+N-387	tests/stdout/cases/N-387.zor	1	none	let 类型标注	zor: runtime error	seen same-type repeat (not claimed)
+N-388	tests/stdout/cases/N-388.zor	1	none	解引用源不是 Box 绑定	zor: runtime error	let v = *b
+N-389	tests/stdout/cases/N-389.zor	1	none	println 实参不可打印	zor: runtime error	println box itself
+N-390	tests/stdout/cases/N-390.zor	1	none	E2301	zor: runtime error	double unbox
+N-391	tests/stdout/cases/N-391.zor	1	none	E2101	zor: runtime error	use after move
+N-392	tests/stdout/cases/N-392.zor	1	none	println 实参不可打印	zor: runtime error	println tuple containing deref

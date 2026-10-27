@@ -1,0 +1,2 @@
+Outer { i: Inner { e: V(1) } }
+Outer { i: Inner { e: V(1) } }

@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S27-01	tests/stdout/cases/S27-01.zor	run	0	expected/S27-01.stdout	-	struct enum field + scalar
+S27-02	tests/stdout/cases/S27-02.zor	run	0	expected/S27-02.stdout	-	zero-field variant in struct
+S27-03	tests/stdout/cases/S27-03.zor	run	0	expected/S27-03.stdout	-	qualified variant + scalar
+S27-04	tests/stdout/cases/S27-04.zor	run	0	expected/S27-04.stdout	-	multi-field variant
+S27-05	tests/stdout/cases/S27-05.zor	run	0	expected/S27-05.stdout	-	enum array mixed variants
+S27-06	tests/stdout/cases/S27-06.zor	run	0	expected/S27-06.stdout	-	enum array single
+S27-07	tests/stdout/cases/S27-07.zor	run	0	expected/S27-07.stdout	-	array of structs
+S27-08	tests/stdout/cases/S27-08.zor	run	0	expected/S27-08.stdout	-	nested struct
+S27-09	tests/stdout/cases/S27-09.zor	run	0	expected/S27-09.stdout	-	struct with enum array field
+S27-10	tests/stdout/cases/S27-10.zor	run	0	expected/S27-10.stdout	-	nested arrays
+S27-11	tests/stdout/cases/S27-11.zor	run	0	expected/S27-11.stdout	-	empty enum array (optional P)
+S27-12	tests/stdout/cases/S27-12.zor	run	0	expected/S27-12.stdout	-	special NAN leaf
+S27-13	tests/stdout/cases/S27-13.zor	run	0	expected/S27-13.stdout	-	named MAX leaf
+S27-14	tests/stdout/cases/S27-14.zor	run	0	expected/S27-14.stdout	-	integer member leaf
+S27-15	tests/stdout/cases/S27-15.zor	run	0	expected/S27-15.stdout	-	bool leaf
+S27-16	tests/stdout/cases/S27-16.zor	run	0	expected/S27-16.stdout	-	f32 NAN leaf
+S27-17	tests/stdout/cases/S27-17.zor	run	0	expected/S27-17.stdout	-	enum + multiple scalar fields
+S27-18	tests/stdout/cases/S27-18.zor	run	0	expected/S27-18.stdout	-	array of structs with scalars
+S27-19	tests/stdout/cases/S27-19.zor	run	0	expected/S27-19.stdout	-	constant composite reinit
+S27-20	tests/stdout/cases/S27-20.zor	run	0	expected/S27-20.stdout	-	Box move
+S27-21	tests/stdout/cases/S27-21.zor	run	0	expected/S27-21.stdout	-	unbox
+S27-22	tests/stdout/cases/S27-22.zor	run	0	expected/S27-22.stdout	-	zero-field variants array
+S27-23	tests/stdout/cases/S27-23.zor	run	0	expected/S27-23.stdout	-	qualified zero-field variant
+S27-24	tests/stdout/cases/S27-24.zor	run	0	expected/S27-24.stdout	-	array of structs zero-field
