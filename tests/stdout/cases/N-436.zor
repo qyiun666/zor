@@ -1,0 +1,3 @@
+struct I { x: i64 }
+struct S { a: I, b: I }
+fn main() { let x = 1; let y = 2; let b: Box<S> = box S { a: I { x: x }, b: I { x: y } }; println(*b); }

@@ -588,8 +588,8 @@ fn is_enum_payload_ty(t: &Ty, prog: &Prog) -> bool {
         && l2k_payload_ty(t, prog)
 }
 
-/// L2y：任意既有复合深度的 live 形态——常量子树或同型 enum 变量叶；
-/// 变量标量叶／表达式构造叶／整棵变量载荷均 fallthrough false。
+/// L2y：任意既有复合深度的 live 形态——常量子树、同型 enum 变量叶或
+/// L2z 标量变量叶；表达式构造叶／整棵变量载荷仍 fallthrough false。
 fn live_composite_ok(
     e: &Ex,
     payload: &Ty,
@@ -601,6 +601,9 @@ fn live_composite_ok(
         return true;
     }
     if live_enum_leaf_ok(e, payload, bindings, types, prog) {
+        return true;
+    }
+    if live_scalar_ok(e, payload, bindings, types) {
         return true;
     }
     match (e, payload) {
@@ -643,6 +646,32 @@ fn live_enum_leaf_ok(
         return false;
     }
     matches!(bindings.get(n), Some(BindingKind::Composite(t)) if t == want)
+}
+
+/// L2z：复合树内标量变量叶——Path 绑定与字段类型同为 L2t 标量白名单类型。
+/// 顶层标量 Box／整棵变量载荷不会到达此处（调用方仅递归 struct／array 子节点）。
+fn live_scalar_ok(
+    e: &Ex,
+    want: &Ty,
+    bindings: &HashMap<String, BindingKind>,
+    types: &TypeTable,
+) -> bool {
+    if !is_scalar_payload_ty(want) {
+        return false;
+    }
+    let Ex::Path(n, _, _) = e else {
+        return false;
+    };
+    if types.expr_ty(e) != Some(want) {
+        return false;
+    }
+    let Ty::Prim(p) = want else {
+        return false;
+    };
+    match (bindings.get(n), prim_kind(p)) {
+        (Some(k), Some(want_kind)) => *k == want_kind,
+        _ => false,
+    }
 }
 
 /// L2k Box 复合载荷白名单（深递归）：8 整型宽度／bool／f32／f64／struct／定长数组；

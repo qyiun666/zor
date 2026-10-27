@@ -870,6 +870,10 @@ fn init_braced(
         (Ty::Enum(_), ConstValue::EnumLive { init, .. }) => {
             enum_init_braced_live(init, out, tmp_counter, overflow)
         }
+        // L2z：复合树内运行期标量变量叶。
+        (_, ConstValue::ScalarLive { ty, expr }) => {
+            emit_int_expr(out, expr, *ty, overflow, tmp_counter)
+        }
         _ => leaf_literal(ty, cv),
     }
 }
@@ -882,6 +886,10 @@ fn init_expr(
     tmp_counter: &mut usize,
     overflow: OverflowMode,
 ) -> String {
+    // L2z：复合树内运行期标量变量叶（struct 指派／数组元素）。
+    if let ConstValue::ScalarLive { ty, expr } = cv {
+        return emit_int_expr(out, expr, *ty, overflow, tmp_counter);
+    }
     match ty {
         Ty::Struct(_) => {
             let cty = payload_c_ty(ty).expect("struct payload c type");

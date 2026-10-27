@@ -1,0 +1,8 @@
+struct S { x: i8 }
+fn main() {
+    let x: i8 = -5;
+    let b: Box<S> = box S { x: x };
+    println(*b);
+    println(S { x: x });
+    println(x);
+}

@@ -388,10 +388,11 @@ fn variable_and_non_constant_payloads_stay_fail_closed() {
         "fn main() {\n    let a: [i64;3] = [1, 2, 3];\n    let b: Box<[i64;3]> = box a;\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "variable-leaf",
+    // L2z：复合树内变量标量叶已开放（原同源负控翻转）。
+    assert_runs(
         "struct P { x: i64 }\nfn main() {\n    let x = 1;\n    let b: Box<P> = box P { x: x };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "variable-leaf",
+        b"P { x: 1 }\n",
     );
     // 负整数值进无符号叶子：由 check 的既有宽度判定拦下（E1201）。
     assert_rc1(
