@@ -821,6 +821,8 @@ fn init_braced(ty: &Ty, cv: &ConstValue) -> String {
             }
             format!("{{ {} }}", parts.join(", "))
         }
+        // L2w：嵌套 enum 叶子（struct 字段／array 元素）。
+        (Ty::Enum(_), ConstValue::Enum { tag, fields, .. }) => enum_init_braced(*tag, fields),
         _ => leaf_literal(ty, cv),
     }
 }
@@ -833,7 +835,28 @@ fn init_expr(ty: &Ty, cv: &ConstValue) -> String {
             format!("({}){}", cty, init_braced(ty, cv))
         }
         Ty::Array(..) => unreachable!("array init must descend element-wise"),
+        // L2w：数组元素位置的 enum 需要带类型的复合字面量。
+        Ty::Enum(_) => {
+            let ConstValue::Enum { tag, fields, .. } = cv else {
+                unreachable!("enum payload shape")
+            };
+            let cty = payload_c_ty(ty).expect("enum payload c type");
+            format!("({}){}", cty, enum_init_braced(*tag, fields))
+        }
         _ => leaf_literal(ty, cv),
+    }
+}
+
+/// L2w：enum 初始化花括号（tag＋union；零载荷仅初始化 tag）。
+fn enum_init_braced(tag: u32, fields: &[(Ty, ConstValue)]) -> String {
+    if fields.is_empty() {
+        format!("{{ .tag = {} }}", tag)
+    } else {
+        let mut parts = Vec::with_capacity(fields.len());
+        for (i, (fty, fv)) in fields.iter().enumerate() {
+            parts.push(format!(".f{} = {}", i, leaf_literal(fty, fv)));
+        }
+        format!("{{ .tag = {}, .u.v{} = {{ {} }} }}", tag, tag, parts.join(", "))
     }
 }
 

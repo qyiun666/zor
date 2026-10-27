@@ -1,0 +1,6 @@
+enum E { A(), B() }
+fn main() {
+    let b: Box<[E; 2]> = box [A(), B()];
+    println(*b);
+    println([A(), B()]);
+}
