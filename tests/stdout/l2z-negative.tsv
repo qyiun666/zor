@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-428	tests/stdout/cases/N-428.zor	1	none	box 载荷非整型字面量	zor: runtime error	top-level scalar variable Box
+N-429	tests/stdout/cases/N-429.zor	1	none	赋值语句	zor: runtime error	top-level scalar reinit
+N-430	tests/stdout/cases/N-430.zor	1	none	box 载荷须为字面量常量	zor: runtime error	whole variable payload
+N-431	tests/stdout/cases/N-431.zor	1	none	box 载荷须为字面量常量	zor: runtime error	expression scalar leaf
+N-432	tests/stdout/cases/N-432.zor	1	none	box 载荷须为字面量常量	zor: runtime error	expression scalar in array
+N-433	tests/stdout/cases/N-433.zor	1	none	box 载荷须为字面量常量	zor: runtime error	deref-derived non-runtime width
+N-434	tests/stdout/cases/N-434.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-435	tests/stdout/cases/N-435.zor	1	none	let 类型标注	zor: runtime error	enum with Box field
+N-436	tests/stdout/cases/N-436.zor	1	none	let 类型标注	zor: runtime error	seen same-type repeat
+N-437	tests/stdout/cases/N-437.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated composite Box
+N-438	tests/stdout/cases/N-438.zor	1	none	解引用源不是 Box 绑定	zor: runtime error	let v = *b
+N-439	tests/stdout/cases/N-439.zor	1	none	println 实参不可打印	zor: runtime error	println box itself
+N-440	tests/stdout/cases/N-440.zor	1	none	E2301	zor: runtime error	double unbox
+N-441	tests/stdout/cases/N-441.zor	1	none	E2101	zor: runtime error	use after move
+N-442	tests/stdout/cases/N-442.zor	1	none	box 载荷须为字面量常量	zor: runtime error	float expression leaf
+N-443	tests/stdout/cases/N-443.zor	1	none	box 载荷须为字面量常量	zor: runtime error	nested array expression
+N-444	tests/stdout/cases/N-444.zor	1	none	box 载荷须为字面量常量	zor: runtime error	unary variable expression
+N-445	tests/stdout/cases/N-445.zor	1	none	box 载荷须为字面量常量	zor: runtime error	mixed array expression

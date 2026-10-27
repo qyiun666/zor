@@ -1,0 +1,9 @@
+fn main() {
+    let x: i64 = 1;
+    let y: i64 = 2;
+    let b: Box<[i64; 2]> = box [x, y];
+    println(*b);
+    println([x, y]);
+    println(x);
+    println(y);
+}

@@ -1,0 +1,9 @@
+struct S1 { x: i64 }
+struct S2 { inner: S1 }
+fn main() {
+    let x = 1;
+    let b: Box<S2> = box S2 { inner: S1 { x: x } };
+    println(*b);
+    println(S2 { inner: S1 { x: x } });
+    println(x);
+}
