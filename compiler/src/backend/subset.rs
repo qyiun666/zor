@@ -121,6 +121,8 @@ fn check_block(
     types: &TypeTable,
     prog: &Prog,
 ) -> Result<(), SubsetError> {
+    // L3b：常量复合字面量初始化的绑定名（仅旁路登记；遮蔽即失效）。
+    let mut const_composites: HashSet<String> = HashSet::new();
     if let Some(tail) = &blk.tail {
         if !matches!(tail.as_ref(), Ex::UnitLit(_, _)) {
             let (l, c) = expr_span(tail);
@@ -195,8 +197,16 @@ fn check_block(
                         ))
                     }
                 };
-                let kind = let_init_kind(init, &ann_kind, bindings, types, prog)?;
+                let kind =
+                    let_init_kind(init, &ann_kind, bindings, &const_composites, types, prog)?;
                 let kind = unify_ann(ann_kind, kind, init, *l, *c)?;
+                if matches!(kind, BindingKind::Composite(_))
+                    && const_composite_literal(init, types, prog)
+                {
+                    const_composites.insert(name.clone());
+                } else {
+                    const_composites.remove(name);
+                }
                 bindings.insert(name.clone(), kind);
             }
             St::Expr(Some(Ex::Call(callee, args, l, c)), _, _) => {
@@ -270,7 +280,14 @@ fn check_block(
                             _ => false,
                         };
                         same_payload
-                            && box_reinit_ok(inner, types.expr_ty(rhs), bindings, types, prog)
+                            && box_reinit_ok(
+                                inner,
+                                types.expr_ty(rhs),
+                                bindings,
+                                &const_composites,
+                                types,
+                                prog,
+                            )
                     }
                     _ => false,
                 };
@@ -298,6 +315,7 @@ fn let_init_kind(
     init: &Ex,
     ann: &Option<BindingKind>,
     bindings: &HashMap<String, BindingKind>,
+    const_composites: &HashSet<String>,
     types: &TypeTable,
     prog: &Prog,
 ) -> Result<BindingKind, SubsetError> {
@@ -366,6 +384,14 @@ fn let_init_kind(
             if let (Some(p), Ex::Path(n, _, _)) = (&ann_payload, inner.as_ref()) {
                 if l2f_payload_ty(p).is_some()
                     && scalar_binding_matches(p, n, bindings)
+                    && matches!(types.expr_ty(init), Some(Ty::BoxTy(t)) if **t == *p)
+                {
+                    return Ok(BindingKind::Box(p.clone()));
+                }
+            }
+            // L3b：顶层整棵常量复合变量（仅常量字面量初始化；struct／array）。
+            if let (Some(p), Ex::Path(n, _, _)) = (&ann_payload, inner.as_ref()) {
+                if whole_const_composite_path(n, p, bindings, const_composites, prog)
                     && matches!(types.expr_ty(init), Some(Ty::BoxTy(t)) if **t == *p)
                 {
                     return Ok(BindingKind::Box(p.clone()));
@@ -556,6 +582,27 @@ fn scalar_binding_matches(p: &Ty, n: &str, bindings: &HashMap<String, BindingKin
         && prim_kind(pname).is_some_and(|k| bindings.get(n) == Some(&k))
 }
 
+/// L3b：常量复合字面量初始化（无变量叶／表达式叶）——旁路登记条件。
+fn const_composite_literal(init: &Ex, types: &TypeTable, prog: &Prog) -> bool {
+    matches!(init, Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..))
+        && payload_init_ok(init, types, prog)
+}
+
+/// L3b：顶层整棵常量复合 Path 闸（struct／array；非 enum）。
+fn whole_const_composite_path(
+    n: &str,
+    p: &Ty,
+    bindings: &HashMap<String, BindingKind>,
+    const_composites: &HashSet<String>,
+    prog: &Prog,
+) -> bool {
+    is_composite_payload_ty(p)
+        && !is_enum_payload_ty(p, prog)
+        && l2k_payload_ty(p, prog)
+        && const_composites.contains(n)
+        && matches!(bindings.get(n), Some(BindingKind::Composite(t)) if t == p)
+}
+
 fn is_box_i64(k: &BindingKind) -> bool {
     matches!(k, BindingKind::Box(t) if t == &Ty::Prim("i64"))
 }
@@ -581,6 +628,7 @@ fn box_reinit_ok(
     inner: &Ex,
     payload: Option<&Ty>,
     bindings: &HashMap<String, BindingKind>,
+    const_composites: &HashSet<String>,
     types: &TypeTable,
     prog: &Prog,
 ) -> bool {
@@ -596,10 +644,13 @@ fn box_reinit_ok(
         }
         // L2v：变量枚举重初始化（Copy；类型表二次核对）。
         // L3a：顶层标量变量重初始化（Copy；bool／整棵载荷仍 false）。
+        // L3b：顶层整棵常量复合变量重初始化（仅字面量初始化）。
         Ex::Path(n, _, _) => {
             (is_enum_payload_ty(p, prog) && types.expr_ty(inner) == Some(p.as_ref()))
                 || (l2f_payload_ty(p).is_some()
                     && scalar_binding_matches(p, n, bindings)
+                    && types.expr_ty(inner) == Some(p.as_ref()))
+                || (whole_const_composite_path(n, p, bindings, const_composites, prog)
                     && types.expr_ty(inner) == Some(p.as_ref()))
         }
         Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..) => {
