@@ -1,0 +1,1 @@
+fn main() { let b0: Box<i8> = box 1; let x = *b0; let b: Box<i8> = box x; println(*b); }

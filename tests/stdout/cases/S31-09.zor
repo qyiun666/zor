@@ -1,0 +1,6 @@
+fn main() {
+    let x: f32 = 1.5;
+    let b: Box<f32> = box x;
+    println(*b);
+    println(x);
+}

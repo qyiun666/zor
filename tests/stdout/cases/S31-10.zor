@@ -1,0 +1,6 @@
+fn main() {
+    let x = f64::MAX;
+    let b: Box<f64> = box x;
+    println(*b);
+    println(x);
+}

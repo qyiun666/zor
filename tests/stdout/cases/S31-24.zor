@@ -1,0 +1,6 @@
+fn main() {
+    let x: i64 = 7;
+    let b: Box<i64> = box x;
+    println(*b);
+    unbox b;
+}
