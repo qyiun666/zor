@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S29-01	tests/stdout/cases/S29-01.zor	run	0	expected/S29-01.stdout	-	nested struct variable leaf
+S29-02	tests/stdout/cases/S29-02.zor	run	0	expected/S29-02.stdout	-	struct enum array variable leaves
+S29-03	tests/stdout/cases/S29-03.zor	run	0	expected/S29-03.stdout	-	array of structs variable leaves
+S29-04	tests/stdout/cases/S29-04.zor	run	0	expected/S29-04.stdout	-	nested arrays variable leaves
+S29-05	tests/stdout/cases/S29-05.zor	run	0	expected/S29-05.stdout	-	nested struct + constant scalar
+S29-06	tests/stdout/cases/S29-06.zor	run	0	expected/S29-06.stdout	-	struct nested struct array variable leaves
+S29-07	tests/stdout/cases/S29-07.zor	run	0	expected/S29-07.stdout	-	nested struct reinit
+S29-08	tests/stdout/cases/S29-08.zor	run	0	expected/S29-08.stdout	-	array-struct reinit
+S29-09	tests/stdout/cases/S29-09.zor	run	0	expected/S29-09.stdout	-	nested array reinit
+S29-10	tests/stdout/cases/S29-10.zor	run	0	expected/S29-10.stdout	-	zero-field nested variable
+S29-11	tests/stdout/cases/S29-11.zor	run	0	expected/S29-11.stdout	-	qualified nested variable
+S29-12	tests/stdout/cases/S29-12.zor	run	0	expected/S29-12.stdout	-	multi-field nested variable
+S29-13	tests/stdout/cases/S29-13.zor	run	0	expected/S29-13.stdout	-	runtime IntExpr nested
+S29-14	tests/stdout/cases/S29-14.zor	run	0	expected/S29-14.stdout	-	NAN nested
+S29-15	tests/stdout/cases/S29-15.zor	run	0	expected/S29-15.stdout	-	MAX nested
+S29-16	tests/stdout/cases/S29-16.zor	run	0	expected/S29-16.stdout	-	integer member nested
+S29-17	tests/stdout/cases/S29-17.zor	run	0	expected/S29-17.stdout	-	bool nested
+S29-18	tests/stdout/cases/S29-18.zor	run	0	expected/S29-18.stdout	-	two enum types at different depths
+S29-19	tests/stdout/cases/S29-19.zor	run	0	expected/S29-19.stdout	-	nested Box move
+S29-20	tests/stdout/cases/S29-20.zor	run	0	expected/S29-20.stdout	-	nested unbox
+S29-21	tests/stdout/cases/S29-21.zor	run	0	expected/S29-21.stdout	-	deep array variable leaf
+S29-22	tests/stdout/cases/S29-22.zor	run	0	expected/S29-22.stdout	-	variable + constant nested leaves
+S29-23	tests/stdout/cases/S29-23.zor	run	0	expected/S29-23.stdout	-	array variable + constant struct
+S29-24	tests/stdout/cases/S29-24.zor	run	0	expected/S29-24.stdout	-	nested array constant + variable
