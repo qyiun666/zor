@@ -1,0 +1,7 @@
+enum E { V(f32) }
+struct S { e: E }
+fn main() {
+    let b: Box<S> = box S { e: V(f32::NAN) };
+    println(*b);
+    println(S { e: V(f32::NAN) });
+}
