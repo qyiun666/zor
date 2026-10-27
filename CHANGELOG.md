@@ -4,6 +4,42 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.22] - 2026-10-27
+
+内部验证里程碑，非可用语言版本：本版为 L2w「⑤a `Box` 常量复合树含 enum 叶子」——在 0.3.21 变量枚举载荷之上，开放 `Box<S{e:E}>`／`Box<[E;N]>`／既有 struct-array 嵌套中的**常量 enum 叶子**（任意深度；enum 字段仅 L2t 标量白名单：8 整型／bool／f32／f64＋有限值／特殊值／命名常量／整型成员；零／单／多字段；裸 `V` 与 `E::V` 同义）；`println(*b)` 与同字面量逐字节一致；Box 释放一次、enum 字段全 Copy、无递归析构；move／常量重初始化／unbox／作用域 drop 沿用。**不开放**：变量复合叶子（`box S{e:e}`／`box [e]`）、表达式 enum 载荷（`box S{e:V(x)}`／`box [V(1+2)]`）、非标量 enum 字段（Box／struct／array／enum／tuple／unit）、嵌套 Box、`Box<[Box<i64>;1]>`、无标注复合 Box、`seen` 同类型重复、`let v=*b`／`println(b)`／`println((*b,1))`；维持 fail-closed。Ret=6（N-145／N-288／N-304／N-305／N-325／N-326，仅执行面；N-304＝N-325、N-305＝N-326 同源）；N-360／N-361 token 由 `let 类型标注` 收敛为 `box 载荷须为字面量常量`（runner 单 ID，TSV／baseline 零改、不退休）；ASAN K=2（新建 `l2w-asan-manifest.tsv` 2 例＋l2k 6／l2t 3／l2v 2 零改，观测 9+2+2=13；默认 manifest 48／41／7 零改）；`l2w-baseline` 第十九基线（979／1520）；按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：支持形态——`Box<S>`／`Box<[E;N]>`／既有 struct-array 嵌套中的常量 enum 叶子；enum 字段仅 L2t 标量白名单；零／单／多字段；`println(*b)` 与同字面量逐字节一致；Box 释放一次、enum 字段全 Copy、无递归析构；move／常量重初始化／unbox／作用域 drop 沿用。仍 fail-closed：变量复合叶（N-360／361）、表达式 enum 载荷、非标量 enum 字段、嵌套 Box、Box 数组 of Box、无标注复合 Box、`seen` 同类型重复、`let v=*b`／`println(b)`／`println((*b,1))`；类型／宽度不符沿用 E1201／E1202／E1601，重复 unbox／unbox 后使用 E2301、移动后使用 E2101。计数：P=**24**、Q=**18**、Ret=**6**（N-145／N-288／N-304／N-305／N-325／N-326，仅执行面；源／TSV／各代 baseline 字节零改、ID 不复用）；Q=18（N-375～392），覆盖变量／表达式 enum 叶子、非标量 enum 字段、嵌套 Box、Box 数组 of Box、无标注、`seen` 同类型重复、解引用／打印、E2301／E2101；R=**510**（486＋24）、G=**324**（312−6＋18）、T=**851**、A=**855**、N=**979**（937＋24＋18）；`l2w-baseline` cases **979**／files **1520**／unique **1520**；旧 18 基线 162／209、188／246、206／275、247／327、297／398、345／466、417／590、461／660、506／734、554／816、599／891、645／963、701／1062、759／1163、827／1274、884／1367、894／1379、937／1450 与 `l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 均零改；分代活跃 L2K=21／L2R=15／L2S=25／L2T=21／L2V=19／L2W=18。ASAN 9+2+2=13（K=2；默认 manifest 48／41／7、l2k 6、l2t 3、l2v 2 零改；无泄漏／double-free／UAF）；E1101 编目 30；Linux x86_64 为唯一终证，macOS 无 LSAN 不作终证；无安装／打包／性能承诺。
+
+### Added
+
+- **`Box` 常量复合树含 enum 叶子（⑤a）**：`Box<S{e:E}>`／`Box<[E;N]>`／既有 struct-array 嵌套；enum 字段仅 L2t 标量白名单；零／单／多字段；`println(*b)` 与同字面量逐字节一致；Box 释放一次、enum 字段全 Copy、无递归析构。
+- **`l2w-baseline` 第十九基线**：`stdout-contract` 在 `l2v` 之后校验 `l2w-baseline`（979／1520／1520），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿；旧 18 基线字节零改。
+- **`l2w-asan-manifest.tsv`（K=2）**：`Box<S{e:E}>` 构造＋drop、`Box<[S;2]>` 嵌套＋drop 2 例；独立判词；l2k 6／l2t 3／l2v 2／默认 48／41／7 零改；观测 9+2+2=13。
+
+### Changed
+
+- **Ret=6 与 token 覆盖**：N-145／N-288／N-304／N-305／N-325／N-326 退休（仅执行面，源／TSV／各代 baseline 字节零改、ID 不复用；N-304＝N-325、N-305＝N-326 同源）；L2K=21／L2R=15／L2S=25／L2T=21；N-360／N-361 token 单 ID 覆盖为 `box 载荷须为字面量常量`，TSV／baseline 零改，L2V=19。
+- **计数与资产**：P=24、Q=18、Ret=6；R 486→510、G 312→324、T 815→851、A 819→855、N 937→979、M 1450→1520；`l2w-baseline.tsv` 979 条（980 行含表头）、`.sha256` 1520 行；L2W=18。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.21` 落至 `0.3.22`；`compiler/Cargo.toml:5` description 版本串同步；`Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.22`。
+- **CI**：十九基线并存；无新 job／YAML／ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L2w-01：**PASS**——integration head `43e5005`（PR #197）；CI run `40426556730`；`baseline`／`stdout-contract`／`runtime-codes`／`asan-linux`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l2w-baseline|cases=979 files=1520 unique=1520 fail=0`；`PASS|stdout-contract|runtime=510 negative=324 fail=0 ran=510/324`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；`PASS|asan-l2k|cases=9 fail=0 ran=9/9`；`PASS|asan-l2v|cases=2 fail=0 ran=2/2`；`PASS|asan-l2w|cases=2 fail=0 ran=2/2`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：十九基线判词全 PASS；P 24/24、六档 `-O*` **144/144**、Q 18/18、locale **24/24 SAME**、Ret 6/6；ASAN **13/13**（9+2+2，K=2；ASAN/LSAN 零报告）；`cargo test --release --locked` **482 passed／0 failed**（`l2w_core` 9；4 条断言翻转）；E1101 编目 **30**；T-4 无 golden 更新；全 job `SKIP|`／`FAIL|` 0 行。
+- 计数口径：P=**24**／Q=**18**／Ret=**6**／R=**510**／G=**324**／T=**851**／A=**855**／N=**979**／M=**1520**。
+- 证据：产品签署 `shared/ZOR-L2w-Stage2-S28会签-产品-v1-signed.md`（77 行／8148 B，sha256 `39766270…331b`）；QA Stage-2 报告 `shared/ZOR-L2w-Stage2-验证报告-质量-v1.md`（96 行／6896 B，sha256 `752e580b…7119`）；QA 会签输入（164 行／11788 B，sha256 `04266c91…792c`）；`l2w-baseline.tsv` `79cbb3bc…f86f`；`l2w-baseline.sha256` `36343fe5…828a1`；`l2w-asan-manifest.tsv` `2e25803f…b13b`；PR #197 **84 files**（核心 6＋QA 72＋CI 6）。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **常量-only**：变量复合叶（N-360／N-361）、表达式 enum 载荷、嵌套 Box、递归 drop、`seen` 同类型重复均未开放；Q 已锁定，账本／README 不得写成变量复合或递归扩张。
+- **Ret=6 双源**：N-304＝N-325、N-305＝N-326；仅执行面退休，历史 TSV／baseline 字节零改、ID 不复用。
+- **N-360／N-361 token**：由 `let 类型标注` 收敛为 `box 载荷须为字面量常量`；runner 单 ID 覆盖，TSV／baseline 零改，L2V=19。
+- **平台／ASAN**：macOS 无 LSAN，不作 ASAN 终证；终证为 Linux CI 13/13；默认 manifest 48／41／7、l2k 6、l2t 3、l2v 2 零改。
+- **版本语境**：0.3.21 及更早节的表述按版本语境保留、不回改；历史节逐字节零改。
+- **发布**：零 tag／Release，不构成安装或环境可用性承诺；不出性能数字。
+
 ## [0.3.21] - 2026-10-26
 
 内部验证里程碑，非可用语言版本：本版为 L2v「②a `Box<enum>` 变量载荷＋变量重初始化」——在 0.3.20 诊断文本层之上，开放标注绑定 `let b: Box<E> = box e;` 与变量重初始化 `b = box e2;` 的**运行期 Copy 枚举变量载荷**：e／e2 为标量字段枚举变量（8 整型／bool／f32／f64＋有限／特殊值／命名常量／整型成员），`box e` 复制、e 之后仍可用；`println(*b)` 与 `println(e)` 逐字节一致；`unbox`／作用域 drop 只释放 Box 一次；`b = box e2` 旧值 drop 一次、不消耗 e2；C 端以 `EnumInit` 配方物化 tag＋union 副本；无递归析构。**不开放**：`box V(x)`／`box V(1+2)`（构造调用载荷）、无标注 `box e`、嵌套 Box、Box 复合含 enum、`Box<[E;N]>`、enum 含 Box／struct／array／enum／tuple／unit 字段、非枚举变量载荷、`let v=*b`／`println(b)`；均维持 fail-closed。Ret=3（N-290／N-321／N-323，仅执行面）；L2u N-290 单 ID 覆盖移除；ASAN K=2（新建 `l2v-asan-manifest.tsv` 2 例＋`l2k-asan-manifest.tsv` 原 6 例零改，观测 9+2=11；默认 manifest 48／41／7 零改）；`l2v-baseline` 第十八基线（937／1450）；按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
