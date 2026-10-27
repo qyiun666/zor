@@ -231,15 +231,16 @@ fn fail_closed_boundaries() {
         "top-scalar-reinit",
         b"2\n",
     );
-    assert_rc1(
-        "whole-payload",
+    // L3b：顶层整棵常量复合变量载荷／重初始化已开放（原负控翻转）。
+    assert_runs(
         "struct P { x: i64 }\nfn main() {\n    let p = P { x: 1 };\n    let b: Box<P> = box p;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "whole-payload",
+        b"P { x: 1 }\n",
     );
-    assert_rc1(
-        "whole-payload-reinit",
+    assert_runs(
         "struct P { x: i64 }\nfn main() {\n    let b: Box<P> = box P { x: 1 };\n    let p = P { x: 2 };\n    b = box p;\n    println(*b);\n}\n",
-        "赋值语句",
+        "whole-payload-reinit",
+        b"P { x: 2 }\n",
     );
     assert_rc1(
         "expression-field",

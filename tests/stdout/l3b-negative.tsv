@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-464	tests/stdout/cases/N-464.zor	1	none	box 载荷须为字面量常量	zor: runtime error	Path copy struct payload
+N-465	tests/stdout/cases/N-465.zor	1	none	box 载荷须为字面量常量	zor: runtime error	Path copy array payload
+N-466	tests/stdout/cases/N-466.zor	1	none	赋值语句	zor: runtime error	Path copy reinit
+N-467	tests/stdout/cases/N-467.zor	1	none	box 载荷须为字面量常量	zor: runtime error	nested whole struct field
+N-468	tests/stdout/cases/N-468.zor	1	none	box 载荷须为字面量常量	zor: runtime error	nested whole array field
+N-469	tests/stdout/cases/N-469.zor	1	none	赋值语句	zor: runtime error	nested whole field reinit
+N-470	tests/stdout/cases/N-470.zor	1	none	box 载荷须为字面量常量	zor: runtime error	runtime scalar leaf whole payload
+N-471	tests/stdout/cases/N-471.zor	1	none	box 载荷须为字面量常量	zor: runtime error	runtime enum leaf whole payload
+N-472	tests/stdout/cases/N-472.zor	1	none	let 类型标注	zor: runtime error	bool top-level Box
+N-473	tests/stdout/cases/N-473.zor	1	none	E1201	zor: runtime error	expression payload box x + 1
+N-474	tests/stdout/cases/N-474.zor	1	none	box 载荷非整型字面量	zor: runtime error	unary expression payload
+N-475	tests/stdout/cases/N-475.zor	1	none	box 载荷非整型字面量	zor: runtime error	paren arithmetic payload
+N-476	tests/stdout/cases/N-476.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated whole payload
+N-477	tests/stdout/cases/N-477.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-478	tests/stdout/cases/N-478.zor	1	none	let 类型标注	zor: runtime error	enum with Box field
+N-479	tests/stdout/cases/N-479.zor	1	none	println 实参不可打印	zor: runtime error	println Box itself
+N-480	tests/stdout/cases/N-480.zor	1	none	E2301	zor: runtime error	double unbox
+N-481	tests/stdout/cases/N-481.zor	1	none	E2101	zor: runtime error	use after move

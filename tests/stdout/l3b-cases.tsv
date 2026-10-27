@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S32-01	tests/stdout/cases/S32-01.zor	run	0	expected/S32-01.stdout	-	struct constant scalar payload
+S32-02	tests/stdout/cases/S32-02.zor	run	0	expected/S32-02.stdout	-	struct negative scalar payload
+S32-03	tests/stdout/cases/S32-03.zor	run	0	expected/S32-03.stdout	-	struct bool field payload
+S32-04	tests/stdout/cases/S32-04.zor	run	0	expected/S32-04.stdout	-	struct float field payload
+S32-05	tests/stdout/cases/S32-05.zor	run	0	expected/S32-05.stdout	-	struct constant enum leaf payload
+S32-06	tests/stdout/cases/S32-06.zor	run	0	expected/S32-06.stdout	-	struct zero-field enum variant payload
+S32-07	tests/stdout/cases/S32-07.zor	run	0	expected/S32-07.stdout	-	struct qualified enum variant payload
+S32-08	tests/stdout/cases/S32-08.zor	run	0	expected/S32-08.stdout	-	nested constant struct and array payload
+S32-09	tests/stdout/cases/S32-09.zor	run	0	expected/S32-09.stdout	-	struct constant enum array payload
+S32-10	tests/stdout/cases/S32-10.zor	run	0	expected/S32-10.stdout	-	array constant integer payload
+S32-11	tests/stdout/cases/S32-11.zor	run	0	expected/S32-11.stdout	-	array constant enum payload
+S32-12	tests/stdout/cases/S32-12.zor	run	0	expected/S32-12.stdout	-	array constant struct payload
+S32-13	tests/stdout/cases/S32-13.zor	run	0	expected/S32-13.stdout	-	nested constant array payload
+S32-14	tests/stdout/cases/S32-14.zor	run	0	expected/S32-14.stdout	-	array of nested struct payload
+S32-15	tests/stdout/cases/S32-15.zor	run	0	expected/S32-15.stdout	-	array of struct with array field payload
+S32-16	tests/stdout/cases/S32-16.zor	run	0	expected/S32-16.stdout	-	struct array of structs payload
+S32-17	tests/stdout/cases/S32-17.zor	run	0	expected/S32-17.stdout	-	struct constant reinit
+S32-18	tests/stdout/cases/S32-18.zor	run	0	expected/S32-18.stdout	-	array constant reinit
+S32-19	tests/stdout/cases/S32-19.zor	run	0	expected/S32-19.stdout	-	struct constant enum reinit
+S32-20	tests/stdout/cases/S32-20.zor	run	0	expected/S32-20.stdout	-	Box move with constant payload
+S32-21	tests/stdout/cases/S32-21.zor	run	0	expected/S32-21.stdout	-	unbox with constant payload
+S32-22	tests/stdout/cases/S32-22.zor	run	0	expected/S32-22.stdout	-	Copy: one constant variable into two Boxes
+S32-23	tests/stdout/cases/S32-23.zor	run	0	expected/S32-23.stdout	-	array constant struct with enum payload
+S32-24	tests/stdout/cases/S32-24.zor	run	0	expected/S32-24.stdout	-	constant reinit after unbox

@@ -282,6 +282,12 @@ fn l2g_negative_cases_are_rc1_and_fail_closed() {
         "n42",
         b"1\n",
     );
+    // L3b：顶层整棵常量复合变量载荷已开放（原 x14c 负控翻转）。
+    assert_runs(
+        "struct S { x: i8 }\nfn main() { let s = S { x: 1 }; let b: Box<S> = box s; println(*b); }",
+        "x14c",
+        b"S { x: 1 }\n",
+    );
     let cases: [(&str, &str, &str); 13] = [
         (
             "n36",
@@ -357,7 +363,7 @@ fn l2g_negative_cases_are_rc1_and_fail_closed() {
 #[test]
 fn zero_expansion_matrix_is_rc1() {
     // X-01～X-15：只开 Box 路径；非 Box 算术／比较、非 i64 Box 签名与复合打印保持 rc=1。
-    let cases: [(&str, &str, &str); 23] = [
+    let cases: [(&str, &str, &str); 22] = [
         ("x01", "fn main() { let x: i8 = 1 + 1; println(x); }", "E1201"),
         ("x02", "fn main() { let x: u64 = 1 + 1; println(x); }", "E1201"),
         ("x03", "fn main() { let b: Box<i8> = box 128; println(*b); }", "E1201"),
@@ -428,11 +434,6 @@ fn zero_expansion_matrix_is_rc1() {
             "x14b",
             "fn main() { let b: Box<[i8; 3]> = box 1; println(*b); }",
             "E1201",
-        ),
-        (
-            "x14c",
-            "struct S { x: i8 }\nfn main() { let s = S { x: 1 }; let b: Box<S> = box s; println(*b); }",
-            "box 载荷须为字面量常量",
         ),
         (
             "x15a",

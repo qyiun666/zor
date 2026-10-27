@@ -71,11 +71,14 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
         let mut body: Vec<Stmt> = Vec::new();
         let mut scope: HashMap<String, LocalId> = HashMap::new();
         let mut values: HashMap<String, Value> = HashMap::new();
+        // L3b：常量复合字面量初始化登记（整棵 box 载荷旁路；遮蔽即失效）。
+        let mut const_composites: HashMap<String, ConstValue> = HashMap::new();
         let mut last_pos = f.span;
         for st in &f.body.stmts {
             match st {
                 St::Let(name, _ann, init, l, c) => {
                     last_pos = (*l, *c);
+                    const_composites.remove(name);
                     let init_ty = types
                         .expr_ty(init)
                         .ok_or_else(|| SubsetError::new(*l, *c, "lower：let 初值缺少 type table 记录"))?
@@ -98,6 +101,16 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             lower_value(init, &mut b, &scope, &values)?
                         };
                         values.insert(name.clone(), value);
+                        let literal = matches!(init, Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..));
+                        let is_enum = matches!(
+                            &init_ty,
+                            AstTy::Named(n) if prog.enums.iter().any(|e| &e.name == n)
+                        );
+                        if literal && !is_enum {
+                            if let Ok(cv) = const_value(init, &init_ty, types, &slots, &scope, prog) {
+                                const_composites.insert(name.clone(), cv);
+                            }
+                        }
                         scope.remove(name);
                         continue;
                     }
@@ -177,6 +190,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     &slots,
                                     &scope,
                                     &values,
+                                    &const_composites,
                                     prog,
                                 )?;
                                 register_payload(&payload, prog, &mut payload_defs)?;
@@ -476,6 +490,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     &slots,
                                     &scope,
                                     &values,
+                                    &const_composites,
                                     prog,
                                 )?;
                                 register_payload(&payload, prog, &mut payload_defs)?;
@@ -1365,8 +1380,23 @@ fn box_payload_ir_ty(t: &AstTy, prog: &Prog) -> Option<Ty> {
     }
 }
 
+/// L3b：整棵常量复合旁路值的顶层形状核对（struct 名／array 元素与长度）。
+fn const_composite_shape_ok(cv: &ConstValue, want: &AstTy, prog: &Prog) -> bool {
+    let Some(ir) = box_payload_ir_ty(want, prog) else {
+        return false;
+    };
+    match (cv, &ir) {
+        (ConstValue::Struct { name, .. }, Ty::Struct(w)) => name == w,
+        (ConstValue::Array { elem, values }, Ty::Array(w, n)) => {
+            elem == w.as_ref() && values.len() as u64 == *n
+        }
+        _ => false,
+    }
+}
+
 /// L2v：`box e` 分派——变量枚举走 EnumLive 堆副本配方，其余沿用常量树。
 /// 变量值缺失配方（init=None）时回落到常量通道，以既有判词 fail-closed。
+/// L3b：整棵常量复合变量走 `const_composites` 旁路（仅字面量初始化登记）。
 fn box_enum_live_or_const(
     inner: &Ex,
     payload_ast: &AstTy,
@@ -1374,6 +1404,7 @@ fn box_enum_live_or_const(
     slots: &[Slot],
     scope: &HashMap<String, LocalId>,
     values: &HashMap<String, Value>,
+    const_composites: &HashMap<String, ConstValue>,
     prog: &Prog,
 ) -> Result<(BoxConst, ConstVal), SubsetError> {
     if let Ex::Path(n, nl, nc) = inner {
@@ -1397,6 +1428,19 @@ fn box_enum_live_or_const(
                 .clone();
             let box_const = BoxConst::EnumLive { init: init.clone(), value: value.clone() };
             return Ok((box_const, ConstVal::EnumLive(value)));
+        }
+        // L3b：顶层整棵常量复合变量（仅常量字面量初始化登记）。
+        if let Some(cv) = const_composites.get(n) {
+            if types.expr_ty(inner) != Some(payload_ast) {
+                return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷类型记录不符"));
+            }
+            if !const_composite_shape_ok(cv, payload_ast, prog) {
+                return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷与标注不符"));
+            }
+            return Ok((
+                BoxConst::Composite(cv.clone()),
+                ConstVal::Composite(cv.clone()),
+            ));
         }
     }
     let const_result = const_value(inner, payload_ast, types, slots, scope, prog);

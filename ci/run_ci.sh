@@ -30,6 +30,7 @@
 # L2y：stdout 判词 558／354／17；stdout-contract 内加第二十一基线 l2y（1062／1659），P=24／Q=17／Ret=3（N-396／N-397／N-398 仅执行面）；ASAN 新增 l2y 独立 K=2 判词（合并 17）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 # L2z：stdout 判词 582／365／17；stdout-contract 内加第二十二基线 l2z（1104／1729），P=24／Q=18／Ret=7（N-149／N-150／N-294／N-296／N-414／N-415／N-427 仅执行面）；ASAN 新增 l2z 独立 K=2 判词（合并 19）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 # L3a：stdout 判词 606／372／17；stdout-contract 内加第二十三基线 l3a（1146／1799），P=24／Q=18／Ret=11（N-20／N-42／N-255／N-293／N-295／N-368／N-399／N-401／N-417／N-428／N-429 仅执行面）；ASAN 新增 l3a 独立 K=2 判词（合并 21）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
+# L3b：stdout 判词 630／381／17；stdout-contract 内加第二十四基线 l3b（1188／1869），P=24／Q=18／Ret=9（N-163／N-164／N-400／N-402／N-416／N-430／N-448／N-449／N-450 仅执行面）；ASAN 新增 l3b 独立 K=2 判词（合并 23）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 set -uo pipefail
 shopt -s nullglob  # S-1：未命中 glob 展开为空数组，杜绝字面 glob 进循环的旁路
 
@@ -755,6 +756,15 @@ stage_asan() { # L2a CI-01：宿主固定 + QA-01 ASAN/LSAN 脚本；fail-closed
         bash ci/asan/run_asan_l3a.sh --strict --zorc "$ZORC" --out "$LOG_DIR/asan-l3a" >>"$log" 2>&1 || rc_l3a=$?
     fi
     [ "$rc_l3a" -eq 0 ] || rc="$rc_l3a"
+    # L3b CI-01：独立 l3b ASAN manifest（K=2）；默认 48／41／7、l2k 6、l2t 3、l2v 2、l2w 2、l2x 2、l2y 2、l2z 2、l3a 2 零改。
+    local rc_l3b=0
+    CC_REAL="$cc_real" ZORC_BIN="$ZORC" \
+      bash ci/asan/run_asan_l3b.sh --validate-only >>"$log" 2>&1 || rc_l3b=$?
+    if [ "$rc_l3b" -eq 0 ]; then
+      CC_REAL="$cc_real" ZORC_BIN="$ZORC" \
+        bash ci/asan/run_asan_l3b.sh --strict --zorc "$ZORC" --out "$LOG_DIR/asan-l3b" >>"$log" 2>&1 || rc_l3b=$?
+    fi
+    [ "$rc_l3b" -eq 0 ] || rc="$rc_l3b"
   fi
   if [ "$rc" -eq 0 ]; then
     echo "[asan] 判定=PASS" >> "$log"
@@ -809,7 +819,7 @@ stdout_section_verdict() { # 显式 FAIL 判词优先（即使脚本 rc=0）；�
   printf 'FAIL'
 }
 
-verify_baseline() { # L2f CI-01：verify_baseline <l2e|l2f|l2g|l2h|l2i|l2j|l2k|l2l|l2m|l2n|l2o|l2p|l2q|l2r|l2s|l2t|l2u|l2v|l2w|l2x|l2y|l2z|l3a> <outdir> <cases> <files>
+verify_baseline() { # L2f CI-01：verify_baseline <l2e|l2f|l2g|l2h|l2i|l2j|l2k|l2l|l2m|l2n|l2o|l2p|l2q|l2r|l2s|l2t|l2u|l2v|l2w|l2x|l2y|l2z|l3a|l3b> <outdir> <cases> <files>
   local name="$1" out="$2" cases_expected="$3" files_expected="$4"
   local base="tests/stdout/${name}-baseline.sha256"
   local tsv="tests/stdout/${name}-baseline.tsv"
@@ -882,7 +892,7 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
     record cli-contract FAIL 1 "$log"
     return
   fi
-  # L3a CI-01：二十三基线 gate（先于两轮用例）。l2e 162／209；l2f 188／246；l2g 206／275；l2h 247／327；l2i 297／398；l2j 345／466；l2k 417／590；l2l 461／660；l2m 506／734；l2n 554／816；l2o 599／891；l2p 645／963；l2q 701／1062；l2r 759／1163；l2s 827／1274；l2t 884／1367；l2u 894／1379；l2v 937／1450；l2w 979／1520；l2x 1021／1590；l2y 1062／1659；l2z 1104／1729；l3a 全矩阵 1146／1799。
+  # L3b CI-01：二十四基线 gate（先于两轮用例）。l2e 162／209；l2f 188／246；l2g 206／275；l2h 247／327；l2i 297／398；l2j 345／466；l2k 417／590；l2l 461／660；l2m 506／734；l2n 554／816；l2o 599／891；l2p 645／963；l2q 701／1062；l2r 759／1163；l2s 827／1274；l2t 884／1367；l2u 894／1379；l2v 937／1450；l2w 979／1520；l2x 1021／1590；l2y 1062／1659；l2z 1104／1729；l3a 1146／1799；l3b 全矩阵 1188／1869。
   # 任一失败即两段 FAIL 并返回；缺件／路径不安全／重复／hash 不符／计数不符一律 FAIL，不可 SKIP。
   if ! verify_baseline l2e "$out" 162 209; then
     grep -hE '^(PASS|FAIL)\|l2e-baseline' "$out/l2e-baseline.log" >> "$log" 2>/dev/null || true
@@ -1068,6 +1078,14 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
     return
   fi
   grep -hE '^(PASS|FAIL)\|l3a-baseline' "$out/l3a-baseline.log" >> "$log" 2>/dev/null || true
+  if ! verify_baseline l3b "$out" 1188 1869; then
+    grep -hE '^(PASS|FAIL)\|l3b-baseline' "$out/l3b-baseline.log" >> "$log" 2>/dev/null || true
+    echo "[l3b-baseline] 校验失败（见 l3b-baseline.log）；stdout-contract／cli-contract 判 FAIL" >> "$log"
+    record stdout-contract FAIL 1 "$log"
+    record cli-contract FAIL 1 "$log"
+    return
+  fi
+  grep -hE '^(PASS|FAIL)\|l3b-baseline' "$out/l3b-baseline.log" >> "$log" 2>/dev/null || true
   local rc=0
   CC="${CC:-cc}" ZORC_BIN="$ZORC" OUT_DIR="$out" \
     bash tests/stdout/run_stdout_contract.sh --strict >>"$log" 2>&1 || rc=$?
@@ -1076,16 +1094,16 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   local so_v cli_v so_rc=0 cli_rc=0
   so_v="$(stdout_section_verdict stdout-contract "$log" "$rc")"
   cli_v="$(stdout_section_verdict cli-contract "$log" "$rc")"
-  # L3a CI-01：冻结计数 606／372／17（P=24／Q=18／Ret=11）；判定 PASS 但判词计数不符（如旧资产 582／365／17）同样 FAIL，防静默洗绿。
-  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=606 negative=372 fail=0 ran=606/372' "$log"; then
-    echo "[stdout-contract] 计数不符：期望 runtime=606 negative=372 ran=606/372（L3a 冻结）" >> "$log"
+  # L3b CI-01：冻结计数 630／381／17（P=24／Q=18／Ret=9）；判定 PASS 但判词计数不符（如旧资产 606／372／17）同样 FAIL，防静默洗绿。
+  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=630 negative=381 fail=0 ran=630/381' "$log"; then
+    echo "[stdout-contract] 计数不符：期望 runtime=630 negative=381 ran=630/381（L3b 冻结）" >> "$log"
     so_v=FAIL
   fi
   if [ "$cli_v" = PASS ] && ! grep -Fq 'PASS|cli-contract|cases=17 fail=0 ran=17' "$log"; then
-    echo "[cli-contract] 计数不符：期望 cases=17 ran=17（L3a 冻结，CLI 不变）" >> "$log"
+    echo "[cli-contract] 计数不符：期望 cases=17 ran=17（L3b 冻结，CLI 不变）" >> "$log"
     cli_v=FAIL
   fi
-  # L3a CI-01：二十三基线精确判词（含 fail=0）；计数不符同样 FAIL。
+  # L3b CI-01：二十四基线精确判词（含 fail=0）；计数不符同样 FAIL。
   if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l2e-baseline|cases=162 files=209 unique=209 fail=0' "$out/l2e-baseline.log"; then
     echo "[l2e-baseline] 计数不符：期望 cases=162 files=209 unique=209（历史冻结）" >> "$log"
     so_v=FAIL
@@ -1176,6 +1194,10 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   fi
   if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l3a-baseline|cases=1146 files=1799 unique=1799 fail=0' "$out/l3a-baseline.log"; then
     echo "[l3a-baseline] 计数不符：期望 cases=1146 files=1799 unique=1799（L3a 冻结）" >> "$log"
+    so_v=FAIL
+  fi
+  if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l3b-baseline|cases=1188 files=1869 unique=1869 fail=0' "$out/l3b-baseline.log"; then
+    echo "[l3b-baseline] 计数不符：期望 cases=1188 files=1869 unique=1869（L3b 冻结）" >> "$log"
     so_v=FAIL
   fi
   [ "$so_v" = FAIL ] && so_rc=1

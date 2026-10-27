@@ -1,0 +1,3 @@
+case_id	source_path	expect_rc	mode	expect_stdout_sha256	kind	notes
+S32-ASAN-01	tests/stdout/cases/S32-ASAN-01.zor	0	build-run	5b6a567e7cf763b96d3b539787d12d27d4f2eea8c1339f92d75e61f83933596a	positive	Box<P> 顶层整棵常量复合 init＋drop（L3b K=1）
+S32-ASAN-02	tests/stdout/cases/S32-ASAN-02.zor	0	build-run	d55345873c35f73f922d4d28ebbb0972a531e653dddbd3253e3d0d72168ec46c	positive	Box<P> 整棵常量复合 live 重初始化＋drop（L3b K=2）
