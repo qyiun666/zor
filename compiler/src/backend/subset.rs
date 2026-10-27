@@ -360,7 +360,7 @@ fn let_init_kind(
                     );
                     let ok = literal
                         && (payload_init_ok(inner, types, prog)
-                            || one_level_live_ok(inner, p, bindings, types, prog));
+                            || live_composite_ok(inner, p, bindings, types, prog));
                     if !ok {
                         return Err(SubsetError::new(*il, *ic, "box 载荷须为字面量常量"));
                     }
@@ -571,7 +571,7 @@ fn box_reinit_ok(
             is_composite_payload_ty(p)
                 && l2k_payload_ty(p, prog)
                 && (payload_init_ok(inner, types, prog)
-                    || one_level_live_ok(inner, p, bindings, types, prog))
+                    || live_composite_ok(inner, p, bindings, types, prog))
         }
         _ => false,
     }
@@ -588,20 +588,23 @@ fn is_enum_payload_ty(t: &Ty, prog: &Prog) -> bool {
         && l2k_payload_ty(t, prog)
 }
 
-/// L2x：一层 live 复合形态——struct 直接 enum 字段／array 直接 enum 元素为变量。
-/// 嵌套子树仍走 `payload_init_ok`（其拒绝变量），故不会放行嵌套变量叶。
-fn one_level_live_ok(
+/// L2y：任意既有复合深度的 live 形态——常量子树或同型 enum 变量叶；
+/// 变量标量叶／表达式构造叶／整棵变量载荷均 fallthrough false。
+fn live_composite_ok(
     e: &Ex,
     payload: &Ty,
     bindings: &HashMap<String, BindingKind>,
     types: &TypeTable,
     prog: &Prog,
 ) -> bool {
-    match payload {
-        Ty::Named(name) => {
-            let Ex::Record(_, fields, _, _) = e else {
-                return false;
-            };
+    if payload_init_ok(e, types, prog) {
+        return true;
+    }
+    if live_enum_leaf_ok(e, payload, bindings, types, prog) {
+        return true;
+    }
+    match (e, payload) {
+        (Ex::Record(_, fields, _, _), Ty::Named(name)) => {
             let Some(decl) = prog.structs.iter().find(|s| &s.name == name) else {
                 return false;
             };
@@ -609,18 +612,13 @@ fn one_level_live_ok(
                 let Some((_, v)) = fields.iter().find(|(n, _)| n == fname) else {
                     return false;
                 };
-                payload_init_ok(v, types, prog)
-                    || live_enum_leaf_ok(v, fty, bindings, types, prog)
+                live_composite_ok(v, fty, bindings, types, prog)
             })
         }
-        Ty::Arr(elem, n) => {
-            let Ex::ArrLit(es, _, _) = e else {
-                return false;
-            };
+        (Ex::ArrLit(es, _, _), Ty::Arr(elem, n)) => {
             es.len() as u64 == *n
                 && es.iter().all(|x| {
-                    payload_init_ok(x, types, prog)
-                        || live_enum_leaf_ok(x, elem, bindings, types, prog)
+                    live_composite_ok(x, elem, bindings, types, prog)
                 })
         }
         _ => false,
