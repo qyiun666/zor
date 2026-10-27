@@ -89,7 +89,8 @@ pub fn type_key(t: &Ty) -> Option<String> {
 }
 
 /// L2k 复合载荷的树：叶子是标量位型，节点自带成员类型
-/// （C 初始化与打印投影都无需回查声明表）；L2x 起可含一层 live enum 叶。
+/// （C 初始化与打印投影都无需回查声明表）；L2x 起可含 live enum 叶，
+/// L2y 起该叶可位于任意既有 struct／array 深度。
 #[derive(Clone, Debug, PartialEq)]
 pub enum ConstValue {
     Int(i128),
@@ -111,12 +112,13 @@ pub enum ConstValue {
         variant: String,
         fields: Vec<(Ty, ConstValue)>,
     },
-    /// L2x：一层 live enum 叶（仅 Struct 字段／Array 元素的直接位置；
+    /// L2x／L2y：live enum 叶（任意既有 struct／array 深度；
     /// 打印投影为 value，初始化投影为 init）。
     EnumLive { init: EnumInit, value: Value },
 }
 
-/// Box 载荷常量：标量保留既有 i128 位型通道（C 文本零漂移），复合走常量树。
+/// Box 载荷常量：标量保留既有 i128 位型通道（C 文本零漂移），
+/// 复合走树（L2y 起可含任意既有深度的 live enum 叶）。
 #[derive(Clone, Debug, PartialEq)]
 pub enum BoxConst {
     Bits(i128),
