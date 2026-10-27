@@ -252,10 +252,11 @@ fn box_and_variable_payload_stay_fail_closed() {
         "box-enum-l2t",
         b"V(1)\n",
     );
-    assert_rc1(
-        "box-struct-enum-field",
+    // L2w：常量复合 enum 叶子转正（Box<S{e:E}>，限定变体）。
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let b: Box<S> = box S { e: E::V(1) };\n    println(*b);\n}\n",
-        "let 类型标注",
+        "box-struct-enum-field",
+        b"S { e: V(1) }\n",
     );
     assert_rc1(
         "nested-box",
