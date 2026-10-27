@@ -263,10 +263,11 @@ fn box_and_variable_payload_stay_fail_closed() {
         "fn main() {\n    let b: Box<Box<i64>> = box box 1;\n    println(*b);\n}\n",
         "let 类型标注",
     );
-    assert_rc1(
-        "variable-payload",
+    // L3a：顶层标量 Box 变量载荷已开放（原 variable-payload 负控翻转）。
+    assert_runs(
         "fn main() {\n    let x: i64 = 1;\n    let b: Box<i64> = box x;\n    println(*b);\n}\n",
-        "box 载荷非整型字面量",
+        "variable-payload",
+        b"1\n",
     );
 }
 

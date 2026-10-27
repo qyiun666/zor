@@ -690,6 +690,23 @@ fn emit_alloc_payload(
         BoxConst::EnumLive { init, .. } => {
             emit_alloc_enum_live(out, id, ty, init, tmp_counter, overflow)
         }
+        // L3a：顶层标量变量载荷——运行期 i64／u8／u32 直接读源局部。
+        BoxConst::ScalarLive { ty, expr } => {
+            let bty = match ty {
+                IntTy::I64 => BoxIntTy::I64,
+                IntTy::U8 => BoxIntTy::U8,
+                IntTy::U32 => BoxIntTy::U32,
+            };
+            let cty = bty.c_ty();
+            let _ = writeln!(
+                out,
+                "    zor_box_{} = ({} *)zor_alloc(sizeof({}));",
+                id.0, cty, cty
+            );
+            let v = emit_int_expr(out, expr, *ty, overflow, tmp_counter);
+            let _ = writeln!(out, "    *zor_box_{} = {};", id.0, v);
+            let _ = writeln!(out, "    zor_live_{} = 1;", id.0);
+        }
     }
 }
 

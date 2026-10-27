@@ -224,10 +224,11 @@ fn variable_payload_boundaries_stay_fail_closed() {
         "enum E { V(i64) }\nfn main() {\n    let e = V(1);\n    let b = box e;\n    println(*b);\n}\n",
         "box 载荷非整型字面量",
     );
-    assert_rc1(
-        "non-enum-variable",
+    // L3a：顶层标量 Box 变量载荷已开放（原 non-enum-variable 负控翻转）。
+    assert_runs(
         "fn main() {\n    let x: i64 = 1;\n    let b: Box<i64> = box x;\n    println(*b);\n}\n",
-        "box 载荷非整型字面量",
+        "non-enum-variable",
+        b"1\n",
     );
     assert_rc1(
         "struct-variable",

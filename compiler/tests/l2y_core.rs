@@ -259,20 +259,22 @@ fn direct_fail_closed_leaves_and_reinit() {
         "array-scalar-one",
         b"[1]\n",
     );
-    assert_rc1(
-        "whole-scalar-box",
+    // L3a：顶层标量 Box 变量载荷已开放（原 whole-scalar-box 负控翻转）。
+    assert_runs(
         "fn main() {\n    let x: i64 = 1;\n    let b: Box<i64> = box x;\n    println(*b);\n}\n",
-        "box 载荷非整型字面量",
+        "whole-scalar-box",
+        b"1\n",
     );
     assert_rc1(
         "whole-array",
         "fn main() {\n    let a: [i64; 3] = [1, 2, 3];\n    let b: Box<[i64; 3]> = box a;\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "scalar-reinit",
+    // L3a：顶层标量重初始化已开放（原 scalar-reinit 负控翻转）。
+    assert_runs(
         "fn main() {\n    let b: Box<i64> = box 1;\n    unbox b;\n    let x: i64 = 2;\n    b = box x;\n    println(*b);\n}\n",
-        "赋值语句",
+        "scalar-reinit",
+        b"2\n",
     );
     assert_rc1(
         "whole-reinit",
