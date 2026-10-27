@@ -580,14 +580,14 @@ fn is_enum_payload_ty(t: &Ty, prog: &Prog) -> bool {
 }
 
 /// L2k Box 复合载荷白名单（深递归）：8 整型宽度／bool／f32／f64／struct／定长数组；
-/// L2t：顶层 enum 允许（所有变体字段全标量），嵌套在 struct／array 内的 enum 仍排除；
-/// 排除 `[byte; N]`（含嵌套）、嵌套 enum、unit、tuple、Box、引用。
+/// L2t/L2w：enum 允许出现在任意深度（变体字段仍须全标量）。
+/// 排除 `[byte; N]`（含嵌套）、enum 变体字段的复合／嵌套 enum／unit、tuple、Box、引用。
 fn l2k_payload_ty(t: &Ty, prog: &Prog) -> bool {
     let mut seen = HashSet::new();
-    l2k_payload_ty_in(t, prog, &mut seen, true)
+    l2k_payload_ty_in(t, prog, &mut seen)
 }
 
-fn l2k_payload_ty_in(t: &Ty, prog: &Prog, seen: &mut HashSet<String>, allow_enum: bool) -> bool {
+fn l2k_payload_ty_in(t: &Ty, prog: &Prog, seen: &mut HashSet<String>) -> bool {
     match t {
         Ty::Prim(p) => matches!(
             *p,
@@ -595,16 +595,15 @@ fn l2k_payload_ty_in(t: &Ty, prog: &Prog, seen: &mut HashSet<String>, allow_enum
         ),
         Ty::Arr(elem, _) => {
             !matches!(elem.as_ref(), Ty::Prim("byte"))
-                && l2k_payload_ty_in(elem, prog, seen, false)
+                && l2k_payload_ty_in(elem, prog, seen)
         }
         Ty::Named(n) => {
             if !seen.insert(n.clone()) {
                 return false;
             }
-            // L2t：enum 仅允许作为 Box 顶层载荷（字段全标量）；嵌套在 struct／array
-            // 内的 enum 字段维持 fail-closed（归后续切片）。
+            // L2w：enum 在任意深度允许（顶层与嵌套同规）；变体字段仍须全标量。
             if let Some(e) = prog.enums.iter().find(|e| &e.name == n) {
-                if !allow_enum || e.variants.is_empty() {
+                if e.variants.is_empty() {
                     return false;
                 }
                 return e.variants.iter().all(|(_, payload, _, _)| {
@@ -615,7 +614,7 @@ fn l2k_payload_ty_in(t: &Ty, prog: &Prog, seen: &mut HashSet<String>, allow_enum
                 Some(s) => s
                     .fields
                     .iter()
-                    .all(|(_, ft, _, _)| l2k_payload_ty_in(ft, prog, seen, false)),
+                    .all(|(_, ft, _, _)| l2k_payload_ty_in(ft, prog, seen)),
                 None => false,
             }
         }
