@@ -1,0 +1,4 @@
+S { a: [Inner { e: V(1) }, Inner { e: V(2) }] }
+S { a: [Inner { e: V(1) }, Inner { e: V(2) }] }
+V(1)
+V(2)

@@ -1,0 +1,13 @@
+enum E { V(i64) }
+enum F { W(f64) }
+struct S1 { e: E }
+struct S2 { inner: S1, f: F }
+fn main() {
+    let e = V(1);
+    let f = W(2.5);
+    let b: Box<S2> = box S2 { inner: S1 { e: e }, f: f };
+    println(*b);
+    println(S2 { inner: S1 { e: e }, f: f });
+    println(e);
+    println(f);
+}

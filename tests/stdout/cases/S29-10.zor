@@ -1,0 +1,10 @@
+enum E { A() }
+struct S1 { e: E }
+struct S2 { inner: S1 }
+fn main() {
+    let e = A();
+    let b: Box<S2> = box S2 { inner: S1 { e: e } };
+    println(*b);
+    println(S2 { inner: S1 { e: e } });
+    println(e);
+}
