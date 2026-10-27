@@ -201,15 +201,16 @@ fn box_enum_composite_boundaries_stay_fail_closed() {
         "enum E { A(i64) }\nfn main() {\n    let b: Box<Box<E>> = box box A(1);\n    println(*b);\n}\n",
         "let 类型标注",
     );
-    assert_rc1(
-        "box-struct-enum-field",
+    // L2w：常量复合 enum 叶子转正（struct 字段／array 元素）。
+    assert_runs(
         "enum E { A(i64) }\nstruct S { e: E }\nfn main() {\n    let b: Box<S> = box S { e: A(1) };\n    println(*b);\n}\n",
-        "let 类型标注",
+        "box-struct-enum-field",
+        b"S { e: A(1) }\n",
     );
-    assert_rc1(
-        "box-array-enum",
+    assert_runs(
         "enum E { A(i64) }\nfn main() {\n    let b: Box<[E; 1]> = box [A(1)];\n    println(*b);\n}\n",
-        "let 类型标注",
+        "box-array-enum",
+        b"[A(1)]\n",
     );
     assert_rc1(
         "enum-box-field",
