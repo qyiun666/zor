@@ -200,7 +200,13 @@ fn typed_boxes_are_stable_across_opt_levels() {
 fn invalid_typed_box_forms_are_rc1_and_fail_closed() {
     // N-21～N-25（`Box<i8>/<i16>/<i32>/<u16>/<u64> = box 1`）由 L2g 支持面承接，
     // 已按冻结件从活跃执行退休；stdout 侧资产保持 byte-identical，不在本表重复。
-    let cases: [(&str, &str, &str); 13] = [
+    // L3a：Box<u8> 变量载荷已开放（原 n20 负控翻转）。
+    assert_runs(
+        "fn main() {\n    let x: u8 = 1;\n    let b: Box<u8> = box x;\n    println(*b);\n}\n",
+        "n20",
+        b"1\n",
+    );
+    let cases: [(&str, &str, &str); 12] = [
         (
             "n16",
             "fn main() {\n    let b: Box<u8> = box 256;\n    println(*b);\n}\n",
@@ -219,11 +225,6 @@ fn invalid_typed_box_forms_are_rc1_and_fail_closed() {
         (
             "n19",
             "fn main() {\n    let b: Box<i64> = box -1;\n    println(*b);\n}\n",
-            "box 载荷非整型字面量",
-        ),
-        (
-            "n20",
-            "fn main() {\n    let x: u8 = 1;\n    let b: Box<u8> = box x;\n    println(*b);\n}\n",
             "box 载荷非整型字面量",
         ),
         (

@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S31-01	tests/stdout/cases/S31-01.zor	run	0	expected/S31-01.stdout	-	i64 literal variable init
+S31-02	tests/stdout/cases/S31-02.zor	run	0	expected/S31-02.stdout	-	u8 literal variable init
+S31-03	tests/stdout/cases/S31-03.zor	run	0	expected/S31-03.stdout	-	u32 literal variable init
+S31-04	tests/stdout/cases/S31-04.zor	run	0	expected/S31-04.stdout	-	i8 compile-time variable init
+S31-05	tests/stdout/cases/S31-05.zor	run	0	expected/S31-05.stdout	-	i16 compile-time variable init
+S31-06	tests/stdout/cases/S31-06.zor	run	0	expected/S31-06.stdout	-	i32 compile-time variable init
+S31-07	tests/stdout/cases/S31-07.zor	run	0	expected/S31-07.stdout	-	u16 compile-time variable init
+S31-08	tests/stdout/cases/S31-08.zor	run	0	expected/S31-08.stdout	-	u64 compile-time variable init
+S31-09	tests/stdout/cases/S31-09.zor	run	0	expected/S31-09.stdout	-	f32 variable init
+S31-10	tests/stdout/cases/S31-10.zor	run	0	expected/S31-10.stdout	-	f64 MAX variable init
+S31-11	tests/stdout/cases/S31-11.zor	run	0	expected/S31-11.stdout	-	f64 NAN variable init
+S31-12	tests/stdout/cases/S31-12.zor	run	0	expected/S31-12.stdout	-	f64 MIN_POSITIVE variable init
+S31-13	tests/stdout/cases/S31-13.zor	run	0	expected/S31-13.stdout	-	i64 arithmetic variable init
+S31-14	tests/stdout/cases/S31-14.zor	run	0	expected/S31-14.stdout	-	u8 runtime arithmetic variable init
+S31-15	tests/stdout/cases/S31-15.zor	run	0	expected/S31-15.stdout	-	u32 runtime arithmetic variable init
+S31-16	tests/stdout/cases/S31-16.zor	run	0	expected/S31-16.stdout	-	i64 deref-derived runtime variable init
+S31-17	tests/stdout/cases/S31-17.zor	run	0	expected/S31-17.stdout	-	u8 deref-derived runtime variable init
+S31-18	tests/stdout/cases/S31-18.zor	run	0	expected/S31-18.stdout	-	u32 deref-derived runtime variable init
+S31-19	tests/stdout/cases/S31-19.zor	run	0	expected/S31-19.stdout	-	Copy: one variable into two Boxes
+S31-20	tests/stdout/cases/S31-20.zor	run	0	expected/S31-20.stdout	-	i64 scalar reinit
+S31-21	tests/stdout/cases/S31-21.zor	run	0	expected/S31-21.stdout	-	u8 scalar reinit
+S31-22	tests/stdout/cases/S31-22.zor	run	0	expected/S31-22.stdout	-	f64 scalar reinit
+S31-23	tests/stdout/cases/S31-23.zor	run	0	expected/S31-23.stdout	-	Box move with scalar payload
+S31-24	tests/stdout/cases/S31-24.zor	run	0	expected/S31-24.stdout	-	unbox with scalar payload

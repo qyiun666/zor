@@ -1,0 +1,7 @@
+fn main() {
+    let b0: Box<u32> = box 3000000000;
+    let x = *b0;
+    let b: Box<u32> = box x;
+    println(*b);
+    println(x);
+}

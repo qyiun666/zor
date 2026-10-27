@@ -276,7 +276,13 @@ fn assert_rc1(tag: &str, src: &str, token: &str) {
 
 #[test]
 fn l2g_negative_cases_are_rc1_and_fail_closed() {
-    let cases: [(&str, &str, &str); 14] = [
+    // L3a：Box<i8> 变量载荷已开放（原 n42 负控翻转）。
+    assert_runs(
+        "fn main() {\n    let x: i8 = 1;\n    let b: Box<i8> = box x;\n    println(*b);\n}\n",
+        "n42",
+        b"1\n",
+    );
+    let cases: [(&str, &str, &str); 13] = [
         (
             "n36",
             "fn main() {\n    let b: Box<i8> = box 128;\n    println(*b);\n}\n",
@@ -305,11 +311,6 @@ fn l2g_negative_cases_are_rc1_and_fail_closed() {
         (
             "n41",
             "fn main() {\n    let b: Box<i8> = box -1;\n    println(*b);\n}\n",
-            "box 载荷非整型字面量",
-        ),
-        (
-            "n42",
-            "fn main() {\n    let x: i8 = 1;\n    let b: Box<i8> = box x;\n    println(*b);\n}\n",
             "box 载荷非整型字面量",
         ),
         (

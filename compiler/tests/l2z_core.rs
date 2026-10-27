@@ -220,15 +220,16 @@ fn copy_multiple_boxes_and_reinit_keep_originals() {
 
 #[test]
 fn fail_closed_boundaries() {
-    assert_rc1(
-        "top-scalar-init",
+    // L3a：顶层标量 Box 变量载荷／重初始化已开放（原负控翻转）。
+    assert_runs(
         "fn main() {\n    let x: i64 = 1;\n    let b: Box<i64> = box x;\n    println(*b);\n}\n",
-        "box 载荷非整型字面量",
+        "top-scalar-init",
+        b"1\n",
     );
-    assert_rc1(
-        "top-scalar-reinit",
+    assert_runs(
         "fn main() {\n    let b: Box<i64> = box 1;\n    unbox b;\n    let x: i64 = 2;\n    b = box x;\n    println(*b);\n}\n",
-        "赋值语句",
+        "top-scalar-reinit",
+        b"2\n",
     );
     assert_rc1(
         "whole-payload",

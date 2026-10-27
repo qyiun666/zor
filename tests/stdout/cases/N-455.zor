@@ -1,0 +1,1 @@
+fn main() { let b0: Box<i32> = box 1; let x = *b0; let b: Box<i32> = box x; println(*b); }
