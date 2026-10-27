@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-446	tests/stdout/cases/N-446.zor	1	none	let 类型标注	zor: runtime error	bool literal top-level Box
+N-447	tests/stdout/cases/N-447.zor	1	none	let 类型标注	zor: runtime error	bool variable top-level Box
+N-448	tests/stdout/cases/N-448.zor	1	none	box 载荷须为字面量常量	zor: runtime error	whole struct variable payload
+N-449	tests/stdout/cases/N-449.zor	1	none	box 载荷须为字面量常量	zor: runtime error	whole array variable payload
+N-450	tests/stdout/cases/N-450.zor	1	none	赋值语句	zor: runtime error	whole struct variable reinit
+N-451	tests/stdout/cases/N-451.zor	1	none	E1201	zor: runtime error	expression payload box x + 1
+N-452	tests/stdout/cases/N-452.zor	1	none	box 载荷非整型字面量	zor: runtime error	unary expression payload
+N-453	tests/stdout/cases/N-453.zor	1	none	box 载荷非整型字面量	zor: runtime error	paren arithmetic payload
+N-454	tests/stdout/cases/N-454.zor	1	none	box 载荷非整型字面量	zor: runtime error	deref-derived i8 variable
+N-455	tests/stdout/cases/N-455.zor	1	none	box 载荷非整型字面量	zor: runtime error	deref-derived i32 variable
+N-456	tests/stdout/cases/N-456.zor	1	none	box 载荷非整型字面量	zor: runtime error	deref-derived u64 variable
+N-457	tests/stdout/cases/N-457.zor	1	none	E1201	zor: runtime error	width mismatch u8 -> Box<i8>
+N-458	tests/stdout/cases/N-458.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated scalar Box
+N-459	tests/stdout/cases/N-459.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-460	tests/stdout/cases/N-460.zor	1	none	let 类型标注	zor: runtime error	enum with Box field
+N-461	tests/stdout/cases/N-461.zor	1	none	println 实参不可打印	zor: runtime error	println Box itself
+N-462	tests/stdout/cases/N-462.zor	1	none	E2301	zor: runtime error	double unbox
+N-463	tests/stdout/cases/N-463.zor	1	none	E2101	zor: runtime error	use after move
