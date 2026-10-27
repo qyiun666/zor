@@ -1,0 +1,4 @@
+enum E { V(i64) }
+struct Inner { e: E }
+struct Outer { i: Inner }
+fn main() { let e = V(1); let b: Box<Outer> = box Outer { i: Inner { e: e } }; println(*b); }

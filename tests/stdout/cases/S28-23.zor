@@ -1,0 +1,8 @@
+enum E { V(f64) }
+fn main() {
+    let e = V(f64::MAX);
+    let b: Box<[E; 1]> = box [e];
+    println(*b);
+    println([e]);
+    println(e);
+}
