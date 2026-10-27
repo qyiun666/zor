@@ -1,10 +1,12 @@
 enum E { V(i64) }
+enum F { W(i64) }
 struct S1 { e: E }
-struct S2 { inner: S1, c: S1 }
+struct T1 { e: F }
+struct S2 { inner: S1, c: T1 }
 fn main() {
     let e = V(1);
-    let b: Box<S2> = box S2 { inner: S1 { e: e }, c: S1 { e: V(9) } };
+    let b: Box<S2> = box S2 { inner: S1 { e: e }, c: T1 { e: W(9) } };
     println(*b);
-    println(S2 { inner: S1 { e: e }, c: S1 { e: V(9) } });
+    println(S2 { inner: S1 { e: e }, c: T1 { e: W(9) } });
     println(e);
 }

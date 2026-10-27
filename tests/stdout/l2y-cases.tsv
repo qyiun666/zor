@@ -20,6 +20,6 @@ S29-18	tests/stdout/cases/S29-18.zor	run	0	expected/S29-18.stdout	-	two enum typ
 S29-19	tests/stdout/cases/S29-19.zor	run	0	expected/S29-19.stdout	-	nested Box move
 S29-20	tests/stdout/cases/S29-20.zor	run	0	expected/S29-20.stdout	-	nested unbox
 S29-21	tests/stdout/cases/S29-21.zor	run	0	expected/S29-21.stdout	-	deep array variable leaf
-S29-22	tests/stdout/cases/S29-22.zor	run	0	expected/S29-22.stdout	-	variable + constant nested leaves
+S29-22	tests/stdout/cases/S29-22.zor	run	0	expected/S29-22.stdout	-	variable + constant nested leaves (distinct types)
 S29-23	tests/stdout/cases/S29-23.zor	run	0	expected/S29-23.stdout	-	array variable + constant struct
 S29-24	tests/stdout/cases/S29-24.zor	run	0	expected/S29-24.stdout	-	nested array constant + variable
