@@ -1,0 +1,3 @@
+case_id	source_path	expect_rc	mode	expect_stdout_sha256	kind	notes
+S27-ASAN-01	tests/stdout/cases/S27-ASAN-01.zor	0	build-run	4fb84536e9777ef0d25909986d02ebf2e87f6f60a62d891dee88e810165eae25	positive	Box<S{e:E}> 常量复合枚举叶子＋作用域 drop（L2w K=1）
+S27-ASAN-02	tests/stdout/cases/S27-ASAN-02.zor	0	build-run	f422ba39141f254ec61c4eb10b5cb8e10f2bf4fe3ad832d255bb893895a4d79d	positive	Box<[S;2]> 数组＋struct＋enum 叶子＋drop（L2w K=2）
