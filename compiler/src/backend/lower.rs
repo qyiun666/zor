@@ -396,15 +396,61 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     "lower：算术绑定类型不在 L2b codegen 子集（仅 i64／u8／u32）",
                                 )
                             })?;
-                            let expr = lower_int_expr(init, ty, types, &slots, &scope)?;
+                            // L3g：先占位 dst 本地／槽位，再求值（Deref 操作数生成临时量）。
+                            locals.push(Local {
+                                id,
+                                name: name.clone(),
+                                ty: local_ty.clone(),
+                            });
+                            slots.push(Slot {
+                                ty: local_ty.clone(),
+                                live: true,
+                                konst: None,
+                                bytes: None,
+                            });
+                            let expr = {
+                                let mut b = Build {
+                                    types,
+                                    prog,
+                                    slots: &mut slots,
+                                    locals: &mut locals,
+                                    body: &mut body,
+                                };
+                                lower_scalar_payload_expr(init, ty, &mut b, &scope, &values)?
+                            };
                             body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
-                            slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
+                            scope.insert(name.clone(), id);
+                            values.remove(name);
+                            continue;
                         }
                         Ex::Un(..) => {
                             if let Some(ty) = ir_int_ty(&local_ty) {
-                                let expr = lower_int_expr(init, ty, types, &slots, &scope)?;
+                                // L3g：一元整型算术同走 let 专用求值（Field／Deref 操作数）。
+                                locals.push(Local {
+                                    id,
+                                    name: name.clone(),
+                                    ty: local_ty.clone(),
+                                });
+                                slots.push(Slot {
+                                    ty: local_ty.clone(),
+                                    live: true,
+                                    konst: None,
+                                    bytes: None,
+                                });
+                                let expr = {
+                                    let mut b = Build {
+                                        types,
+                                        prog,
+                                        slots: &mut slots,
+                                        locals: &mut locals,
+                                        body: &mut body,
+                                    };
+                                    lower_scalar_payload_expr(init, ty, &mut b, &scope, &values)?
+                                };
                                 body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
-                                slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
+                                scope.insert(name.clone(), id);
+                                values.remove(name);
+                                continue;
                             } else {
                                 let val = const_scalar(init, &local_ty, types, &slots, &scope)?;
                                 slots.push(Slot { ty: local_ty, live: true, konst: Some(val), bytes: None });
