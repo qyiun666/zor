@@ -190,40 +190,42 @@ fn reinit_copy_and_shadowing() {
 
 #[test]
 fn fail_closed_boundaries() {
-    assert_rc1(
-        "nested-whole-field",
+    // L3c：嵌套整棵字段／数组字段／重初始化已开放（原负控翻转）。
+    assert_runs(
         "struct I { x: i64 }\nstruct O { i: I }\nfn main() {\n    let s1 = I { x: 1 };\n    let b: Box<O> = box O { i: s1 };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "nested-whole-field",
+        b"O { i: I { x: 1 } }\n",
     );
-    assert_rc1(
-        "array-whole-field",
+    assert_runs(
         "struct S { a: [i64; 1] }\nfn main() {\n    let av: [i64; 1] = [1];\n    let b: Box<S> = box S { a: av };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "array-whole-field",
+        b"S { a: [1] }\n",
     );
-    assert_rc1(
-        "nested-whole-reinit",
+    assert_runs(
         "struct I { x: i64 }\nstruct O { i: I }\nfn main() {\n    let b: Box<O> = box O { i: I { x: 1 } };\n    let s1 = I { x: 2 };\n    b = box O { i: s1 };\n    println(*b);\n}\n",
-        "赋值语句",
+        "nested-whole-reinit",
+        b"O { i: I { x: 2 } }\n",
     );
-    assert_rc1(
-        "runtime-leaf",
+    // L3c：整棵运行期叶／Path 复制／遮蔽后运行期叶已开放（原负控翻转）。
+    assert_runs(
         "struct P { x: i64 }\nfn main() {\n    let x = 1 + 2;\n    let p = P { x: x };\n    let b: Box<P> = box p;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "runtime-leaf",
+        b"P { x: 3 }\n",
     );
-    assert_rc1(
-        "path-copy",
+    assert_runs(
         "struct P { x: i64 }\nfn main() {\n    let p = P { x: 1 };\n    let q = p;\n    let b: Box<P> = box q;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "path-copy",
+        b"P { x: 1 }\n",
     );
-    assert_rc1(
-        "path-copy-reinit",
+    assert_runs(
         "struct P { x: i64 }\nfn main() {\n    let b: Box<P> = box P { x: 1 };\n    let p = P { x: 2 };\n    let q = p;\n    b = box q;\n    println(*b);\n}\n",
-        "赋值语句",
+        "path-copy-reinit",
+        b"P { x: 2 }\n",
     );
-    assert_rc1(
-        "shadow-runtime",
+    assert_runs(
         "struct P { x: i64 }\nfn main() {\n    let p = P { x: 1 };\n    let p = P { x: 1 + 2 };\n    let b: Box<P> = box p;\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "shadow-runtime",
+        b"P { x: 3 }\n",
     );
     assert_rc1(
         "bool-box",

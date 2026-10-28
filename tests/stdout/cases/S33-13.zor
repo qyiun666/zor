@@ -1,0 +1,9 @@
+enum E { V(i64), W(i64) }
+fn main() {
+    let e = V(1);
+    let e2 = W(2);
+    let a: [E; 2] = [e, e2];
+    let b: Box<[E; 2]> = box a;
+    println(*b);
+    println(a);
+}

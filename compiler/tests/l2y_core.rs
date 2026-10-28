@@ -200,30 +200,33 @@ fn nested_fail_closed_leaves() {
         "enum E { V(i64) }\nstruct S1 { e: E }\nstruct S2 { inner: S1 }\nfn main() {\n    let x: i64 = 1;\n    let b: Box<S2> = box S2 { inner: S1 { e: V(x) } };\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "nested-whole-payload",
+    // L3c：嵌套整棵字段已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nstruct S1 { e: E }\nstruct S2 { inner: S1 }\nfn main() {\n    let s1 = S1 { e: V(1) };\n    let b: Box<S2> = box S2 { inner: s1 };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "nested-whole-payload",
+        b"S2 { inner: S1 { e: V(1) } }\n",
     );
     assert_runs(
         "struct S { a: [i64; 1] }\nfn main() {\n    let v: i64 = 1;\n    let b: Box<S> = box S { a: [v] };\n    println(*b);\n}\n",
         "array-scalar-leaf",
         b"S { a: [1] }\n",
     );
-    assert_rc1(
-        "array-whole-payload",
+    // L3c：数组整棵字段已开放（原负控翻转）。
+    assert_runs(
         "struct S { a: [i64; 1] }\nfn main() {\n    let av: [i64; 1] = [1];\n    let b: Box<S> = box S { a: av };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "array-whole-payload",
+        b"S { a: [1] }\n",
     );
     assert_runs(
         "enum E { V(i64) }\nstruct S1 { e: E, x: i64 }\nstruct S2 { inner: S1 }\nfn main() {\n    let b: Box<S2> = box S2 { inner: S1 { e: V(1), x: 1 } };\n    let v: i64 = 2;\n    b = box S2 { inner: S1 { e: V(1), x: v } };\n    println(*b);\n}\n",
         "nested-scalar-reinit",
         b"S2 { inner: S1 { e: V(1), x: 2 } }\n",
     );
-    assert_rc1(
-        "nested-whole-reinit",
+    // L3c：嵌套整棵字段重初始化已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nstruct S1 { e: E }\nstruct S2 { inner: S1 }\nfn main() {\n    let b: Box<S2> = box S2 { inner: S1 { e: V(1) } };\n    let s1 = S1 { e: V(2) };\n    b = box S2 { inner: s1 };\n    println(*b);\n}\n",
-        "赋值语句",
+        "nested-whole-reinit",
+        b"S2 { inner: S1 { e: V(2) } }\n",
     );
 }
 
