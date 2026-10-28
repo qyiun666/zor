@@ -229,20 +229,22 @@ fn fail_closed_boundaries() {
         "fn main() {\n    let x = 1;\n    let b: Box<i64> = box x + 1;\n    println(*b);\n}\n",
         "E1201",
     );
-    assert_rc1(
-        "neg-expression",
+    // L3d：i64 标量表达式载荷已开放（原负控翻转）。
+    assert_runs(
         "fn main() {\n    let x = 1;\n    let b: Box<i64> = box -x;\n    println(*b);\n}\n",
-        "box 载荷非整型字面量",
+        "neg-expression",
+        b"-1\n",
     );
     assert_rc1(
         "box-deref",
         "struct P { x: i64 }\nfn main() {\n    let b0: Box<P> = box P { x: 1 };\n    let b: Box<P> = box *b0;\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "box-field",
+    // L3d：i64 字段投影表达式载荷已开放（原负控翻转）。
+    assert_runs(
         "struct P { x: i64 }\nfn main() {\n    let p = P { x: 1 };\n    let b: Box<i64> = box p.x;\n    println(*b);\n}\n",
-        "box 载荷非整型字面量",
+        "box-field",
+        b"1\n",
     );
     assert_rc1(
         "box-ctor",

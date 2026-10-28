@@ -418,6 +418,15 @@ fn let_init_kind(
                     return Ok(BindingKind::Box(p.clone()));
                 }
             }
+            // L3d：顶层标量表达式载荷（仅运行期 i64／u8／u32）。
+            if let Some(p) = &ann_payload {
+                if matches!(p, Ty::Prim("i64" | "u8" | "u32"))
+                    && scalar_expr_ok(inner, p, bindings, types, prog)
+                    && matches!(types.expr_ty(init), Some(Ty::BoxTy(t)) if **t == *p)
+                {
+                    return Ok(BindingKind::Box(p.clone()));
+                }
+            }
             // L2k：复合字面量载荷（常量树；变量即 fail-closed）。
             // L2t：枚举常量载荷（`box V(..)`／`box E::V(..)`）同走复合通道。
             // L2x：一层变量 enum 叶（struct 直接字段／array 直接元素）走 live 闸。
@@ -673,6 +682,53 @@ fn scalar_kind_matches(want: &Ty, n: &str, bindings: &HashMap<String, BindingKin
         && prim_kind(pname).is_some_and(|k| bindings.get(n) == Some(&k))
 }
 
+/// L3d：顶层标量表达式载荷——仅 i64／u8／u32；单层 Field／Deref；
+/// Lit／同型 Path／Un("-")（仅 i64）／Bin（+ - * / %）递归。
+fn scalar_expr_ok(
+    e: &Ex,
+    want: &Ty,
+    bindings: &HashMap<String, BindingKind>,
+    types: &TypeTable,
+    prog: &Prog,
+) -> bool {
+    if types.expr_ty(e) != Some(want) {
+        return false;
+    }
+    match e {
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _) => true,
+        Ex::Path(n, _, _) => scalar_binding_matches(want, n, bindings),
+        Ex::Un(op, x, _, _) if op == "-" => {
+            matches!(want, Ty::Prim("i64")) && scalar_expr_ok(x, want, bindings, types, prog)
+        }
+        Ex::Bin(op, a, b, _, _) => {
+            matches!(op.as_str(), "+" | "-" | "*" | "/" | "%")
+                && scalar_expr_ok(a, want, bindings, types, prog)
+                && scalar_expr_ok(b, want, bindings, types, prog)
+        }
+        Ex::Field(base, fname, _, _) => {
+            let Ex::Path(n, _, _) = base.as_ref() else {
+                return false;
+            };
+            let Some(BindingKind::Composite(Ty::Named(sname))) = bindings.get(n) else {
+                return false;
+            };
+            let Some(decl) = prog.structs.iter().find(|s| &s.name == sname) else {
+                return false;
+            };
+            decl.fields
+                .iter()
+                .any(|(f, fty, _, _)| f == fname && fty == want)
+        }
+        Ex::Deref(base, _, _) => {
+            let Ex::Path(n, _, _) = base.as_ref() else {
+                return false;
+            };
+            matches!(bindings.get(n), Some(BindingKind::Box(t)) if t == want)
+        }
+        _ => false,
+    }
+}
+
 /// L3c：编译期标量绑定判定（与 lower 的 slot.konst 同口径）。
 fn scalar_const_binding(init: &Ex, kind: &BindingKind, scalar_consts: &HashSet<String>) -> bool {
     match kind {
@@ -743,8 +799,10 @@ fn box_reinit_ok(
         Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _) | Ex::FloatSpecial(..) => true,
         Ex::Lit(Lit::Float(_), _, _) => matches!(p.as_ref(), Ty::Prim("f32") | Ty::Prim("f64")),
         Ex::Un(op, x, _, _) if op == "-" => {
-            matches!(x.as_ref(), Ex::Lit(Lit::Float(_), _, _))
-                && matches!(p.as_ref(), Ty::Prim("f32") | Ty::Prim("f64"))
+            (matches!(x.as_ref(), Ex::Lit(Lit::Float(_), _, _))
+                && matches!(p.as_ref(), Ty::Prim("f32") | Ty::Prim("f64")))
+                || (matches!(p.as_ref(), Ty::Prim("i64" | "u8" | "u32"))
+                    && scalar_expr_ok(inner, p, bindings, types, prog))
         }
         // L2v：变量枚举重初始化（Copy；类型表二次核对）。
         // L3a：顶层标量变量重初始化（Copy；bool／整棵载荷仍 false）。
@@ -763,7 +821,11 @@ fn box_reinit_ok(
                 && (payload_init_ok(inner, types, prog)
                     || live_composite_ok(inner, p, bindings, live_composites, types, prog))
         }
-        _ => false,
+        // L3d：标量表达式重初始化（仅运行期 i64／u8／u32）。
+        _ => {
+            matches!(p.as_ref(), Ty::Prim("i64" | "u8" | "u32"))
+                && scalar_expr_ok(inner, p, bindings, types, prog)
+        }
     }
 }
 

@@ -209,15 +209,16 @@ fn fail_closed_boundaries() {
         "whole-reinit",
         b"P { x: 2 }\n",
     );
-    assert_rc1(
-        "neg-expression",
+    // L3d：i64 标量表达式载荷已开放（原负控翻转）。
+    assert_runs(
         "fn main() {\n    let x: i64 = 1;\n    let b: Box<i64> = box -x;\n    println(*b);\n}\n",
-        "box 载荷非整型字面量",
+        "neg-expression",
+        b"-1\n",
     );
-    assert_rc1(
-        "paren-expression",
+    assert_runs(
         "fn main() {\n    let x: i64 = 1;\n    let b: Box<i64> = box (x + 1);\n    println(*b);\n}\n",
-        "box 载荷非整型字面量",
+        "paren-expression",
+        b"2\n",
     );
     assert_rc1(
         "add-expression",

@@ -484,10 +484,11 @@ fn unannotated_box_payloads_stay_fail_closed() {
         "fn main() {\n    let b = box 1.5;\n    println(*b);\n}\n",
         "box 载荷非整型字面量",
     );
-    assert_rc1(
-        "negative-int-scalar-payload",
+    // L3d：i64 负号字面量表达式载荷已开放（原负控翻转）。
+    assert_runs(
         "fn main() {\n    let b: Box<i64> = box -1;\n    println(*b);\n}\n",
-        "box 载荷非整型字面量",
+        "negative-int-scalar-payload",
+        b"-1\n",
     );
 }
 
