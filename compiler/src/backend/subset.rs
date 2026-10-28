@@ -841,7 +841,8 @@ fn is_enum_payload_ty(t: &Ty, prog: &Prog) -> bool {
 }
 
 /// L2y：任意既有复合深度的 live 形态——常量子树、同型 enum 变量叶、
-/// L2z 标量变量叶或 L3c 可物化复合 Path 叶；表达式构造叶仍 fallthrough false。
+/// L2z 标量变量叶或 L3c 可物化复合 Path 叶；L3e 起运行期标量表达式叶亦可。
+/// enum 构造叶（Call）不在 `scalar_expr_ok` 内，仍 fallthrough false（⑤f-2b）。
 fn live_composite_ok(
     e: &Ex,
     payload: &Ty,
@@ -851,6 +852,12 @@ fn live_composite_ok(
     prog: &Prog,
 ) -> bool {
     if payload_init_ok(e, types, prog) {
+        return true;
+    }
+    // L3e：复合字面量标量叶直接表达式（仅运行期 i64／u8／u32）。
+    if matches!(payload, Ty::Prim("i64" | "u8" | "u32"))
+        && scalar_expr_ok(e, payload, bindings, types, prog)
+    {
         return true;
     }
     if live_enum_leaf_ok(e, payload, bindings, types, prog) {

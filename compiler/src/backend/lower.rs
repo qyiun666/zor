@@ -190,16 +190,36 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     Some(AstTy::BoxTy(p)) => (**p).clone(),
                                     _ => return Err(SubsetError::new(*l, *c, "lower：box 复合载荷缺少标注")),
                                 };
-                                let (box_const, konst) = box_enum_live_or_const(
-                                    inner,
-                                    &payload_ast,
-                                    types,
-                                    &slots,
-                                    &scope,
-                                    &values,
-                                    &live_composites,
-                                    prog,
-                                )?;
+                                // L3e：先占位 Box 本地与槽位，再求值表达式叶临时量，
+                                // 保证 LocalId 与 slots/locals 下标一致。
+                                locals.push(Local {
+                                    id,
+                                    name: name.clone(),
+                                    ty: local_ty.clone(),
+                                });
+                                slots.push(Slot {
+                                    ty: local_ty.clone(),
+                                    live: true,
+                                    konst: None,
+                                    bytes: None,
+                                });
+                                let (box_const, konst) = {
+                                    let mut b = Build {
+                                        types,
+                                        prog,
+                                        slots: &mut slots,
+                                        locals: &mut locals,
+                                        body: &mut body,
+                                    };
+                                    box_enum_live_or_const(
+                                        inner,
+                                        &payload_ast,
+                                        &mut b,
+                                        &scope,
+                                        &values,
+                                        &live_composites,
+                                    )?
+                                };
                                 register_payload(&payload, prog, &mut payload_defs)?;
                                 body.push(Stmt::BindBox {
                                     local: id,
@@ -208,14 +228,9 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     line: *l,
                                     col: *c,
                                 });
-                                slots.push(Slot {
-                                    ty: local_ty,
-                                    live: true,
-                                    konst: Some(konst),
-                                    bytes: None,
-                                });
-                                let slot = slots.last().expect("slot pushed").clone();
-                                locals.push(Local { id, name: name.clone(), ty: slot.ty });
+                                if let Some(slot) = slots.get_mut(id.0 as usize) {
+                                    slot.konst = Some(konst);
+                                }
                                 scope.insert(name.clone(), id);
                                 values.remove(name);
                                 continue;
@@ -516,16 +531,23 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     Some(AstTy::BoxTy(p)) => (**p).clone(),
                                     _ => return Err(SubsetError::new(*al, *ac, "lower：box 复合载荷缺少标注")),
                                 };
-                                let (box_const, konst) = box_enum_live_or_const(
-                                    inner,
-                                    &payload_ast,
-                                    types,
-                                    &slots,
-                                    &scope,
-                                    &values,
-                                    &live_composites,
-                                    prog,
-                                )?;
+                                let (box_const, konst) = {
+                                    let mut b = Build {
+                                        types,
+                                        prog,
+                                        slots: &mut slots,
+                                        locals: &mut locals,
+                                        body: &mut body,
+                                    };
+                                    box_enum_live_or_const(
+                                        inner,
+                                        &payload_ast,
+                                        &mut b,
+                                        &scope,
+                                        &values,
+                                        &live_composites,
+                                    )?
+                                };
                                 register_payload(&payload, prog, &mut payload_defs)?;
                                 body.push(Stmt::BindBoxAssign {
                                     local: ia,
@@ -1556,15 +1578,14 @@ fn live_composite_leaf(
 /// L2v：`box e` 分派——变量枚举走 EnumLive 堆副本配方，其余沿用常量树。
 /// 变量值缺失配方（init=None）时回落到常量通道，以既有判词 fail-closed。
 /// L3c：整棵可物化复合变量走 `live_composites` 树旁路（任意叶来源）。
+/// L3e：复合字面量表达式叶在 live 构建中就地求值（临时量先于 BindBox）。
 fn box_enum_live_or_const(
     inner: &Ex,
     payload_ast: &AstTy,
-    types: &TypeTable,
-    slots: &[Slot],
+    b: &mut Build,
     scope: &HashMap<String, LocalId>,
     values: &HashMap<String, Value>,
     live_composites: &HashMap<String, ConstValue>,
-    prog: &Prog,
 ) -> Result<(BoxConst, ConstVal), SubsetError> {
     if let Ex::Path(n, nl, nc) = inner {
         if let Some(Value::Enum { init: Some(init), .. }) = values.get(n) {
@@ -1575,7 +1596,7 @@ fn box_enum_live_or_const(
                 return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷类型与标注不符"));
             }
             // 二次防线：`e` 的节点类型必须与标注载荷一致。
-            if types.expr_ty(inner) != Some(payload_ast) {
+            if b.types.expr_ty(inner) != Some(payload_ast) {
                 return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷类型记录不符"));
             }
             if init.fields.iter().any(|(t, _)| !is_enum_scalar_field_ir(t)) {
@@ -1590,10 +1611,10 @@ fn box_enum_live_or_const(
         }
         // L3c：顶层整棵可物化复合变量（任意叶来源）。
         if let Some(cv) = live_composites.get(n) {
-            if types.expr_ty(inner) != Some(payload_ast) {
+            if b.types.expr_ty(inner) != Some(payload_ast) {
                 return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷类型记录不符"));
             }
-            if !const_composite_shape_ok(cv, payload_ast, prog) {
+            if !const_composite_shape_ok(cv, payload_ast, b.prog) {
                 return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷与标注不符"));
             }
             return Ok((
@@ -1602,7 +1623,7 @@ fn box_enum_live_or_const(
             ));
         }
     }
-    let const_result = const_value(inner, payload_ast, types, slots, scope, prog);
+    let const_result = const_value(inner, payload_ast, b.types, b.slots, scope, b.prog);
     let const_err = match const_result {
         Ok(cv) => return Ok((BoxConst::Composite(cv.clone()), ConstVal::Composite(cv))),
         Err(e) => e,
@@ -1611,12 +1632,10 @@ fn box_enum_live_or_const(
     match composite_value_live(
         inner,
         payload_ast,
-        types,
-        slots,
+        b,
         scope,
         values,
         live_composites,
-        prog,
     ) {
         Ok(cv) => Ok((BoxConst::Composite(cv.clone()), ConstVal::Composite(cv))),
         Err(_) => Err(const_err),
@@ -1624,54 +1643,55 @@ fn box_enum_live_or_const(
 }
 
 /// L2y：任意既有复合深度的 live 树——常量子树优先，enum／标量／复合变量叶可为任意深度。
+/// L3e：运行期标量表达式叶就地求值到唯一临时局部。
 fn composite_value_live(
     e: &Ex,
     want: &AstTy,
-    types: &TypeTable,
-    slots: &[Slot],
+    b: &mut Build,
     scope: &HashMap<String, LocalId>,
     values: &HashMap<String, Value>,
     live: &HashMap<String, ConstValue>,
-    prog: &Prog,
 ) -> Result<ConstValue, SubsetError> {
-    live_value(e, want, types, slots, scope, values, live, prog)?
+    live_value(e, want, b, scope, values, live)?
         .ok_or_else(|| SubsetError::new(0, 0, "lower：box 复合载荷形态不符"))
 }
 
 /// 单节点 live 构建：常量子树 → enum 变量叶 → 标量变量叶 → 复合变量叶 → 递归 struct／array。
-/// 表达式构造叶／非物化整棵载荷在非 Record／ArrLit 形态返回 None。
+/// L3e：运行期标量表达式叶（i64／u8／u32）就地求值；其余形态返回 None。
 fn live_value(
     e: &Ex,
     want: &AstTy,
-    types: &TypeTable,
-    slots: &[Slot],
+    b: &mut Build,
     scope: &HashMap<String, LocalId>,
     values: &HashMap<String, Value>,
     live: &HashMap<String, ConstValue>,
-    prog: &Prog,
 ) -> Result<Option<ConstValue>, SubsetError> {
     let (l, c) = subset::expr_span(e);
-    let recorded = types
+    let recorded = b
+        .types
         .expr_ty(e)
         .ok_or_else(|| SubsetError::new(l, c, "lower：box 复合载荷缺少 type table 记录"))?;
     if recorded != want {
         return Err(SubsetError::new(l, c, "lower：box 复合载荷节点类型与标注不符"));
     }
-    if let Ok(cv) = const_value(e, want, types, slots, scope, prog) {
+    if let Ok(cv) = const_value(e, want, b.types, b.slots, scope, b.prog) {
         return Ok(Some(cv));
     }
-    if let Some(cv) = live_enum_leaf(e, want, types, values, prog)? {
+    if let Some(cv) = live_enum_leaf(e, want, b.types, values, b.prog)? {
         return Ok(Some(cv));
     }
-    if let Some(cv) = live_scalar_leaf(e, want, types, slots, scope)? {
+    if let Some(cv) = live_scalar_leaf(e, want, b.types, b.slots, scope)? {
         return Ok(Some(cv));
     }
-    if let Some(cv) = live_composite_leaf(e, want, types, live, prog)? {
+    if let Some(cv) = live_composite_leaf(e, want, b.types, live, b.prog)? {
+        return Ok(Some(cv));
+    }
+    if let Some(cv) = live_scalar_expr_leaf(e, want, b, scope, values)? {
         return Ok(Some(cv));
     }
     match (e, want) {
         (Ex::Record(name, fields, rl, rc), AstTy::Named(want_name)) if name == want_name => {
-            let decl = struct_decl(prog, name)?;
+            let decl = struct_decl(b.prog, name)?;
             let mut out = Vec::with_capacity(decl.fields.len());
             for (fname, fty, _, _) in &decl.fields {
                 let (_, v) = fields
@@ -1680,10 +1700,10 @@ fn live_value(
                     .ok_or_else(|| {
                         SubsetError::new(*rl, *rc, format!("lower：结构体字段 '{}' 未初始化", fname))
                     })?;
-                let ir = box_payload_ir_ty(fty, prog).ok_or_else(|| {
+                let ir = box_payload_ir_ty(fty, b.prog).ok_or_else(|| {
                     SubsetError::new(*rl, *rc, format!("lower：字段 '{}' 类型不在载荷白名单", fname))
                 })?;
-                let cv = live_value(v, fty, types, slots, scope, values, live, prog)?
+                let cv = live_value(v, fty, b, scope, values, live)?
                     .ok_or_else(|| SubsetError::new(*rl, *rc, "lower：box 复合载荷形态不符"))?;
                 out.push((fname.clone(), ir, cv));
             }
@@ -1696,11 +1716,11 @@ fn live_value(
             if es.len() as u64 != *n {
                 return Err(SubsetError::new(*al, *ac, "lower：数组元素数量与标注不符"));
             }
-            let ir = box_payload_ir_ty(elem, prog)
+            let ir = box_payload_ir_ty(elem, b.prog)
                 .ok_or_else(|| SubsetError::new(*al, *ac, "lower：数组元素类型不在载荷白名单"))?;
             let mut out = Vec::with_capacity(es.len());
             for x in es {
-                let cv = live_value(x, elem, types, slots, scope, values, live, prog)?
+                let cv = live_value(x, elem, b, scope, values, live)?
                     .ok_or_else(|| SubsetError::new(*al, *ac, "lower：box 复合载荷形态不符"))?;
                 out.push(cv);
             }
@@ -1708,6 +1728,51 @@ fn live_value(
         }
         _ => Ok(None),
     }
+}
+
+/// L3e：复合字面量运行期标量表达式叶——复用 L3d 求值器；
+/// 求值结果绑定唯一临时局部（box 时刻一次），以 ScalarLive 入树。
+fn live_scalar_expr_leaf(
+    e: &Ex,
+    want: &AstTy,
+    b: &mut Build,
+    scope: &HashMap<String, LocalId>,
+    values: &HashMap<String, Value>,
+) -> Result<Option<ConstValue>, SubsetError> {
+    if !matches!(want, AstTy::Prim("i64" | "u8" | "u32")) {
+        return Ok(None);
+    }
+    // 只接管表达式形态；Lit／Path 已由 const_value／live_scalar_leaf 处理，
+    // Call（enum 构造）与复合字面量由调用方递归，均不在本函数内。
+    if !matches!(e, Ex::Un(..) | Ex::Bin(..) | Ex::Field(..) | Ex::Deref(..)) {
+        return Ok(None);
+    }
+    let (l, c) = subset::expr_span(e);
+    let ir = ast_to_ir(want)
+        .ok_or_else(|| SubsetError::new(l, c, "lower：box 表达式叶缺少 IR 类型"))?;
+    let ity = ir_int_ty(&ir)
+        .ok_or_else(|| SubsetError::new(l, c, "lower：box 表达式叶非运行期标量"))?;
+    let expr = lower_scalar_payload_expr(e, ity, b, scope, values)?;
+    Ok(Some(match expr {
+        IntExpr::Const(n) => ConstValue::ScalarLive {
+            ty: ity,
+            expr: IntExpr::Const(n),
+        },
+        expr => {
+            let id = new_temp(b, ir);
+            b.body.push(Stmt::BindInt {
+                local: id,
+                ty: ity,
+                expr,
+                line: l,
+                col: c,
+            });
+            ConstValue::ScalarLive {
+                ty: ity,
+                expr: IntExpr::Local(id),
+            }
+        }
+    }))
 }
 
 /// L2x：直接 enum 变量叶——只接受 `values` 中的 Copy 枚举值（含 L2v 配方）。
