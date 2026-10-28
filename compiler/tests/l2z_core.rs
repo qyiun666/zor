@@ -242,15 +242,17 @@ fn fail_closed_boundaries() {
         "whole-payload-reinit",
         b"P { x: 2 }\n",
     );
-    assert_rc1(
-        "expression-field",
+    // L3e：复合字面量表达式叶已开放（原负控翻转）。
+    assert_runs(
         "struct S { x: i64 }\nfn main() {\n    let x = 1;\n    let b: Box<S> = box S { x: x + 1 };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "expression-field",
+        b"S { x: 2 }\n",
     );
-    assert_rc1(
-        "expression-array",
+    // L3e：array 复合字面量表达式叶已开放（原负控翻转）。
+    assert_runs(
         "fn main() {\n    let x = 1;\n    let b: Box<[i64; 1]> = box [x + 1];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "expression-array",
+        b"[2]\n",
     );
     assert_rc1(
         "deref-narrow",
