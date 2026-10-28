@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S35-01	tests/stdout/cases/S35-01.zor	run	0	expected/S35-01.stdout	-	struct literal i64 constant expression leaf
+S35-02	tests/stdout/cases/S35-02.zor	run	0	expected/S35-02.stdout	-	struct literal i64 runtime expression leaf
+S35-03	tests/stdout/cases/S35-03.zor	run	0	expected/S35-03.stdout	-	struct literal i64 negation leaf
+S35-04	tests/stdout/cases/S35-04.zor	run	0	expected/S35-04.stdout	-	struct literal nested arithmetic leaf
+S35-05	tests/stdout/cases/S35-05.zor	run	0	expected/S35-05.stdout	-	struct literal field projection leaf (literal binding)
+S35-06	tests/stdout/cases/S35-06.zor	run	0	expected/S35-06.stdout	-	struct literal field projection leaf (runtime binding)
+S35-07	tests/stdout/cases/S35-07.zor	run	0	expected/S35-07.stdout	-	struct literal scalar deref leaf
+S35-08	tests/stdout/cases/S35-08.zor	run	0	expected/S35-08.stdout	-	struct literal deref plus arithmetic leaf
+S35-09	tests/stdout/cases/S35-09.zor	run	0	expected/S35-09.stdout	-	array literal expression leaf
+S35-10	tests/stdout/cases/S35-10.zor	run	0	expected/S35-10.stdout	-	array literal mixed leaves
+S35-11	tests/stdout/cases/S35-11.zor	run	0	expected/S35-11.stdout	-	nested array literal expression leaf
+S35-12	tests/stdout/cases/S35-12.zor	run	0	expected/S35-12.stdout	-	array of struct literal expression leaf
+S35-13	tests/stdout/cases/S35-13.zor	run	0	expected/S35-13.stdout	-	struct containing array expression leaf
+S35-14	tests/stdout/cases/S35-14.zor	run	0	expected/S35-14.stdout	-	nested struct literal expression leaf
+S35-15	tests/stdout/cases/S35-15.zor	run	0	expected/S35-15.stdout	-	nested struct literal field projection leaf
+S35-16	tests/stdout/cases/S35-16.zor	run	0	expected/S35-16.stdout	-	u8 expression leaf
+S35-17	tests/stdout/cases/S35-17.zor	run	0	expected/S35-17.stdout	-	u32 expression leaf
+S35-18	tests/stdout/cases/S35-18.zor	run	0	expected/S35-18.stdout	-	struct literal reinit expression leaf
+S35-19	tests/stdout/cases/S35-19.zor	run	0	expected/S35-19.stdout	-	nested array reinit expression leaf
+S35-20	tests/stdout/cases/S35-20.zor	run	0	expected/S35-20.stdout	-	constant, variable and expression leaves mixed
+S35-21	tests/stdout/cases/S35-21.zor	run	0	expected/S35-21.stdout	-	same literal into two Box values
+S35-22	tests/stdout/cases/S35-22.zor	run	0	expected/S35-22.stdout	-	copy, move, unbox and drop combination
+S35-23	tests/stdout/cases/S35-23.zor	run	0	expected/S35-23.stdout	-	temp local stability with extra expressions
+S35-24	tests/stdout/cases/S35-24.zor	run	0	expected/S35-24.stdout	-	print equivalence with same-value literals

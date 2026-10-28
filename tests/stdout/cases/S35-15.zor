@@ -1,0 +1,10 @@
+struct P { x: i64 }
+struct I { x: i64 }
+struct O { i: I }
+fn main() {
+    let p = P { x: 3 };
+    let b: Box<O> = box O { i: I { x: p.x } };
+    let q = O { i: I { x: 3 } };
+    println(*b);
+    println(q);
+}
