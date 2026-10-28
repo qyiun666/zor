@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-500	tests/stdout/cases/N-500.zor	1	none	E1201	zor: runtime error	unparenthesized add stays E1201
+N-501	tests/stdout/cases/N-501.zor	1	none	box 载荷非整型字面量	zor: runtime error	i8 negative literal expression
+N-502	tests/stdout/cases/N-502.zor	1	none	box 载荷非整型字面量	zor: runtime error	i8 arithmetic expression
+N-503	tests/stdout/cases/N-503.zor	1	none	box 载荷非整型字面量	zor: runtime error	i16 arithmetic expression
+N-504	tests/stdout/cases/N-504.zor	1	none	box 载荷非整型字面量	zor: runtime error	u64 arithmetic expression
+N-505	tests/stdout/cases/N-505.zor	1	none	box 载荷非整型字面量	zor: runtime error	narrow field projection
+N-506	tests/stdout/cases/N-506.zor	1	none	box 载荷非整型字面量	zor: runtime error	narrow scalar deref
+N-507	tests/stdout/cases/N-507.zor	1	none	box 载荷须为字面量常量	zor: runtime error	composite deref payload
+N-508	tests/stdout/cases/N-508.zor	1	none	box 载荷须为字面量常量	zor: runtime error	composite field expression leaf
+N-509	tests/stdout/cases/N-509.zor	1	none	box 载荷须为字面量常量	zor: runtime error	composite array expression leaf
+N-510	tests/stdout/cases/N-510.zor	1	none	box 载荷须为字面量常量	zor: runtime error	enum construction expression
+N-511	tests/stdout/cases/N-511.zor	1	none	box 载荷须为字面量常量	zor: runtime error	nested enum construction expression
+N-512	tests/stdout/cases/N-512.zor	1	none	let 类型标注	zor: runtime error	bool top-level Box
+N-513	tests/stdout/cases/N-513.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated expression Box
+N-514	tests/stdout/cases/N-514.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-515	tests/stdout/cases/N-515.zor	1	none	let 类型标注	zor: runtime error	enum with Box field
+N-516	tests/stdout/cases/N-516.zor	1	none	let 类型标注	zor: runtime error	enum with struct payload
+N-517	tests/stdout/cases/N-517.zor	1	none	let 类型标注	zor: runtime error	seen same-type repeat

@@ -223,8 +223,29 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             let ty = box_int_ty(&payload).ok_or_else(|| {
                                 SubsetError::new(*l, *c, "lower：box 载荷类型非 8 个整型宽度之一")
                             })?;
-                            let (value, konst) =
-                                scalar_box_value(inner, &payload, ty, types, &slots, &scope)?;
+                            // L3d：先占位 Box 本地与槽位，再求值表达式临时量，
+                            // 保证 LocalId 与 slots/locals 下标一致。
+                            locals.push(Local {
+                                id,
+                                name: name.clone(),
+                                ty: local_ty.clone(),
+                            });
+                            slots.push(Slot {
+                                ty: local_ty.clone(),
+                                live: true,
+                                konst: None,
+                                bytes: None,
+                            });
+                            let (value, konst) = {
+                                let mut b = Build {
+                                    types,
+                                    prog,
+                                    slots: &mut slots,
+                                    locals: &mut locals,
+                                    body: &mut body,
+                                };
+                                scalar_box_value(inner, &payload, ty, &mut b, &scope, &values)?
+                            };
                             body.push(Stmt::BindBox {
                                 local: id,
                                 ty: payload,
@@ -232,7 +253,12 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                 line: *l,
                                 col: *c,
                             });
-                            slots.push(Slot { ty: local_ty, live: true, konst, bytes: None });
+                            if let Some(slot) = slots.get_mut(id.0 as usize) {
+                                slot.konst = konst;
+                            }
+                            scope.insert(name.clone(), id);
+                            values.remove(name);
+                            continue;
                         }
                         Ex::Lit(Lit::Int(v), il, ic) => match &local_ty {
                             Ty::I64 => {
@@ -518,8 +544,16 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             let ty = box_int_ty(&payload).ok_or_else(|| {
                                 SubsetError::new(*al, *ac, "lower：box 载荷类型非 8 个整型宽度之一")
                             })?;
-                            let (value, konst) =
-                                scalar_box_value(inner, &payload, ty, types, &slots, &scope)?;
+                            let (value, konst) = {
+                                let mut b = Build {
+                                    types,
+                                    prog,
+                                    slots: &mut slots,
+                                    locals: &mut locals,
+                                    body: &mut body,
+                                };
+                                scalar_box_value(inner, &payload, ty, &mut b, &scope, &values)?
+                            };
                             body.push(Stmt::BindBoxAssign {
                                 local: ia,
                                 ty: payload,
@@ -2355,17 +2389,19 @@ fn box_float_bits(val: &ConstVal, ty: BoxIntTy) -> Result<i128, SubsetError> {
 
 /// L3a：顶层标量 Box 取值——变量 Path 优先（编译期常量转位型；运行期
 /// i64／u8／u32 生成 ScalarLive）；无载体的 deref 派生宽度报既有判词。
+/// L3d：i64／u8／u32 表达式在 box 时刻求值到唯一临时局部后落堆。
 fn scalar_box_value(
     e: &Ex,
     payload: &Ty,
     ty: BoxIntTy,
-    types: &TypeTable,
-    slots: &[Slot],
+    b: &mut Build,
     scope: &HashMap<String, LocalId>,
+    values: &HashMap<String, Value>,
 ) -> Result<(BoxConst, Option<ConstVal>), SubsetError> {
     if let Ex::Path(n, nl, nc) = e {
         let id = lookup(scope, n, *nl, *nc)?;
-        let slot = slots
+        let slot = b
+            .slots
             .get(id.0 as usize)
             .ok_or_else(|| SubsetError::new(*nl, *nc, "lower：box 标量载荷槽位缺失"))?;
         if &slot.ty != payload {
@@ -2392,10 +2428,162 @@ fn scalar_box_value(
         return Err(SubsetError::new(*nl, *nc, "box 载荷非整型字面量"));
     }
     if matches!(payload, Ty::F32 | Ty::F64) {
-        let val = const_scalar(e, payload, types, slots, scope)?;
+        let val = const_scalar(e, payload, b.types, b.slots, scope)?;
         return Ok((BoxConst::Bits(box_float_bits(&val, ty)?), Some(val)));
     }
+    if matches!(payload, Ty::I64 | Ty::U8 | Ty::U32)
+        && !matches!(e, Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _))
+    {
+        let ity = ir_int_ty(payload).expect("runtime width");
+        let expr = lower_scalar_payload_expr(e, ity, b, scope, values)?;
+        return Ok(match expr {
+            IntExpr::Const(n) => (BoxConst::Bits(n), None),
+            expr => {
+                let id = new_temp(b, payload.clone());
+                let (l, c) = subset::expr_span(e);
+                b.body.push(Stmt::BindInt {
+                    local: id,
+                    ty: ity,
+                    expr,
+                    line: l,
+                    col: c,
+                });
+                (
+                    BoxConst::ScalarLive {
+                        ty: ity,
+                        expr: IntExpr::Local(id),
+                    },
+                    None,
+                )
+            }
+        });
+    }
     Ok((BoxConst::Bits(box_lit(e, ty)?), None))
+}
+
+/// L3d：运行时标量表达式求值（仅 Box 载荷使用；不扩普通算术面）。
+fn lower_scalar_payload_expr(
+    e: &Ex,
+    ty: IntTy,
+    b: &mut Build,
+    scope: &HashMap<String, LocalId>,
+    values: &HashMap<String, Value>,
+) -> Result<IntExpr, SubsetError> {
+    let (el, ec) = subset::expr_span(e);
+    let recorded = b
+        .types
+        .expr_ty(e)
+        .ok_or_else(|| SubsetError::new(el, ec, "lower：box 标量表达式缺少 type table 记录"))?;
+    if ast_to_ir(recorded) != Some(ty.ir_ty()) {
+        return Err(SubsetError::new(
+            el,
+            ec,
+            "lower：box 标量表达式类型与标注不符",
+        ));
+    }
+    match e {
+        Ex::Lit(Lit::Int(v), _, _) => Ok(IntExpr::Const(int_const(v, ty, e)?)),
+        Ex::Lit(Lit::IntConst(v), _, _) => Ok(IntExpr::Const(int_const_i128(*v, ty, e)?)),
+        Ex::Path(n, nl, nc) => {
+            let id = lookup(scope, n, *nl, *nc)?;
+            if b.slots.get(id.0 as usize).map(|s| &s.ty) != Some(&ty.ir_ty()) {
+                return Err(SubsetError::new(
+                    *nl,
+                    *nc,
+                    "lower：box 标量表达式操作数与绑定类型不符",
+                ));
+            }
+            Ok(IntExpr::Local(id))
+        }
+        Ex::Un(op, x, l, c) if op == "-" => {
+            if ty != IntTy::I64 {
+                return Err(SubsetError::new(
+                    *l,
+                    *c,
+                    "lower：无符号一元 '-' 不在 box 标量表达式子集",
+                ));
+            }
+            if let Ex::Lit(Lit::Int(v), il, ic) = x.as_ref() {
+                let n = i128::try_from(*v)
+                    .map_err(|_| SubsetError::new(*il, *ic, "lower：整型字面量超出 i128"))?;
+                let n = n
+                    .checked_neg()
+                    .ok_or_else(|| SubsetError::new(*il, *ic, "lower：整型常量取负溢出"))?;
+                if !int_in_range(&Ty::I64, n) {
+                    return Err(SubsetError::new(*il, *ic, "lower：整型字面量超出声明宽度"));
+                }
+                return Ok(IntExpr::Const(n));
+            }
+            let inner = lower_scalar_payload_expr(x, ty, b, scope, values)?;
+            Ok(IntExpr::Neg {
+                expr: Box::new(inner),
+                line: *l,
+                col: *c,
+            })
+        }
+        Ex::Bin(op, a, b2, l, c) => {
+            let op = arith_op(op)
+                .ok_or_else(|| SubsetError::new(*l, *c, "lower：box 标量表达式运算符不支持"))?;
+            let lhs = lower_scalar_payload_expr(a, ty, b, scope, values)?;
+            let rhs = lower_scalar_payload_expr(b2, ty, b, scope, values)?;
+            Ok(IntExpr::Bin {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                line: *l,
+                col: *c,
+            })
+        }
+        Ex::Field(base, fname, fl, fc) => {
+            let Ex::Path(..) = base.as_ref() else {
+                return Err(SubsetError::new(*fl, *fc, "lower：box 字段投影基座须为绑定"));
+            };
+            let base_val = lower_value(base, b, scope, values)?;
+            let Value::Struct { fields, .. } = base_val else {
+                return Err(SubsetError::new(*fl, *fc, "lower：box 字段投影源非 struct"));
+            };
+            let (_, v) = fields
+                .into_iter()
+                .find(|(n, _)| n == fname)
+                .ok_or_else(|| SubsetError::new(*fl, *fc, "lower：box 字段投影不存在"))?;
+            match v {
+                Value::Int { ty: ity, expr } if ity == ty => Ok(expr),
+                _ => Err(SubsetError::new(
+                    *fl,
+                    *fc,
+                    "lower：box 字段投影类型非运行期标量",
+                )),
+            }
+        }
+        Ex::Deref(base, dl, dc) => {
+            let Ex::Path(n, nl, nc) = base.as_ref() else {
+                return Err(SubsetError::new(*dl, *dc, "lower：box 标量 deref 基座须为绑定"));
+            };
+            let src = lookup(scope, n, *nl, *nc)?;
+            if b.slots.get(src.0 as usize).map(|s| s.ty.clone())
+                != Some(Ty::Box(Box::new(ty.ir_ty())))
+            {
+                return Err(SubsetError::new(
+                    *dl,
+                    *dc,
+                    "lower：box 标量 deref 源类型与标注不符",
+                ));
+            }
+            let id = new_temp(b, ty.ir_ty());
+            b.body.push(Stmt::BindDeref {
+                local: id,
+                src,
+                line: *dl,
+                col: *dc,
+            });
+            Ok(IntExpr::Local(id))
+        }
+        _ => Err(SubsetError::new(
+            el,
+            ec,
+            "lower：box 标量表达式形态不支持",
+        )),
+    }
 }
 
 fn box_lit(e: &Ex, ty: BoxIntTy) -> Result<i128, SubsetError> {
