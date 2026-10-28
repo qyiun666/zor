@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S34-01	tests/stdout/cases/S34-01.zor	run	0	expected/S34-01.stdout	-	i64 constant expression
+S34-02	tests/stdout/cases/S34-02.zor	run	0	expected/S34-02.stdout	-	i64 negative literal
+S34-03	tests/stdout/cases/S34-03.zor	run	0	expected/S34-03.stdout	-	i64 negative variable
+S34-04	tests/stdout/cases/S34-04.zor	run	0	expected/S34-04.stdout	-	i64 arithmetic
+S34-05	tests/stdout/cases/S34-05.zor	run	0	expected/S34-05.stdout	-	i64 nested parens
+S34-06	tests/stdout/cases/S34-06.zor	run	0	expected/S34-06.stdout	-	i64 two variables
+S34-07	tests/stdout/cases/S34-07.zor	run	0	expected/S34-07.stdout	-	u8 arithmetic
+S34-08	tests/stdout/cases/S34-08.zor	run	0	expected/S34-08.stdout	-	u8 multiply
+S34-09	tests/stdout/cases/S34-09.zor	run	0	expected/S34-09.stdout	-	u32 arithmetic
+S34-10	tests/stdout/cases/S34-10.zor	run	0	expected/S34-10.stdout	-	u32 multiply
+S34-11	tests/stdout/cases/S34-11.zor	run	0	expected/S34-11.stdout	-	field projection i64
+S34-12	tests/stdout/cases/S34-12.zor	run	0	expected/S34-12.stdout	-	field projection in arithmetic
+S34-13	tests/stdout/cases/S34-13.zor	run	0	expected/S34-13.stdout	-	field projection u8
+S34-14	tests/stdout/cases/S34-14.zor	run	0	expected/S34-14.stdout	-	scalar deref i64
+S34-15	tests/stdout/cases/S34-15.zor	run	0	expected/S34-15.stdout	-	scalar deref u8
+S34-16	tests/stdout/cases/S34-16.zor	run	0	expected/S34-16.stdout	-	scalar deref in arithmetic
+S34-17	tests/stdout/cases/S34-17.zor	run	0	expected/S34-17.stdout	-	expression reinit
+S34-18	tests/stdout/cases/S34-18.zor	run	0	expected/S34-18.stdout	-	self-referential reinit
+S34-19	tests/stdout/cases/S34-19.zor	run	0	expected/S34-19.stdout	-	reinit after unbox
+S34-20	tests/stdout/cases/S34-20.zor	run	0	expected/S34-20.stdout	-	paren grouping regression
+S34-21	tests/stdout/cases/S34-21.zor	run	0	expected/S34-21.stdout	-	binding expression + intermediate temp
+S34-22	tests/stdout/cases/S34-22.zor	run	0	expected/S34-22.stdout	-	same expression two Boxes
+S34-23	tests/stdout/cases/S34-23.zor	run	0	expected/S34-23.stdout	-	field projection + deref mixed
+S34-24	tests/stdout/cases/S34-24.zor	run	0	expected/S34-24.stdout	-	Copy/move/unbox/drop with print equivalence
