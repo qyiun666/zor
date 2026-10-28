@@ -182,10 +182,11 @@ fn box_enum_constness_fail_closed() {
         "variable",
         b"A(1)\nA(1)\n",
     );
-    assert_rc1(
-        "expression",
+    // L3f：enum 构造表达式载荷已开放（原负控翻转）。
+    assert_runs(
         "enum E { A(i64) }\nfn main() {\n    let b: Box<E> = box A(1 + 2);\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "expression",
+        b"A(3)\n",
     );
     assert_rc1(
         "unannotated",

@@ -411,15 +411,17 @@ fn fail_closed_boundaries() {
         "array-expression-leaf",
         b"[2]\n",
     );
-    assert_rc1(
-        "enum-ctor-expression",
+    // L3f：顶层 enum 构造表达式载荷已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let x = 1;\n    let b: Box<E> = box V(x);\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "enum-ctor-expression",
+        b"V(1)\n",
     );
-    assert_rc1(
-        "enum-expression-leaf",
+    // L3f：enum 构造表达式叶已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let x = 1;\n    let b: Box<S> = box S { e: V(x) };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "enum-expression-leaf",
+        b"S { e: V(1) }\n",
     );
     assert_rc1(
         "bool-top-level",
