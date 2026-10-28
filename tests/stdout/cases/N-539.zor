@@ -1,0 +1,2 @@
+enum E { V(()) }
+fn main() { let b: Box<E> = box V(()); println(*b); }

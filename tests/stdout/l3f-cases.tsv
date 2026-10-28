@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S36-01	tests/stdout/cases/S36-01.zor	run	0	expected/S36-01.stdout	-	top-level enum ctor constant expression payload
+S36-02	tests/stdout/cases/S36-02.zor	run	0	expected/S36-02.stdout	-	top-level enum ctor variable argument
+S36-03	tests/stdout/cases/S36-03.zor	run	0	expected/S36-03.stdout	-	top-level enum ctor arithmetic argument
+S36-04	tests/stdout/cases/S36-04.zor	run	0	expected/S36-04.stdout	-	top-level enum ctor negation argument
+S36-05	tests/stdout/cases/S36-05.zor	run	0	expected/S36-05.stdout	-	top-level enum ctor field projection (literal binding)
+S36-06	tests/stdout/cases/S36-06.zor	run	0	expected/S36-06.stdout	-	top-level enum ctor field projection (runtime binding)
+S36-07	tests/stdout/cases/S36-07.zor	run	0	expected/S36-07.stdout	-	top-level enum ctor scalar deref argument
+S36-08	tests/stdout/cases/S36-08.zor	run	0	expected/S36-08.stdout	-	composite literal enum ctor variable leaf
+S36-09	tests/stdout/cases/S36-09.zor	run	0	expected/S36-09.stdout	-	composite literal enum ctor constant expression leaf
+S36-10	tests/stdout/cases/S36-10.zor	run	0	expected/S36-10.stdout	-	array literal enum ctor expression leaf
+S36-11	tests/stdout/cases/S36-11.zor	run	0	expected/S36-11.stdout	-	array literal multiple constant enum leaves (regression)
+S36-12	tests/stdout/cases/S36-12.zor	run	0	expected/S36-12.stdout	-	array of struct enum ctor expression leaf
+S36-13	tests/stdout/cases/S36-13.zor	run	0	expected/S36-13.stdout	-	nested struct enum ctor expression leaf
+S36-14	tests/stdout/cases/S36-14.zor	run	0	expected/S36-14.stdout	-	nested array enum ctor expression leaf
+S36-15	tests/stdout/cases/S36-15.zor	run	0	expected/S36-15.stdout	-	u8 enum payload expression argument
+S36-16	tests/stdout/cases/S36-16.zor	run	0	expected/S36-16.stdout	-	u32 enum payload expression argument
+S36-17	tests/stdout/cases/S36-17.zor	run	0	expected/S36-17.stdout	-	zero-field enum ctor (regression)
+S36-18	tests/stdout/cases/S36-18.zor	run	0	expected/S36-18.stdout	-	top-level enum ctor reinit expression
+S36-19	tests/stdout/cases/S36-19.zor	run	0	expected/S36-19.stdout	-	composite literal reinit enum ctor leaf
+S36-20	tests/stdout/cases/S36-20.zor	run	0	expected/S36-20.stdout	-	enum ctor leaf mixed with scalar expression leaf
+S36-21	tests/stdout/cases/S36-21.zor	run	0	expected/S36-21.stdout	-	same expression into two Box values
+S36-22	tests/stdout/cases/S36-22.zor	run	0	expected/S36-22.stdout	-	copy, move, unbox and drop combination
+S36-23	tests/stdout/cases/S36-23.zor	run	0	expected/S36-23.stdout	-	temp local stability with extra expressions
+S36-24	tests/stdout/cases/S36-24.zor	run	0	expected/S36-24.stdout	-	print equivalence with same-value enum constructors
