@@ -1,0 +1,1 @@
+fn main() { let b0: Box<u32> = box 2; let y = *b0 + 2; println(y); println(4); }

@@ -1,0 +1,2 @@
+struct P { x: u8 }
+fn main() { let p = P { x: 1 }; let b0: Box<u8> = box 2; let y = p.x + *b0; println(y); println(3); }

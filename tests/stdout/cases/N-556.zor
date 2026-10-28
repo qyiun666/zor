@@ -1,0 +1,2 @@
+struct P { x: u64 }
+fn main() { let p = P { x: 1 }; let y = p.x + 1; println(y); }

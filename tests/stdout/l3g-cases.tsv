@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S37-01	tests/stdout/cases/S37-01.zor	run	0	expected/S37-01.stdout	-	i64 field arithmetic (literal binding)
+S37-02	tests/stdout/cases/S37-02.zor	run	0	expected/S37-02.stdout	-	i64 field arithmetic (runtime binding)
+S37-03	tests/stdout/cases/S37-03.zor	run	0	expected/S37-03.stdout	-	i64 deref arithmetic
+S37-04	tests/stdout/cases/S37-04.zor	run	0	expected/S37-04.stdout	-	u8 field arithmetic
+S37-05	tests/stdout/cases/S37-05.zor	run	0	expected/S37-05.stdout	-	u32 field arithmetic
+S37-06	tests/stdout/cases/S37-06.zor	run	0	expected/S37-06.stdout	-	u8 deref arithmetic
+S37-07	tests/stdout/cases/S37-07.zor	run	0	expected/S37-07.stdout	-	u32 deref arithmetic
+S37-08	tests/stdout/cases/S37-08.zor	run	0	expected/S37-08.stdout	-	nested arithmetic with field
+S37-09	tests/stdout/cases/S37-09.zor	run	0	expected/S37-09.stdout	-	field plus deref arithmetic
+S37-10	tests/stdout/cases/S37-10.zor	run	0	expected/S37-10.stdout	-	two field operands
+S37-11	tests/stdout/cases/S37-11.zor	run	0	expected/S37-11.stdout	-	negated field operand
+S37-12	tests/stdout/cases/S37-12.zor	run	0	expected/S37-12.stdout	-	field modulo
+S37-13	tests/stdout/cases/S37-13.zor	run	0	expected/S37-13.stdout	-	deep field and deref arithmetic
+S37-14	tests/stdout/cases/S37-14.zor	run	0	expected/S37-14.stdout	-	chained let with field arithmetic
+S37-15	tests/stdout/cases/S37-15.zor	run	0	expected/S37-15.stdout	-	bare deref read plus chain (regression)
+S37-16	tests/stdout/cases/S37-16.zor	run	0	expected/S37-16.stdout	-	let and box payload same expression
+S37-17	tests/stdout/cases/S37-17.zor	run	0	expected/S37-17.stdout	-	constant Box deref arithmetic
+S37-18	tests/stdout/cases/S37-18.zor	run	0	expected/S37-18.stdout	-	runtime Box deref arithmetic
+S37-19	tests/stdout/cases/S37-19.zor	run	0	expected/S37-19.stdout	-	u8 field plus deref arithmetic
+S37-20	tests/stdout/cases/S37-20.zor	run	0	expected/S37-20.stdout	-	same field used twice independently
+S37-21	tests/stdout/cases/S37-21.zor	run	0	expected/S37-21.stdout	-	field plus constant expression
+S37-22	tests/stdout/cases/S37-22.zor	run	0	expected/S37-22.stdout	-	chained field and deref lets
+S37-23	tests/stdout/cases/S37-23.zor	run	0	expected/S37-23.stdout	-	deep combined arithmetic modulo
+S37-24	tests/stdout/cases/S37-24.zor	run	0	expected/S37-24.stdout	-	print equivalence with constants

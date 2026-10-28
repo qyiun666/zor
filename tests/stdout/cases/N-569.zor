@@ -1,0 +1,1 @@
+fn main() { let b0: Box<bool> = box true; let y = *b0 + 1; println(y); }
