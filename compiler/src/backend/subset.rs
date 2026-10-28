@@ -121,8 +121,9 @@ fn check_block(
     types: &TypeTable,
     prog: &Prog,
 ) -> Result<(), SubsetError> {
-    // L3b：常量复合字面量初始化的绑定名（仅旁路登记；遮蔽即失效）。
-    let mut const_composites: HashSet<String> = HashSet::new();
+    // L3c：可物化复合绑定名（整棵 box 载荷旁路；遮蔽即失效）与编译期标量绑定名。
+    let mut live_composites: HashSet<String> = HashSet::new();
+    let mut scalar_consts: HashSet<String> = HashSet::new();
     if let Some(tail) = &blk.tail {
         if !matches!(tail.as_ref(), Ex::UnitLit(_, _)) {
             let (l, c) = expr_span(tail);
@@ -198,14 +199,34 @@ fn check_block(
                     }
                 };
                 let kind =
-                    let_init_kind(init, &ann_kind, bindings, &const_composites, types, prog)?;
+                    let_init_kind(init, &ann_kind, bindings, &live_composites, types, prog)?;
                 let kind = unify_ann(ann_kind, kind, init, *l, *c)?;
-                if matches!(kind, BindingKind::Composite(_))
-                    && const_composite_literal(init, types, prog)
-                {
-                    const_composites.insert(name.clone());
+                if let BindingKind::Composite(t) = &kind {
+                    let live = is_composite_payload_ty(t)
+                        && !is_enum_payload_ty(t, prog)
+                        && l2k_payload_ty(t, prog)
+                        && materializable_node(
+                            init,
+                            t,
+                            bindings,
+                            &live_composites,
+                            &scalar_consts,
+                            types,
+                            prog,
+                        );
+                    if live {
+                        live_composites.insert(name.clone());
+                    } else {
+                        live_composites.remove(name);
+                    }
+                    scalar_consts.remove(name);
                 } else {
-                    const_composites.remove(name);
+                    live_composites.remove(name);
+                    if scalar_const_binding(init, &kind, &scalar_consts) {
+                        scalar_consts.insert(name.clone());
+                    } else {
+                        scalar_consts.remove(name);
+                    }
                 }
                 bindings.insert(name.clone(), kind);
             }
@@ -284,7 +305,7 @@ fn check_block(
                                 inner,
                                 types.expr_ty(rhs),
                                 bindings,
-                                &const_composites,
+                                &live_composites,
                                 types,
                                 prog,
                             )
@@ -315,7 +336,7 @@ fn let_init_kind(
     init: &Ex,
     ann: &Option<BindingKind>,
     bindings: &HashMap<String, BindingKind>,
-    const_composites: &HashSet<String>,
+    live_composites: &HashSet<String>,
     types: &TypeTable,
     prog: &Prog,
 ) -> Result<BindingKind, SubsetError> {
@@ -389,9 +410,9 @@ fn let_init_kind(
                     return Ok(BindingKind::Box(p.clone()));
                 }
             }
-            // L3b：顶层整棵常量复合变量（仅常量字面量初始化；struct／array）。
+            // L3c：顶层整棵可物化复合变量（任意叶来源；struct／array）。
             if let (Some(p), Ex::Path(n, _, _)) = (&ann_payload, inner.as_ref()) {
-                if whole_const_composite_path(n, p, bindings, const_composites, prog)
+                if whole_live_composite_path(n, p, bindings, live_composites, prog)
                     && matches!(types.expr_ty(init), Some(Ty::BoxTy(t)) if **t == *p)
                 {
                     return Ok(BindingKind::Box(p.clone()));
@@ -408,7 +429,7 @@ fn let_init_kind(
                     );
                     let ok = literal
                         && (payload_init_ok(inner, types, prog)
-                            || live_composite_ok(inner, p, bindings, types, prog));
+                            || live_composite_ok(inner, p, bindings, live_composites, types, prog));
                     if !ok {
                         return Err(SubsetError::new(*il, *ic, "box 载荷须为字面量常量"));
                     }
@@ -582,24 +603,107 @@ fn scalar_binding_matches(p: &Ty, n: &str, bindings: &HashMap<String, BindingKin
         && prim_kind(pname).is_some_and(|k| bindings.get(n) == Some(&k))
 }
 
-/// L3b：常量复合字面量初始化（无变量叶／表达式叶）——旁路登记条件。
-fn const_composite_literal(init: &Ex, types: &TypeTable, prog: &Prog) -> bool {
-    matches!(init, Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..))
-        && payload_init_ok(init, types, prog)
+/// L3c：可物化叶/节点——常量叶、运行期标量叶、enum 值叶、物化复合 Path 叶、
+/// 嵌套字面量；绑定内表达式叶仅限 i64／u8／u32 与白名单 enum 构造叶。
+fn materializable_node(
+    e: &Ex,
+    want: &Ty,
+    bindings: &HashMap<String, BindingKind>,
+    live: &HashSet<String>,
+    scalar_consts: &HashSet<String>,
+    types: &TypeTable,
+    prog: &Prog,
+) -> bool {
+    if payload_init_ok(e, types, prog) {
+        return true;
+    }
+    match (e, want) {
+        (Ex::Record(_, fields, _, _), Ty::Named(name)) => {
+            let Some(decl) = prog.structs.iter().find(|s| &s.name == name) else {
+                return false;
+            };
+            decl.fields.iter().all(|(fname, fty, _, _)| {
+                fields
+                    .iter()
+                    .find(|(n, _)| n == fname)
+                    .is_some_and(|(_, v)| {
+                        materializable_node(v, fty, bindings, live, scalar_consts, types, prog)
+                    })
+            })
+        }
+        (Ex::ArrLit(es, _, _), Ty::Arr(elem, n)) => {
+            es.len() as u64 == *n
+                && es.iter().all(|x| {
+                    materializable_node(x, elem, bindings, live, scalar_consts, types, prog)
+                })
+        }
+        (Ex::Path(n, _, _), _) => {
+            let Some(k) = bindings.get(n) else {
+                return false;
+            };
+            if is_scalar_payload_ty(want) {
+                // 运行期标量任意来源；编译期标量必须是编译期绑定。
+                if matches!(want, Ty::Prim("i64") | Ty::Prim("u8") | Ty::Prim("u32")) {
+                    return scalar_kind_matches(want, n, bindings);
+                }
+                return scalar_kind_matches(want, n, bindings) && scalar_consts.contains(n);
+            }
+            if is_enum_payload_ty(want, prog) {
+                return matches!(k, BindingKind::Composite(t) if t == want);
+            }
+            if is_composite_payload_ty(want) {
+                return matches!(k, BindingKind::Composite(t) if t == want) && live.contains(n);
+            }
+            false
+        }
+        // 绑定内 enum 构造叶（实参已求值；字段白名单由 l2k 保证）。
+        (Ex::Call(..), _) if is_enum_payload_ty(want, prog) => l2k_payload_ty(want, prog),
+        // 绑定内运行期标量表达式（算术／字段读取／*b）。
+        (_, _) if matches!(want, Ty::Prim("i64") | Ty::Prim("u8") | Ty::Prim("u32")) => true,
+        _ => false,
+    }
 }
 
-/// L3b：顶层整棵常量复合 Path 闸（struct／array；非 enum）。
-fn whole_const_composite_path(
+/// L3c：物化标量叶的绑定种类口径（含 bool 等 L2t 白名单；区别于顶层 Box 标量白名单）。
+fn scalar_kind_matches(want: &Ty, n: &str, bindings: &HashMap<String, BindingKind>) -> bool {
+    let Ty::Prim(pname) = want else {
+        return false;
+    };
+    is_scalar_payload_ty(want)
+        && prim_kind(pname).is_some_and(|k| bindings.get(n) == Some(&k))
+}
+
+/// L3c：编译期标量绑定判定（与 lower 的 slot.konst 同口径）。
+fn scalar_const_binding(init: &Ex, kind: &BindingKind, scalar_consts: &HashSet<String>) -> bool {
+    match kind {
+        BindingKind::I8
+        | BindingKind::I16
+        | BindingKind::I32
+        | BindingKind::U16
+        | BindingKind::U64
+        | BindingKind::Bool
+        | BindingKind::F32
+        | BindingKind::F64 => match init {
+            Ex::Deref(..) => false,
+            Ex::Path(n, _, _) => scalar_consts.contains(n),
+            _ => true,
+        },
+        _ => false,
+    }
+}
+
+/// L3c：顶层整棵可物化复合 Path 闸（struct／array；非 enum）。
+fn whole_live_composite_path(
     n: &str,
     p: &Ty,
     bindings: &HashMap<String, BindingKind>,
-    const_composites: &HashSet<String>,
+    live_composites: &HashSet<String>,
     prog: &Prog,
 ) -> bool {
     is_composite_payload_ty(p)
         && !is_enum_payload_ty(p, prog)
         && l2k_payload_ty(p, prog)
-        && const_composites.contains(n)
+        && live_composites.contains(n)
         && matches!(bindings.get(n), Some(BindingKind::Composite(t)) if t == p)
 }
 
@@ -628,7 +732,7 @@ fn box_reinit_ok(
     inner: &Ex,
     payload: Option<&Ty>,
     bindings: &HashMap<String, BindingKind>,
-    const_composites: &HashSet<String>,
+    live_composites: &HashSet<String>,
     types: &TypeTable,
     prog: &Prog,
 ) -> bool {
@@ -644,20 +748,20 @@ fn box_reinit_ok(
         }
         // L2v：变量枚举重初始化（Copy；类型表二次核对）。
         // L3a：顶层标量变量重初始化（Copy；bool／整棵载荷仍 false）。
-        // L3b：顶层整棵常量复合变量重初始化（仅字面量初始化）。
+        // L3c：顶层整棵可物化复合变量重初始化（任意叶来源）。
         Ex::Path(n, _, _) => {
             (is_enum_payload_ty(p, prog) && types.expr_ty(inner) == Some(p.as_ref()))
                 || (l2f_payload_ty(p).is_some()
                     && scalar_binding_matches(p, n, bindings)
                     && types.expr_ty(inner) == Some(p.as_ref()))
-                || (whole_const_composite_path(n, p, bindings, const_composites, prog)
+                || (whole_live_composite_path(n, p, bindings, live_composites, prog)
                     && types.expr_ty(inner) == Some(p.as_ref()))
         }
         Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..) => {
             is_composite_payload_ty(p)
                 && l2k_payload_ty(p, prog)
                 && (payload_init_ok(inner, types, prog)
-                    || live_composite_ok(inner, p, bindings, types, prog))
+                    || live_composite_ok(inner, p, bindings, live_composites, types, prog))
         }
         _ => false,
     }
@@ -674,12 +778,13 @@ fn is_enum_payload_ty(t: &Ty, prog: &Prog) -> bool {
         && l2k_payload_ty(t, prog)
 }
 
-/// L2y：任意既有复合深度的 live 形态——常量子树、同型 enum 变量叶或
-/// L2z 标量变量叶；表达式构造叶／整棵变量载荷仍 fallthrough false。
+/// L2y：任意既有复合深度的 live 形态——常量子树、同型 enum 变量叶、
+/// L2z 标量变量叶或 L3c 可物化复合 Path 叶；表达式构造叶仍 fallthrough false。
 fn live_composite_ok(
     e: &Ex,
     payload: &Ty,
     bindings: &HashMap<String, BindingKind>,
+    live: &HashSet<String>,
     types: &TypeTable,
     prog: &Prog,
 ) -> bool {
@@ -692,6 +797,9 @@ fn live_composite_ok(
     if live_scalar_ok(e, payload, bindings, types) {
         return true;
     }
+    if live_composite_leaf_ok(e, payload, bindings, live, types, prog) {
+        return true;
+    }
     match (e, payload) {
         (Ex::Record(_, fields, _, _), Ty::Named(name)) => {
             let Some(decl) = prog.structs.iter().find(|s| &s.name == name) else {
@@ -701,17 +809,37 @@ fn live_composite_ok(
                 let Some((_, v)) = fields.iter().find(|(n, _)| n == fname) else {
                     return false;
                 };
-                live_composite_ok(v, fty, bindings, types, prog)
+                live_composite_ok(v, fty, bindings, live, types, prog)
             })
         }
         (Ex::ArrLit(es, _, _), Ty::Arr(elem, n)) => {
             es.len() as u64 == *n
                 && es.iter().all(|x| {
-                    live_composite_ok(x, elem, bindings, types, prog)
+                    live_composite_ok(x, elem, bindings, live, types, prog)
                 })
         }
         _ => false,
     }
+}
+
+/// L3c：直接字面量中的整棵复合 Path 叶（可物化绑定；非 enum）。
+fn live_composite_leaf_ok(
+    e: &Ex,
+    want: &Ty,
+    bindings: &HashMap<String, BindingKind>,
+    live: &HashSet<String>,
+    types: &TypeTable,
+    prog: &Prog,
+) -> bool {
+    let Ex::Path(n, _, _) = e else {
+        return false;
+    };
+    types.expr_ty(e) == Some(want)
+        && is_composite_payload_ty(want)
+        && !is_enum_payload_ty(want, prog)
+        && l2k_payload_ty(want, prog)
+        && live.contains(n)
+        && matches!(bindings.get(n), Some(BindingKind::Composite(t)) if t == want)
 }
 
 /// L2x：直接 enum 变量叶——Path 绑定为同型枚举值（Copy），enum 字段全标量。

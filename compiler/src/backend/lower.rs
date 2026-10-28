@@ -71,14 +71,14 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
         let mut body: Vec<Stmt> = Vec::new();
         let mut scope: HashMap<String, LocalId> = HashMap::new();
         let mut values: HashMap<String, Value> = HashMap::new();
-        // L3b：常量复合字面量初始化登记（整棵 box 载荷旁路；遮蔽即失效）。
-        let mut const_composites: HashMap<String, ConstValue> = HashMap::new();
+        // L3c：可物化复合绑定树（整棵 box 载荷旁路；遮蔽即失效）。
+        let mut live_composites: HashMap<String, ConstValue> = HashMap::new();
         let mut last_pos = f.span;
         for st in &f.body.stmts {
             match st {
                 St::Let(name, _ann, init, l, c) => {
                     last_pos = (*l, *c);
-                    const_composites.remove(name);
+                    live_composites.remove(name);
                     let init_ty = types
                         .expr_ty(init)
                         .ok_or_else(|| SubsetError::new(*l, *c, "lower：let 初值缺少 type table 记录"))?
@@ -100,17 +100,24 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             };
                             lower_value(init, &mut b, &scope, &values)?
                         };
-                        values.insert(name.clone(), value);
-                        let literal = matches!(init, Ex::Record(..) | Ex::ArrLit(..) | Ex::Call(..));
-                        let is_enum = matches!(
-                            &init_ty,
-                            AstTy::Named(n) if prog.enums.iter().any(|e| &e.name == n)
-                        );
-                        if literal && !is_enum {
-                            if let Ok(cv) = const_value(init, &init_ty, types, &slots, &scope, prog) {
-                                const_composites.insert(name.clone(), cv);
-                            }
+                        let tree = if let Ex::Path(n, _, _) = init {
+                            live_composites.get(n).cloned()
+                        } else {
+                            materialize_node(
+                                init,
+                                &value,
+                                &init_ty,
+                                &live_composites,
+                                types,
+                                &slots,
+                                &scope,
+                                prog,
+                            )
+                        };
+                        if let Some(cv) = tree {
+                            live_composites.insert(name.clone(), cv);
                         }
+                        values.insert(name.clone(), value);
                         scope.remove(name);
                         continue;
                     }
@@ -190,7 +197,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     &slots,
                                     &scope,
                                     &values,
-                                    &const_composites,
+                                    &live_composites,
                                     prog,
                                 )?;
                                 register_payload(&payload, prog, &mut payload_defs)?;
@@ -490,7 +497,7 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                                     &slots,
                                     &scope,
                                     &values,
-                                    &const_composites,
+                                    &live_composites,
                                     prog,
                                 )?;
                                 register_payload(&payload, prog, &mut payload_defs)?;
@@ -1380,7 +1387,7 @@ fn box_payload_ir_ty(t: &AstTy, prog: &Prog) -> Option<Ty> {
     }
 }
 
-/// L3b：整棵常量复合旁路值的顶层形状核对（struct 名／array 元素与长度）。
+/// L3c：整棵可物化复合值的顶层形状核对（struct 名／array 元素与长度）。
 fn const_composite_shape_ok(cv: &ConstValue, want: &AstTy, prog: &Prog) -> bool {
     let Some(ir) = box_payload_ir_ty(want, prog) else {
         return false;
@@ -1394,9 +1401,127 @@ fn const_composite_shape_ok(cv: &ConstValue, want: &AstTy, prog: &Prog) -> bool 
     }
 }
 
+/// L3c：从绑定初始化器与已降级 Value 构建物化树（box 时刻快照的初始化配方）。
+/// 常量优先；运行期标量→ScalarLive；enum 值→EnumLive；复合 Path→克隆 live 树。
+fn materialize_node(
+    ast: &Ex,
+    val: &Value,
+    want: &AstTy,
+    live: &HashMap<String, ConstValue>,
+    types: &TypeTable,
+    slots: &[Slot],
+    scope: &HashMap<String, LocalId>,
+    prog: &Prog,
+) -> Option<ConstValue> {
+    if let Ok(cv) = const_value(ast, want, types, slots, scope, prog) {
+        return Some(cv);
+    }
+    // 编译期标量 Path（bool／窄整型／浮点）：const_value 拒绝 Path，改取槽位常量。
+    if let Ex::Path(n, nl, nc) = ast {
+        if let Ok(id) = lookup(scope, n, *nl, *nc) {
+            if let Some(slot) = slots.get(id.0 as usize) {
+                if ast_to_ir(want).as_ref() == Some(&slot.ty) {
+                    if let Some(val) = &slot.konst {
+                        if let Some(cv) = constval_to_constvalue(val) {
+                            return Some(cv);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    match (ast, want, val) {
+        (
+            Ex::Record(_, afields, _, _),
+            AstTy::Named(name),
+            Value::Struct { name: vname, fields: vfields },
+        ) if vname == name => {
+            let decl = prog.structs.iter().find(|s| &s.name == name)?;
+            let mut out = Vec::with_capacity(decl.fields.len());
+            for (fname, fty, _, _) in &decl.fields {
+                let fa = &afields.iter().find(|(n, _)| n == fname)?.1;
+                let fv = &vfields.iter().find(|(n, _)| n == fname)?.1;
+                let ir = box_payload_ir_ty(fty, prog)?;
+                out.push((
+                    fname.clone(),
+                    ir,
+                    materialize_node(fa, fv, fty, live, types, slots, scope, prog)?,
+                ));
+            }
+            Some(ConstValue::Struct { name: name.clone(), fields: out })
+        }
+        (Ex::ArrLit(es, _, _), AstTy::Arr(elem, n), Value::Array(vs)) => {
+            if es.len() as u64 != *n || vs.len() as u64 != *n {
+                return None;
+            }
+            let ir = box_payload_ir_ty(elem, prog)?;
+            let mut out = Vec::with_capacity(vs.len());
+            for (x, v) in es.iter().zip(vs.iter()) {
+                out.push(materialize_node(x, v, elem, live, types, slots, scope, prog)?);
+            }
+            Some(ConstValue::Array { elem: ir, values: out })
+        }
+        (Ex::Path(n, _, _), _, Value::Struct { .. } | Value::Array { .. }) => {
+            let cv = live.get(n)?;
+            if const_composite_shape_ok(cv, want, prog) {
+                Some(cv.clone())
+            } else {
+                None
+            }
+        }
+        (_, _, Value::Int { ty, expr }) => {
+            let ir = ast_to_ir(want)?;
+            if ir_int_ty(&ir) == Some(*ty) {
+                Some(ConstValue::ScalarLive { ty: *ty, expr: expr.clone() })
+            } else {
+                None
+            }
+        }
+        (_, _, Value::Enum { init: Some(init), .. }) => {
+            let AstTy::Named(name) = want else {
+                return None;
+            };
+            if &init.name != name {
+                return None;
+            }
+            if !prog.enums.iter().any(|e| &e.name == name) {
+                return None;
+            }
+            if init.fields.iter().any(|(t, _)| !is_enum_scalar_field_ir(t)) {
+                return None;
+            }
+            Some(ConstValue::EnumLive { init: init.clone(), value: val.clone() })
+        }
+        _ => None,
+    }
+}
+
+/// L3c：直接字面量中的整棵可物化复合 Path 叶。
+fn live_composite_leaf(
+    e: &Ex,
+    want: &AstTy,
+    types: &TypeTable,
+    live: &HashMap<String, ConstValue>,
+    prog: &Prog,
+) -> Result<Option<ConstValue>, SubsetError> {
+    let Ex::Path(n, _, _) = e else {
+        return Ok(None);
+    };
+    if types.expr_ty(e) != Some(want) {
+        return Ok(None);
+    }
+    let Some(cv) = live.get(n) else {
+        return Ok(None);
+    };
+    if !const_composite_shape_ok(cv, want, prog) {
+        return Ok(None);
+    }
+    Ok(Some(cv.clone()))
+}
+
 /// L2v：`box e` 分派——变量枚举走 EnumLive 堆副本配方，其余沿用常量树。
 /// 变量值缺失配方（init=None）时回落到常量通道，以既有判词 fail-closed。
-/// L3b：整棵常量复合变量走 `const_composites` 旁路（仅字面量初始化登记）。
+/// L3c：整棵可物化复合变量走 `live_composites` 树旁路（任意叶来源）。
 fn box_enum_live_or_const(
     inner: &Ex,
     payload_ast: &AstTy,
@@ -1404,7 +1529,7 @@ fn box_enum_live_or_const(
     slots: &[Slot],
     scope: &HashMap<String, LocalId>,
     values: &HashMap<String, Value>,
-    const_composites: &HashMap<String, ConstValue>,
+    live_composites: &HashMap<String, ConstValue>,
     prog: &Prog,
 ) -> Result<(BoxConst, ConstVal), SubsetError> {
     if let Ex::Path(n, nl, nc) = inner {
@@ -1429,8 +1554,8 @@ fn box_enum_live_or_const(
             let box_const = BoxConst::EnumLive { init: init.clone(), value: value.clone() };
             return Ok((box_const, ConstVal::EnumLive(value)));
         }
-        // L3b：顶层整棵常量复合变量（仅常量字面量初始化登记）。
-        if let Some(cv) = const_composites.get(n) {
+        // L3c：顶层整棵可物化复合变量（任意叶来源）。
+        if let Some(cv) = live_composites.get(n) {
             if types.expr_ty(inner) != Some(payload_ast) {
                 return Err(SubsetError::new(*nl, *nc, "lower：box 变量载荷类型记录不符"));
             }
@@ -1448,14 +1573,23 @@ fn box_enum_live_or_const(
         Ok(cv) => return Ok((BoxConst::Composite(cv.clone()), ConstVal::Composite(cv))),
         Err(e) => e,
     };
-    // L2x：一层变量 enum 叶——常量通道失败后回落 live 构建；失败仍报原常量判词。
-    match composite_value_live(inner, payload_ast, types, slots, scope, values, prog) {
+    // L2x／L3c：常量通道失败后回落 live 构建；失败仍报原常量判词。
+    match composite_value_live(
+        inner,
+        payload_ast,
+        types,
+        slots,
+        scope,
+        values,
+        live_composites,
+        prog,
+    ) {
         Ok(cv) => Ok((BoxConst::Composite(cv.clone()), ConstVal::Composite(cv))),
         Err(_) => Err(const_err),
     }
 }
 
-/// L2y：任意既有复合深度的 live 树——常量子树优先，enum 变量叶可为任意深度。
+/// L2y：任意既有复合深度的 live 树——常量子树优先，enum／标量／复合变量叶可为任意深度。
 fn composite_value_live(
     e: &Ex,
     want: &AstTy,
@@ -1463,14 +1597,15 @@ fn composite_value_live(
     slots: &[Slot],
     scope: &HashMap<String, LocalId>,
     values: &HashMap<String, Value>,
+    live: &HashMap<String, ConstValue>,
     prog: &Prog,
 ) -> Result<ConstValue, SubsetError> {
-    live_value(e, want, types, slots, scope, values, prog)?
+    live_value(e, want, types, slots, scope, values, live, prog)?
         .ok_or_else(|| SubsetError::new(0, 0, "lower：box 复合载荷形态不符"))
 }
 
-/// 单节点 live 构建：常量子树 → 直接 enum 变量叶 → 递归 struct／array。
-/// 变量标量叶／表达式构造叶／整棵变量载荷在非 Record／ArrLit 形态返回 None。
+/// 单节点 live 构建：常量子树 → enum 变量叶 → 标量变量叶 → 复合变量叶 → 递归 struct／array。
+/// 表达式构造叶／非物化整棵载荷在非 Record／ArrLit 形态返回 None。
 fn live_value(
     e: &Ex,
     want: &AstTy,
@@ -1478,6 +1613,7 @@ fn live_value(
     slots: &[Slot],
     scope: &HashMap<String, LocalId>,
     values: &HashMap<String, Value>,
+    live: &HashMap<String, ConstValue>,
     prog: &Prog,
 ) -> Result<Option<ConstValue>, SubsetError> {
     let (l, c) = subset::expr_span(e);
@@ -1496,6 +1632,9 @@ fn live_value(
     if let Some(cv) = live_scalar_leaf(e, want, types, slots, scope)? {
         return Ok(Some(cv));
     }
+    if let Some(cv) = live_composite_leaf(e, want, types, live, prog)? {
+        return Ok(Some(cv));
+    }
     match (e, want) {
         (Ex::Record(name, fields, rl, rc), AstTy::Named(want_name)) if name == want_name => {
             let decl = struct_decl(prog, name)?;
@@ -1510,7 +1649,7 @@ fn live_value(
                 let ir = box_payload_ir_ty(fty, prog).ok_or_else(|| {
                     SubsetError::new(*rl, *rc, format!("lower：字段 '{}' 类型不在载荷白名单", fname))
                 })?;
-                let cv = live_value(v, fty, types, slots, scope, values, prog)?
+                let cv = live_value(v, fty, types, slots, scope, values, live, prog)?
                     .ok_or_else(|| SubsetError::new(*rl, *rc, "lower：box 复合载荷形态不符"))?;
                 out.push((fname.clone(), ir, cv));
             }
@@ -1527,7 +1666,7 @@ fn live_value(
                 .ok_or_else(|| SubsetError::new(*al, *ac, "lower：数组元素类型不在载荷白名单"))?;
             let mut out = Vec::with_capacity(es.len());
             for x in es {
-                let cv = live_value(x, elem, types, slots, scope, values, prog)?
+                let cv = live_value(x, elem, types, slots, scope, values, live, prog)?
                     .ok_or_else(|| SubsetError::new(*al, *ac, "lower：box 复合载荷形态不符"))?;
                 out.push(cv);
             }
