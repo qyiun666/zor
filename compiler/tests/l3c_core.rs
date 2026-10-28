@@ -214,15 +214,17 @@ fn copy_in_snapshot_and_ownership() {
 
 #[test]
 fn fail_closed_boundaries() {
-    assert_rc1(
-        "nested-expression",
+    // L3e：嵌套复合字面量表达式叶已开放（原负控翻转）。
+    assert_runs(
         "struct I { x: i64 }\nstruct O { i: I }\nfn main() {\n    let b: Box<O> = box O { i: I { x: 1 + 2 } };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "nested-expression",
+        b"O { i: I { x: 3 } }\n",
     );
-    assert_rc1(
-        "array-expression",
+    // L3e：array 复合字面量表达式叶已开放（原负控翻转）。
+    assert_runs(
         "fn main() {\n    let x = 1;\n    let b: Box<[i64; 1]> = box [x + 1];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "array-expression",
+        b"[2]\n",
     );
     assert_rc1(
         "add-expression",

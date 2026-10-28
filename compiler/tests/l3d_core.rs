@@ -399,15 +399,17 @@ fn fail_closed_boundaries() {
         "struct P { x: i64 }\nfn main() {\n    let b0: Box<P> = box P { x: 1 };\n    let b: Box<P> = box *b0;\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "struct-expression-leaf",
+    // L3e：struct 复合字面量表达式叶已开放（原负控翻转）。
+    assert_runs(
         "struct S { x: i64 }\nfn main() {\n    let x = 1;\n    let b: Box<S> = box S { x: x + 1 };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "struct-expression-leaf",
+        b"S { x: 2 }\n",
     );
-    assert_rc1(
-        "array-expression-leaf",
+    // L3e：array 复合字面量表达式叶已开放（原负控翻转）。
+    assert_runs(
         "fn main() {\n    let x = 1;\n    let b: Box<[i64; 1]> = box [x + 1];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "array-expression-leaf",
+        b"[2]\n",
     );
     assert_rc1(
         "enum-ctor-expression",
