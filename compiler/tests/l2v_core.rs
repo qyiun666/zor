@@ -209,15 +209,16 @@ fn bool_and_float_variables_including_special_values() {
 
 #[test]
 fn variable_payload_boundaries_stay_fail_closed() {
-    assert_rc1(
-        "direct-expression",
+    // L3f：顶层 enum 构造表达式载荷已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let x: i64 = 7;\n    let b: Box<E> = box V(x);\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "direct-expression",
+        b"V(7)\n",
     );
-    assert_rc1(
-        "direct-arith",
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let b: Box<E> = box V(1 + 2);\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "direct-arith",
+        b"V(3)\n",
     );
     assert_rc1(
         "unannotated",
@@ -241,10 +242,11 @@ fn variable_payload_boundaries_stay_fail_closed() {
         "struct P { x: i64 }\nenum E { V(P) }\nfn main() {\n    let e = V(P { x: 1 });\n    let b: Box<E> = box e;\n    println(*b);\n}\n",
         "let 类型标注",
     );
-    assert_rc1(
-        "reinit-expression",
+    // L3f：enum 构造表达式重初始化已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let e = V(1);\n    let b: Box<E> = box e;\n    b = box V(1 + 2);\n    println(*b);\n}\n",
-        "赋值语句",
+        "reinit-expression",
+        b"V(3)\n",
     );
     assert_rc1(
         "let-deref",

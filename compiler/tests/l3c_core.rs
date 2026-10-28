@@ -248,10 +248,11 @@ fn fail_closed_boundaries() {
         "box-field",
         b"1\n",
     );
-    assert_rc1(
-        "box-ctor",
+    // L3f：顶层 enum 构造表达式载荷已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let x = 1;\n    let b: Box<E> = box V(x);\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "box-ctor",
+        b"V(1)\n",
     );
     assert_rc1(
         "deref-narrow-direct",

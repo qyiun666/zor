@@ -335,26 +335,26 @@ fn print_equivalence() {
 
 #[test]
 fn fail_closed_boundaries() {
-    // ⑤f-2b：enum 构造表达式叶维持 fail-closed。
-    assert_rc1(
-        "enum-ctor",
+    // L3f：enum 构造表达式叶已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let x = 1;\n    let b: Box<E> = box V(x);\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "enum-ctor",
+        b"V(1)\n",
     );
-    assert_rc1(
-        "enum-ctor-field",
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let x = 1;\n    let b: Box<S> = box S { e: V(x) };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "enum-ctor-field",
+        b"S { e: V(1) }\n",
     );
-    assert_rc1(
-        "enum-ctor-array",
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let b: Box<[E; 1]> = box [V(1 + 2)];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "enum-ctor-array",
+        b"[V(3)]\n",
     );
-    assert_rc1(
-        "enum-ctor-nested",
+    assert_runs(
         "enum E { V(i64) }\nstruct I { e: E }\nstruct O { i: I }\nfn main() {\n    let x = 1;\n    let b: Box<O> = box O { i: I { e: V(x) } };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "enum-ctor-nested",
+        b"O { i: I { e: V(1) } }\n",
     );
     assert_rc1(
         "float-expr",

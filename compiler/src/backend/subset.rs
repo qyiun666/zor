@@ -840,9 +840,52 @@ fn is_enum_payload_ty(t: &Ty, prog: &Prog) -> bool {
         && l2k_payload_ty(t, prog)
 }
 
+/// L3f：enum 构造表达式叶——变体载荷仅标量；运行期 i64／u8／u32 实参
+/// 复用 L3d `scalar_expr_ok`，其余宽度仍仅常量实参（既有 `is_const_scalar_arg`）。
+fn enum_ctor_expr_ok(
+    e: &Ex,
+    want: &Ty,
+    bindings: &HashMap<String, BindingKind>,
+    types: &TypeTable,
+    prog: &Prog,
+) -> bool {
+    if types.expr_ty(e) != Some(want) {
+        return false;
+    }
+    let (Ex::Call(callee, args, _, _), Ty::Named(en)) = (e, want) else {
+        return false;
+    };
+    let Some(decl) = prog.enums.iter().find(|x| &x.name == en) else {
+        return false;
+    };
+    let Ex::Path(v, _, _) = callee.as_ref() else {
+        return false;
+    };
+    let var = match v.rsplit_once("::") {
+        Some((q, r)) if q == en.as_str() => r,
+        Some(_) => return false,
+        None => v.as_str(),
+    };
+    let Some((_, payload, _, _)) = decl.variants.iter().find(|(n, _, _, _)| n.as_str() == var) else {
+        return false;
+    };
+    payload.len() == args.len()
+        && payload.iter().zip(args.iter()).all(|((fty, _, _), arg)| {
+            if !is_scalar_payload_ty(fty) {
+                return false;
+            }
+            match fty {
+                Ty::Prim("i64" | "u8" | "u32") => {
+                    scalar_expr_ok(arg, fty, bindings, types, prog)
+                }
+                _ => is_const_scalar_arg(arg),
+            }
+        })
+}
+
 /// L2y：任意既有复合深度的 live 形态——常量子树、同型 enum 变量叶、
-/// L2z 标量变量叶或 L3c 可物化复合 Path 叶；L3e 起运行期标量表达式叶亦可。
-/// enum 构造叶（Call）不在 `scalar_expr_ok` 内，仍 fallthrough false（⑤f-2b）。
+/// L2z 标量变量叶、L3c 可物化复合 Path 叶、L3e 运行期标量表达式叶，
+/// L3f 起 enum 构造表达式叶（仅标量 payload；非标量／窄宽度表达式仍 false）。
 fn live_composite_ok(
     e: &Ex,
     payload: &Ty,
@@ -859,6 +902,12 @@ fn live_composite_ok(
         && scalar_expr_ok(e, payload, bindings, types, prog)
     {
         return true;
+    }
+    // L3f：enum 构造表达式叶（⑤f-2b）。
+    if let Ex::Call(..) = e {
+        if enum_ctor_expr_ok(e, payload, bindings, types, prog) {
+            return true;
+        }
     }
     if live_enum_leaf_ok(e, payload, bindings, types, prog) {
         return true;

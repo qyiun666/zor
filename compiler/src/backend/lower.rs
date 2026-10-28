@@ -1575,10 +1575,75 @@ fn live_composite_leaf(
     Ok(Some(cv.clone()))
 }
 
+/// L3f：enum 构造表达式叶求值——运行期 i64／u8／u32 实参走 L3d 求值器
+/// （Deref 生成唯一临时），其余实参沿用 `lower_value`；EnumInit 复用既有 builder。
+fn enum_ctor_live(
+    e: &Ex,
+    want: &AstTy,
+    b: &mut Build,
+    scope: &HashMap<String, LocalId>,
+    values: &HashMap<String, Value>,
+) -> Result<Option<(EnumInit, Value)>, SubsetError> {
+    let (Ex::Call(callee, args, _, _), AstTy::Named(en)) = (e, want) else {
+        return Ok(None);
+    };
+    let Some(decl) = b.prog.enums.iter().find(|x| &x.name == en) else {
+        return Ok(None);
+    };
+    let Ex::Path(v, _, _) = callee.as_ref() else {
+        return Ok(None);
+    };
+    let var = match v.rsplit_once("::") {
+        Some((q, r)) if q == en.as_str() => r,
+        Some(_) => return Ok(None),
+        None => v.as_str(),
+    };
+    let Some((_, payload, _, _)) = decl.variants.iter().find(|(n, _, _, _)| n.as_str() == var) else {
+        return Ok(None);
+    };
+    if payload.len() != args.len() {
+        return Ok(None);
+    }
+    let mut vals = Vec::with_capacity(args.len());
+    for ((fty, _, _), arg) in payload.iter().zip(args.iter()) {
+        if matches!(fty, AstTy::Prim("i64" | "u8" | "u32")) {
+            let ir = box_payload_ir_ty(fty, b.prog)
+                .ok_or_else(|| SubsetError::new(0, 0, "lower：enum 字段类型不在载荷白名单"))?;
+            let ity = ir_int_ty(&ir)
+                .ok_or_else(|| SubsetError::new(0, 0, "lower：enum 字段非运行期标量"))?;
+            let expr = lower_scalar_payload_expr(arg, ity, b, scope, values)?;
+            vals.push(Value::Int { ty: ity, expr });
+        } else {
+            vals.push(lower_value(arg, b, scope, values)?);
+        }
+    }
+    let Some(init) = build_enum_init(
+        callee,
+        args,
+        want,
+        &vals,
+        b.types,
+        b.slots.as_slice(),
+        scope,
+        b.prog,
+    ) else {
+        return Ok(None);
+    };
+    Ok(Some((
+        init.clone(),
+        Value::Enum {
+            variant: var.to_string(),
+            payload: vals,
+            init: Some(init),
+        },
+    )))
+}
+
 /// L2v：`box e` 分派——变量枚举走 EnumLive 堆副本配方，其余沿用常量树。
 /// 变量值缺失配方（init=None）时回落到常量通道，以既有判词 fail-closed。
 /// L3c：整棵可物化复合变量走 `live_composites` 树旁路（任意叶来源）。
 /// L3e：复合字面量表达式叶在 live 构建中就地求值（临时量先于 BindBox）。
+/// L3f：顶层 enum 构造表达式走 EnumLive 专用通道（emit 分配路径）。
 fn box_enum_live_or_const(
     inner: &Ex,
     payload_ast: &AstTy,
@@ -1628,6 +1693,20 @@ fn box_enum_live_or_const(
         Ok(cv) => return Ok((BoxConst::Composite(cv.clone()), ConstVal::Composite(cv))),
         Err(e) => e,
     };
+    // L3f：顶层 enum 构造表达式——BoxConst::EnumLive 专用通道；
+    // emit_alloc_composite 不支持 enum 的 EnumLive（会 unreachable!）。
+    if let Ex::Call(..) = inner {
+        return match enum_ctor_live(inner, payload_ast, b, scope, values) {
+            Ok(Some((init, value))) => Ok((
+                BoxConst::EnumLive {
+                    init,
+                    value: value.clone(),
+                },
+                ConstVal::EnumLive(value),
+            )),
+            _ => Err(const_err),
+        };
+    }
     // L2x／L3c：常量通道失败后回落 live 构建；失败仍报原常量判词。
     match composite_value_live(
         inner,
@@ -1656,8 +1735,8 @@ fn composite_value_live(
         .ok_or_else(|| SubsetError::new(0, 0, "lower：box 复合载荷形态不符"))
 }
 
-/// 单节点 live 构建：常量子树 → enum 变量叶 → 标量变量叶 → 复合变量叶 → 递归 struct／array。
-/// L3e：运行期标量表达式叶（i64／u8／u32）就地求值；其余形态返回 None。
+/// 单节点 live 构建：常量子树 → enum 变量叶 → 标量变量叶 → 复合变量叶 →
+/// L3e 标量表达式叶 → L3f enum 构造表达式叶 → 递归 struct／array。
 fn live_value(
     e: &Ex,
     want: &AstTy,
@@ -1688,6 +1767,13 @@ fn live_value(
     }
     if let Some(cv) = live_scalar_expr_leaf(e, want, b, scope, values)? {
         return Ok(Some(cv));
+    }
+    // L3f：enum 构造表达式叶（任意既有嵌套深度；ConstValue::EnumLive 入树）。
+    if let Ex::Call(..) = e {
+        return match enum_ctor_live(e, want, b, scope, values)? {
+            Some((init, value)) => Ok(Some(ConstValue::EnumLive { init, value })),
+            None => Ok(None),
+        };
     }
     match (e, want) {
         (Ex::Record(name, fields, rl, rc), AstTy::Named(want_name)) if name == want_name => {
