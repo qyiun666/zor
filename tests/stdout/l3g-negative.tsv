@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-554	tests/stdout/cases/N-554.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	i8 field arithmetic
+N-555	tests/stdout/cases/N-555.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	i16 field arithmetic
+N-556	tests/stdout/cases/N-556.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	u64 field arithmetic
+N-557	tests/stdout/cases/N-557.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	f64 field arithmetic
+N-558	tests/stdout/cases/N-558.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	i8 deref arithmetic
+N-559	tests/stdout/cases/N-559.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	u64 deref arithmetic
+N-560	tests/stdout/cases/N-560.zor	1	none	E1201	zor: runtime error	bool field arithmetic
+N-561	tests/stdout/cases/N-561.zor	1	none	E1201	zor: runtime error	composite deref arithmetic
+N-562	tests/stdout/cases/N-562.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	nested field arithmetic
+N-563	tests/stdout/cases/N-563.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	field of deref arithmetic
+N-564	tests/stdout/cases/N-564.zor	1	none	println 实参不可打印	zor: runtime error	println field arithmetic
+N-565	tests/stdout/cases/N-565.zor	1	none	lower：算术操作数形态不在 L2b 子集	zor: runtime error	println deref arithmetic
+N-566	tests/stdout/cases/N-566.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	array index arithmetic
+N-567	tests/stdout/cases/N-567.zor	1	none	E1201	zor: runtime error	field plus bool
+N-568	tests/stdout/cases/N-568.zor	1	none	E1202	zor: runtime error	field plus float (E1202)
+N-569	tests/stdout/cases/N-569.zor	1	none	E1201	zor: runtime error	bool Box deref arithmetic
+N-570	tests/stdout/cases/N-570.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	f32 field arithmetic
+N-571	tests/stdout/cases/N-571.zor	1	none	let 初始化非整型算术表达式	zor: runtime error	i32 field arithmetic
