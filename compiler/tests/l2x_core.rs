@@ -276,20 +276,21 @@ fn scalar_leaves_run_and_whole_payload_stays_fail_closed() {
 
 #[test]
 fn expression_constructor_leaves_stay_fail_closed() {
-    assert_rc1(
-        "constructor-field",
+    // L3f：enum 构造表达式叶已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let x: i64 = 1;\n    let b: Box<S> = box S { e: V(x) };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "constructor-field",
+        b"S { e: V(1) }\n",
     );
-    assert_rc1(
-        "constructor-arith",
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let b: Box<S> = box S { e: V(1 + 2) };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "constructor-arith",
+        b"S { e: V(3) }\n",
     );
-    assert_rc1(
-        "constructor-array",
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let b: Box<[E; 1]> = box [V(1 + 2)];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "constructor-array",
+        b"[V(3)]\n",
     );
 }
 

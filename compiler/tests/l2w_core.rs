@@ -193,15 +193,16 @@ fn variable_and_expression_leaves_stay_fail_closed() {
         "variable-leaf",
         b"S { e: V(1) }\n",
     );
-    assert_rc1(
-        "expression-field",
+    // L3f：enum 构造表达式叶已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let x: i64 = 1;\n    let b: Box<S> = box S { e: V(x) };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "expression-field",
+        b"S { e: V(1) }\n",
     );
-    assert_rc1(
-        "expression-arith",
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let b: Box<[E; 1]> = box [V(1 + 2)];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "expression-arith",
+        b"[V(3)]\n",
     );
     // L2x：一层变量复合重初始化转正。
     assert_runs(

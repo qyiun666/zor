@@ -195,10 +195,11 @@ fn nested_fail_closed_leaves() {
         "nested-scalar",
         b"S2 { inner: S1 { e: V(1), x: 1 } }\n",
     );
-    assert_rc1(
-        "nested-expression",
+    // L3f：嵌套 enum 构造表达式叶已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nstruct S1 { e: E }\nstruct S2 { inner: S1 }\nfn main() {\n    let x: i64 = 1;\n    let b: Box<S2> = box S2 { inner: S1 { e: V(x) } };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "nested-expression",
+        b"S2 { inner: S1 { e: V(1) } }\n",
     );
     // L3c：嵌套整棵字段已开放（原负控翻转）。
     assert_runs(
@@ -232,20 +233,21 @@ fn nested_fail_closed_leaves() {
 
 #[test]
 fn direct_fail_closed_leaves_and_reinit() {
-    assert_rc1(
-        "constructor-field",
+    // L3f：enum 构造表达式叶已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let x: i64 = 1;\n    let b: Box<S> = box S { e: V(x) };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "constructor-field",
+        b"S { e: V(1) }\n",
     );
-    assert_rc1(
-        "constructor-arith",
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let b: Box<S> = box S { e: V(1 + 2) };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "constructor-arith",
+        b"S { e: V(3) }\n",
     );
-    assert_rc1(
-        "constructor-array",
+    assert_runs(
         "enum E { V(i64) }\nfn main() {\n    let b: Box<[E; 1]> = box [V(1 + 2)];\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "constructor-array",
+        b"[V(3)]\n",
     );
     assert_runs(
         "struct S { x: i64 }\nfn main() {\n    let v: i64 = 1;\n    let b: Box<S> = box S { x: v };\n    println(*b);\n}\n",

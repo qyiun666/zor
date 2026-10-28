@@ -1,0 +1,3 @@
+enum I { A(i64) }
+enum E { V(I) }
+fn main() { let b: Box<E> = box V(A(1)); println(*b); }

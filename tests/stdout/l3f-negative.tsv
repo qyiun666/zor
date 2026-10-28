@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-536	tests/stdout/cases/N-536.zor	1	none	let 类型标注	zor: runtime error	non-scalar enum payload: struct
+N-537	tests/stdout/cases/N-537.zor	1	none	let 类型标注	zor: runtime error	non-scalar enum payload: array
+N-538	tests/stdout/cases/N-538.zor	1	none	let 类型标注	zor: runtime error	non-scalar enum payload: tuple
+N-539	tests/stdout/cases/N-539.zor	1	none	let 类型标注	zor: runtime error	non-scalar enum payload: unit
+N-540	tests/stdout/cases/N-540.zor	1	none	let 类型标注	zor: runtime error	non-scalar enum payload: enum
+N-541	tests/stdout/cases/N-541.zor	1	none	let 类型标注	zor: runtime error	non-scalar enum payload: Box
+N-542	tests/stdout/cases/N-542.zor	1	none	box 载荷须为字面量常量	zor: runtime error	float expression argument
+N-543	tests/stdout/cases/N-543.zor	1	none	box 载荷须为字面量常量	zor: runtime error	i8 expression argument (typed variable form)
+N-544	tests/stdout/cases/N-544.zor	1	none	box 载荷须为字面量常量	zor: runtime error	i16 expression argument (typed variable form)
+N-545	tests/stdout/cases/N-545.zor	1	none	box 载荷须为字面量常量	zor: runtime error	u64 expression argument (typed variable form)
+N-546	tests/stdout/cases/N-546.zor	1	none	box 载荷须为字面量常量	zor: runtime error	narrow field projection argument
+N-547	tests/stdout/cases/N-547.zor	1	none	box 载荷须为字面量常量	zor: runtime error	narrow scalar deref argument
+N-548	tests/stdout/cases/N-548.zor	1	none	let 类型标注	zor: runtime error	enum variant containing Box field
+N-549	tests/stdout/cases/N-549.zor	1	none	let 类型标注	zor: runtime error	bool top-level Box
+N-550	tests/stdout/cases/N-550.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated enum ctor Box
+N-551	tests/stdout/cases/N-551.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-552	tests/stdout/cases/N-552.zor	1	none	let 类型标注	zor: runtime error	seen same-type repeat
+N-553	tests/stdout/cases/N-553.zor	1	none	println 实参不可打印	zor: runtime error	println of Box itself

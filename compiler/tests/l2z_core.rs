@@ -259,10 +259,11 @@ fn fail_closed_boundaries() {
         "struct S { x: i32 }\nfn main() {\n    let b0: Box<i32> = box 7;\n    let x = *b0;\n    let b: Box<S> = box S { x: x };\n    println(*b);\n}\n",
         "box 载荷须为字面量常量",
     );
-    assert_rc1(
-        "enum-ctor-expression",
+    // L3f：enum 构造表达式叶已开放（原负控翻转）。
+    assert_runs(
         "enum E { V(i64) }\nstruct S { e: E }\nfn main() {\n    let x: i64 = 1;\n    let b: Box<S> = box S { e: V(x) };\n    println(*b);\n}\n",
-        "box 载荷须为字面量常量",
+        "enum-ctor-expression",
+        b"S { e: V(1) }\n",
     );
     assert_rc1(
         "unannotated",

@@ -1,0 +1,10 @@
+enum E { V(i64) }
+struct S { e: E }
+fn main() {
+    let x: i64 = 1;
+    let b: Box<[S; 1]> = box [S { e: V(x) }];
+    let e = V(x);
+    let q = [S { e: e }];
+    println(*b);
+    println(q);
+}
