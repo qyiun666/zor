@@ -1,0 +1,3 @@
+struct I { x: i64 }
+struct P { inner: I }
+fn main() { let p = P { inner: I { x: 1 } }; let y = p.inner.x + 1; println(y); }
