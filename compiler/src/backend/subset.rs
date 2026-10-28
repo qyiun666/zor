@@ -533,12 +533,12 @@ fn let_init_kind(
             }
             _ => Err(SubsetError::new(*il, *ic, "let 初始化非可复制绑定")),
         },
-        Ex::Bin(..) => match int_expr_kind(init, bindings) {
+        Ex::Bin(..) => match let_int_expr_kind(init, bindings, types) {
             Some(k) => unify_ann(ann.clone(), k, init, l, c),
             None => Err(SubsetError::new(l, c, "let 初始化非整型算术表达式")),
         },
         Ex::Un(..) => {
-            if let Some(k) = int_expr_kind(init, bindings) {
+            if let Some(k) = let_int_expr_kind(init, bindings, types) {
                 unify_ann(ann.clone(), k, init, l, c)
             } else if let Some(k) = const_unary_kind(init, bindings) {
                 unify_ann(ann.clone(), k, init, l, c)
@@ -1346,6 +1346,70 @@ fn int_expr_kind(e: &Ex, bindings: &HashMap<String, BindingKind>) -> Option<Bind
                 return Some(ka);
             }
             // 上下文整型字面量向另一侧收敛（与 check 的 expect 语义一致）
+            if kb == BindingKind::I64 && is_int_lit(b) {
+                return Some(ka);
+            }
+            if ka == BindingKind::I64 && is_int_lit(a) {
+                return Some(kb);
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+/// L3g：普通 let 初始化器算术——在既有 `int_expr_kind` 之上增加
+/// 单层 Field／Deref 运行期标量操作数（仅 i64／u8／u32）。
+/// 仅供 `let_init_kind` 的 Bin／Un 使用；全局判定与 lower 入口不变。
+fn let_int_expr_kind(
+    e: &Ex,
+    bindings: &HashMap<String, BindingKind>,
+    types: &TypeTable,
+) -> Option<BindingKind> {
+    match e {
+        Ex::Lit(Lit::Int(_) | Lit::IntConst(_), _, _) | Ex::Path(..) => {
+            int_expr_kind(e, bindings)
+        }
+        Ex::Field(base, _, _, _) => {
+            let Ex::Path(n, _, _) = base.as_ref() else {
+                return None;
+            };
+            if !matches!(bindings.get(n), Some(BindingKind::Composite(Ty::Named(_)))) {
+                return None;
+            }
+            match types.expr_ty(e)? {
+                Ty::Prim("i64") => Some(BindingKind::I64),
+                Ty::Prim("u8") => Some(BindingKind::U8),
+                Ty::Prim("u32") => Some(BindingKind::U32),
+                _ => None,
+            }
+        }
+        Ex::Deref(base, _, _) => {
+            let Ex::Path(n, _, _) = base.as_ref() else {
+                return None;
+            };
+            match bindings.get(n) {
+                Some(BindingKind::Box(p)) => match p {
+                    Ty::Prim("i64") => Some(BindingKind::I64),
+                    Ty::Prim("u8") => Some(BindingKind::U8),
+                    Ty::Prim("u32") => Some(BindingKind::U32),
+                    _ => None,
+                },
+                _ => None,
+            }
+        }
+        Ex::Un(op, inner, _, _) if op == "-" => {
+            match let_int_expr_kind(inner, bindings, types)? {
+                BindingKind::I64 => Some(BindingKind::I64),
+                _ => None,
+            }
+        }
+        Ex::Bin(op, a, b, _, _) if matches!(op.as_str(), "+" | "-" | "*" | "/" | "%") => {
+            let ka = let_int_expr_kind(a, bindings, types)?;
+            let kb = let_int_expr_kind(b, bindings, types)?;
+            if ka == kb {
+                return Some(ka);
+            }
             if kb == BindingKind::I64 && is_int_lit(b) {
                 return Some(ka);
             }
