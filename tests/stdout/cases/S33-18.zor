@@ -1,0 +1,8 @@
+struct S { a: [i64; 2] }
+fn main() {
+    let x = 3;
+    let a: [i64; 2] = [x, 4];
+    let b: Box<S> = box S { a: a };
+    println(*b);
+    println(S { a: a });
+}

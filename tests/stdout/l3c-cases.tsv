@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S33-01	tests/stdout/cases/S33-01.zor	run	0	expected/S33-01.stdout	-	struct runtime leaf + intermediate expression + temp stability
+S33-02	tests/stdout/cases/S33-02.zor	run	0	expected/S33-02.stdout	-	struct u8 runtime leaf
+S33-03	tests/stdout/cases/S33-03.zor	run	0	expected/S33-03.stdout	-	struct u32 runtime leaf
+S33-04	tests/stdout/cases/S33-04.zor	run	0	expected/S33-04.stdout	-	struct deref i64 leaf
+S33-05	tests/stdout/cases/S33-05.zor	run	0	expected/S33-05.stdout	-	struct deref u8 leaf
+S33-06	tests/stdout/cases/S33-06.zor	run	0	expected/S33-06.stdout	-	struct bool compile-time leaf
+S33-07	tests/stdout/cases/S33-07.zor	run	0	expected/S33-07.stdout	-	struct f64 compile-time leaf
+S33-08	tests/stdout/cases/S33-08.zor	run	0	expected/S33-08.stdout	-	struct enum variable leaf
+S33-09	tests/stdout/cases/S33-09.zor	run	0	expected/S33-09.stdout	-	struct mixed constant and runtime leaves
+S33-10	tests/stdout/cases/S33-10.zor	run	0	expected/S33-10.stdout	-	nested struct runtime leaf
+S33-11	tests/stdout/cases/S33-11.zor	run	0	expected/S33-11.stdout	-	struct array field runtime leaves
+S33-12	tests/stdout/cases/S33-12.zor	run	0	expected/S33-12.stdout	-	array i64 runtime leaf
+S33-13	tests/stdout/cases/S33-13.zor	run	0	expected/S33-13.stdout	-	array enum variable leaves
+S33-14	tests/stdout/cases/S33-14.zor	run	0	expected/S33-14.stdout	-	struct array runtime leaves
+S33-15	tests/stdout/cases/S33-15.zor	run	0	expected/S33-15.stdout	-	nested array runtime leaf
+S33-16	tests/stdout/cases/S33-16.zor	run	0	expected/S33-16.stdout	-	nested whole field constant composite
+S33-17	tests/stdout/cases/S33-17.zor	run	0	expected/S33-17.stdout	-	nested whole field runtime leaf
+S33-18	tests/stdout/cases/S33-18.zor	run	0	expected/S33-18.stdout	-	nested whole array field runtime leaf
+S33-19	tests/stdout/cases/S33-19.zor	run	0	expected/S33-19.stdout	-	nested whole array elements
+S33-20	tests/stdout/cases/S33-20.zor	run	0	expected/S33-20.stdout	-	Path copy struct
+S33-21	tests/stdout/cases/S33-21.zor	run	0	expected/S33-21.stdout	-	Path copy array
+S33-22	tests/stdout/cases/S33-22.zor	run	0	expected/S33-22.stdout	-	Path copy reinit
+S33-23	tests/stdout/cases/S33-23.zor	run	0	expected/S33-23.stdout	-	whole runtime reinit
+S33-24	tests/stdout/cases/S33-24.zor	run	0	expected/S33-24.stdout	-	shadow + double Box + unbox + move

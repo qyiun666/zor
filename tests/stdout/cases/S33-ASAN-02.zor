@@ -1,0 +1,9 @@
+struct I { x: i64 }
+struct O { i: I }
+fn main() {
+    let i = I { x: 1 };
+    let b: Box<O> = box O { i: i };
+    let i2 = I { x: 2 };
+    b = box O { i: i2 };
+    println(*b);
+}
