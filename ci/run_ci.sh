@@ -35,6 +35,7 @@
 # L3d：stdout 判词 678／399／17；stdout-contract 内加第二十六基线 l3d（1272／2009），P=24／Q=18／Ret=10（N-19／N-297／N-299／N-452／N-453／N-474／N-475／N-483／N-484／N-488 仅执行面）；ASAN 新增 l3d 独立 K=2 判词（合并 27）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 # L3e：stdout 判词 702／407／17；stdout-contract 内加第二十七基线 l3e（1314／2079），P=24／Q=18／Ret=10（N-298／N-431／N-432／N-443／N-444／N-445／N-485／N-486／N-508／N-509 仅执行面）；ASAN 新增 l3e 独立 K=2 判词（合并 29）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 # L3f：stdout 判词 726／405／17；stdout-contract 内加第二十八基线 l3f（1356／2149），P=24／Q=18／Ret=20（N-322／N-356／N-357／N-375／N-376／N-377／N-393／N-394／N-395／N-411／N-412／N-413／N-426／N-489／N-510／N-511／N-518／N-519／N-520／N-521 仅执行面）；ASAN 新增 l3f 独立 K=2 判词（合并 31）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
+# L3g：stdout 判词 750／423／17；stdout-contract 内加第二十九基线 l3g（1398／2219），P=24／Q=18／Ret=0（无退休、无断言翻转）；ASAN 新增 l3g 独立 K=2 判词（合并 33）；runtime-codes 39／6／19、packaging 4 不变；不建新 job。
 set -uo pipefail
 shopt -s nullglob  # S-1：未命中 glob 展开为空数组，杜绝字面 glob 进循环的旁路
 
@@ -805,6 +806,15 @@ stage_asan() { # L2a CI-01：宿主固定 + QA-01 ASAN/LSAN 脚本；fail-closed
         bash ci/asan/run_asan_l3f.sh --strict --zorc "$ZORC" --out "$LOG_DIR/asan-l3f" >>"$log" 2>&1 || rc_l3f=$?
     fi
     [ "$rc_l3f" -eq 0 ] || rc="$rc_l3f"
+    # L3g CI-01：独立 l3g ASAN manifest（K=2）；默认 48／41／7、l2k 6、l2t 3、l2v 2、l2w 2、l2x 2、l2y 2、l2z 2、l3a 2、l3b 2、l3c 2、l3d 2、l3e 2、l3f 2 零改。
+    local rc_l3g=0
+    CC_REAL="$cc_real" ZORC_BIN="$ZORC" \
+      bash ci/asan/run_asan_l3g.sh --validate-only >>"$log" 2>&1 || rc_l3g=$?
+    if [ "$rc_l3g" -eq 0 ]; then
+      CC_REAL="$cc_real" ZORC_BIN="$ZORC" \
+        bash ci/asan/run_asan_l3g.sh --strict --zorc "$ZORC" --out "$LOG_DIR/asan-l3g" >>"$log" 2>&1 || rc_l3g=$?
+    fi
+    [ "$rc_l3g" -eq 0 ] || rc="$rc_l3g"
   fi
   if [ "$rc" -eq 0 ]; then
     echo "[asan] 判定=PASS" >> "$log"
@@ -859,7 +869,7 @@ stdout_section_verdict() { # 显式 FAIL 判词优先（即使脚本 rc=0）；�
   printf 'FAIL'
 }
 
-verify_baseline() { # L2f CI-01：verify_baseline <l2e|l2f|l2g|l2h|l2i|l2j|l2k|l2l|l2m|l2n|l2o|l2p|l2q|l2r|l2s|l2t|l2u|l2v|l2w|l2x|l2y|l2z|l3a|l3b|l3c|l3d|l3e|l3f> <outdir> <cases> <files>
+verify_baseline() { # L2f CI-01：verify_baseline <l2e|l2f|l2g|l2h|l2i|l2j|l2k|l2l|l2m|l2n|l2o|l2p|l2q|l2r|l2s|l2t|l2u|l2v|l2w|l2x|l2y|l2z|l3a|l3b|l3c|l3d|l3e|l3f|l3g> <outdir> <cases> <files>
   local name="$1" out="$2" cases_expected="$3" files_expected="$4"
   local base="tests/stdout/${name}-baseline.sha256"
   local tsv="tests/stdout/${name}-baseline.tsv"
@@ -932,7 +942,7 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
     record cli-contract FAIL 1 "$log"
     return
   fi
-  # L3f CI-01：二十八基线 gate（先于两轮用例）。l2e 162／209；l2f 188／246；l2g 206／275；l2h 247／327；l2i 297／398；l2j 345／466；l2k 417／590；l2l 461／660；l2m 506／734；l2n 554／816；l2o 599／891；l2p 645／963；l2q 701／1062；l2r 759／1163；l2s 827／1274；l2t 884／1367；l2u 894／1379；l2v 937／1450；l2w 979／1520；l2x 1021／1590；l2y 1062／1659；l2z 1104／1729；l3a 1146／1799；l3b 1188／1869；l3c 1230／1939；l3d 1272／2009；l3e 1314／2079；l3f 全矩阵 1356／2149。
+  # L3g CI-01：二十九基线 gate（先于两轮用例）。l2e 162／209；l2f 188／246；l2g 206／275；l2h 247／327；l2i 297／398；l2j 345／466；l2k 417／590；l2l 461／660；l2m 506／734；l2n 554／816；l2o 599／891；l2p 645／963；l2q 701／1062；l2r 759／1163；l2s 827／1274；l2t 884／1367；l2u 894／1379；l2v 937／1450；l2w 979／1520；l2x 1021／1590；l2y 1062／1659；l2z 1104／1729；l3a 1146／1799；l3b 1188／1869；l3c 1230／1939；l3d 1272／2009；l3e 1314／2079；l3f 1356／2149；l3g 全矩阵 1398／2219。
   # 任一失败即两段 FAIL 并返回；缺件／路径不安全／重复／hash 不符／计数不符一律 FAIL，不可 SKIP。
   if ! verify_baseline l2e "$out" 162 209; then
     grep -hE '^(PASS|FAIL)\|l2e-baseline' "$out/l2e-baseline.log" >> "$log" 2>/dev/null || true
@@ -1158,6 +1168,14 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
     return
   fi
   grep -hE '^(PASS|FAIL)\|l3f-baseline' "$out/l3f-baseline.log" >> "$log" 2>/dev/null || true
+  if ! verify_baseline l3g "$out" 1398 2219; then
+    grep -hE '^(PASS|FAIL)\|l3g-baseline' "$out/l3g-baseline.log" >> "$log" 2>/dev/null || true
+    echo "[l3g-baseline] 校验失败（见 l3g-baseline.log）；stdout-contract／cli-contract 判 FAIL" >> "$log"
+    record stdout-contract FAIL 1 "$log"
+    record cli-contract FAIL 1 "$log"
+    return
+  fi
+  grep -hE '^(PASS|FAIL)\|l3g-baseline' "$out/l3g-baseline.log" >> "$log" 2>/dev/null || true
   local rc=0
   CC="${CC:-cc}" ZORC_BIN="$ZORC" OUT_DIR="$out" \
     bash tests/stdout/run_stdout_contract.sh --strict >>"$log" 2>&1 || rc=$?
@@ -1166,16 +1184,16 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   local so_v cli_v so_rc=0 cli_rc=0
   so_v="$(stdout_section_verdict stdout-contract "$log" "$rc")"
   cli_v="$(stdout_section_verdict cli-contract "$log" "$rc")"
-  # L3f CI-01：冻结计数 726／405／17（P=24／Q=18／Ret=20）；判定 PASS 但判词计数不符（如旧资产 702／407／17）同样 FAIL，防静默洗绿。
-  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=726 negative=405 fail=0 ran=726/405' "$log"; then
-    echo "[stdout-contract] 计数不符：期望 runtime=726 negative=405 ran=726/405（L3f 冻结）" >> "$log"
+  # L3g CI-01：冻结计数 750／423／17（P=24／Q=18／Ret=0）；判定 PASS 但判词计数不符（如旧资产 726／405／17）同样 FAIL，防静默洗绿。
+  if [ "$so_v" = PASS ] && ! grep -Fq 'PASS|stdout-contract|runtime=750 negative=423 fail=0 ran=750/423' "$log"; then
+    echo "[stdout-contract] 计数不符：期望 runtime=750 negative=423 ran=750/423（L3g 冻结）" >> "$log"
     so_v=FAIL
   fi
   if [ "$cli_v" = PASS ] && ! grep -Fq 'PASS|cli-contract|cases=17 fail=0 ran=17' "$log"; then
-    echo "[cli-contract] 计数不符：期望 cases=17 ran=17（L3f 冻结，CLI 不变）" >> "$log"
+    echo "[cli-contract] 计数不符：期望 cases=17 ran=17（L3g 冻结，CLI 不变）" >> "$log"
     cli_v=FAIL
   fi
-  # L3f CI-01：二十八基线精确判词（含 fail=0）；计数不符同样 FAIL。
+  # L3g CI-01：二十九基线精确判词（含 fail=0）；计数不符同样 FAIL。
   if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l2e-baseline|cases=162 files=209 unique=209 fail=0' "$out/l2e-baseline.log"; then
     echo "[l2e-baseline] 计数不符：期望 cases=162 files=209 unique=209（历史冻结）" >> "$log"
     so_v=FAIL
@@ -1286,6 +1304,10 @@ stage_stdout_contract() { # L2c CI-01：独立 Linux job；直调 QA 判据脚�
   fi
   if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l3f-baseline|cases=1356 files=2149 unique=2149 fail=0' "$out/l3f-baseline.log"; then
     echo "[l3f-baseline] 计数不符：期望 cases=1356 files=2149 unique=2149（L3f 冻结）" >> "$log"
+    so_v=FAIL
+  fi
+  if [ "$so_v" = PASS ] && ! grep -Fxq 'PASS|l3g-baseline|cases=1398 files=2219 unique=2219 fail=0' "$out/l3g-baseline.log"; then
+    echo "[l3g-baseline] 计数不符：期望 cases=1398 files=2219 unique=2219（L3g 冻结）" >> "$log"
     so_v=FAIL
   fi
   [ "$so_v" = FAIL ] && so_rc=1
