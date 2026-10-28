@@ -217,7 +217,13 @@ fn invalid_typed_box_forms_are_rc1_and_fail_closed() {
         "n32",
         b"[1, 2, 3]\n",
     );
-    let cases: [(&str, &str, &str); 10] = [
+    // L3d：i64 负号字面量表达式载荷已开放（原 n19 负控翻转）。
+    assert_runs(
+        "fn main() {\n    let b: Box<i64> = box -1;\n    println(*b);\n}\n",
+        "n19",
+        b"-1\n",
+    );
+    let cases: [(&str, &str, &str); 9] = [
         (
             "n16",
             "fn main() {\n    let b: Box<u8> = box 256;\n    println(*b);\n}\n",
@@ -232,11 +238,6 @@ fn invalid_typed_box_forms_are_rc1_and_fail_closed() {
             "n18",
             "fn main() {\n    let b: Box<i64> = box 9223372036854775808;\n    println(*b);\n}\n",
             "E1201",
-        ),
-        (
-            "n19",
-            "fn main() {\n    let b: Box<i64> = box -1;\n    println(*b);\n}\n",
-            "box 载荷非整型字面量",
         ),
         (
             "n28",
