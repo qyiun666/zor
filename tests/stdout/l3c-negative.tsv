@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-482	tests/stdout/cases/N-482.zor	1	none	E1201	zor: runtime error	expression payload box x + 1
+N-483	tests/stdout/cases/N-483.zor	1	none	box 载荷非整型字面量	zor: runtime error	unary expression payload
+N-484	tests/stdout/cases/N-484.zor	1	none	box 载荷非整型字面量	zor: runtime error	paren arithmetic payload
+N-485	tests/stdout/cases/N-485.zor	1	none	box 载荷须为字面量常量	zor: runtime error	direct field expression leaf
+N-486	tests/stdout/cases/N-486.zor	1	none	box 载荷须为字面量常量	zor: runtime error	direct array expression leaf
+N-487	tests/stdout/cases/N-487.zor	1	none	box 载荷须为字面量常量	zor: runtime error	deref composite payload
+N-488	tests/stdout/cases/N-488.zor	1	none	box 载荷非整型字面量	zor: runtime error	field projection payload
+N-489	tests/stdout/cases/N-489.zor	1	none	box 载荷须为字面量常量	zor: runtime error	enum construction expression payload
+N-490	tests/stdout/cases/N-490.zor	1	none	box 载荷须为字面量常量	zor: runtime error	deref-derived i8 leaf direct composite
+N-491	tests/stdout/cases/N-491.zor	1	none	let 类型标注	zor: runtime error	bool top-level Box
+N-492	tests/stdout/cases/N-492.zor	1	none	box 载荷非整型字面量	zor: runtime error	unannotated whole Box
+N-493	tests/stdout/cases/N-493.zor	1	none	let 类型标注	zor: runtime error	nested Box
+N-494	tests/stdout/cases/N-494.zor	1	none	let 类型标注	zor: runtime error	enum with Box field
+N-495	tests/stdout/cases/N-495.zor	1	none	let 类型标注	zor: runtime error	enum with struct payload
+N-496	tests/stdout/cases/N-496.zor	1	none	let 类型标注	zor: runtime error	seen same-type repeat
+N-497	tests/stdout/cases/N-497.zor	1	none	println 实参不可打印	zor: runtime error	println Box itself
+N-498	tests/stdout/cases/N-498.zor	1	none	E2301	zor: runtime error	double unbox
+N-499	tests/stdout/cases/N-499.zor	1	none	E2101	zor: runtime error	use after move

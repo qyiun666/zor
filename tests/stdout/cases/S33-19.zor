@@ -1,0 +1,10 @@
+struct P { x: i64 }
+fn main() {
+    let x = 1;
+    let y = 2;
+    let p1 = P { x: x };
+    let p2 = P { x: y };
+    let b: Box<[P; 2]> = box [p1, p2];
+    println(*b);
+    println([p1, p2]);
+}
