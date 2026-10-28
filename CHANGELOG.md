@@ -4,6 +4,42 @@
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循项目 0.x 顺序递进规则；0.2.x 为首个可执行闭环与运行链路起步阶段（见 README「看进度·版本节奏」）。
 
+## [0.3.32] - 2026-10-28
+
+内部验证里程碑，非可用语言版本：本版为 L3g「普通 let 算术 Field／Deref 操作数」——普通 `let` 初始化器的整型算术表达式支持**单层 Field／Deref 操作数**：`let y = p.x + 1`／`let y = *b0 + 1`（操作数结果类型 i64／u8／u32；任意既有 Bin／Un 组合；括号分组；字段＋deref 混排；字面量／运行期绑定与常量／运行期 Box），与 Box 载荷内同表达式结果逐字节一致。实现为 **let-only 最小路径**：subset 新增 `let_int_expr_kind`（仅 `let_init_kind` 的 Bin／Un 使用；Field 基座 struct 绑定单层、Deref 基座 `Box<i64|u8|u32>` 返回运行期宽度）；lower 的 St::Let Bin／int-Un 分支复用 L3d `lower_scalar_payload_expr`（先占位 dst 本地／槽位再求值，Deref 临时量唯一）；**未改全局 `int_expr_kind`、未改 `lower_int_expr`**，表达式语句／println／复合初值／enum 实参闸位零漂移；emit／IR／parser／check／所有权零改动。**不开放**（维持 fail-closed）：裸字段读取 `let y = p.x`（`let 初始化非可 codegen 形态`）、println 内算术、函数实参／返回值算术、嵌套字段／字段 of deref、数组索引／方法调用、非运行期宽度／浮点 Field／Deref 算术（i8／i16／i32／u16／u64／bool／f32／f64）、复合 `*b`；`box x + 1` 仍 E1201；`box S{x:-1}`（i8）为既有常量路径能力；裸 deref 读取 `let y = *b0` 为既有能力。Ret=**0**（无新增退休；423 条活动负控零翻转、零判词漂移）；断言翻转 **0**（新增 `l3g_core`）；ASAN K=2（`l3g-asan-manifest.tsv` 2 例＋l2k 9／l2v 2／l2w 2／l2x 2／l2y 2／l2z 2／l3a 2／l3b 2／l3c 2／l3d 2／l3e 2／l3f 2 零改，观测 9+2×12=33；默认 manifest 48／41／7 零改）；`l3g-baseline` 第二十九基线（1398／2219 用例／文件）；按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
+
+本版口径：支持形态——普通 let 初始化器算术的 Field／Deref 操作数（单层 `p.x`／`*b0`；i64／u8／u32；任意既有 Bin／Un；与 Box 载荷同表达式一致）；非运行期宽度／浮点、裸字段读取、println 算术、表达式语句、函数实参／返回值、嵌套字段、数组索引、复合 `*b` 维持 fail-closed。计数：P=**24**、Q=**18**、Ret=**0**；Q=18（N-554～N-571）；R=**750**（726＋24）、G=**423**（405＋18）、T=**1190**、A=**1194**、N=**1398**（1356＋24＋18）；`l3g-baseline` cases **1398**／files **2219**／unique **2219**；旧 28 基线 162／209 … 1272／2009、1314／2079、1356／2149 与 `l2c` 68／105、legacy 226、runtime-codes 39／6／19、`new-cases.tsv` 120 均零改；分代活跃 L3G=18；L2T=20／L2V=14／L2W=15／L2X=8／L2Y=8／L3C=12／L3D=14／L3E=14／L3F=18；其余分代与 legacy 12 不变。ASAN 9+2×12=33（K=2；默认 manifest 48／41／7、l2k 6、l2t 3、l2v 2、l2w 2、l2x 2、l2y 2、l2z 2、l3a 2、l3b 2、l3c 2、l3d 2、l3e 2、l3f 2 零改；无泄漏／double-free／UAF）；E1101 编目 30；Linux x86_64 为唯一终证，macOS 无 LSAN 不作终证；无安装／打包／性能承诺。
+
+### Added
+
+- **普通 let 算术 Field／Deref 操作数（L3g）**：`let y = p.x + 1`／`let y = *b0 + 1`（i64／u8／u32；任意既有 Bin／Un；单层投影；字面量／运行期绑定与常量／运行期 Box）；let-only 路径；与 Box 载荷同表达式一致；普通标量算术／Box 载荷／普通枚举构造不变。
+- **`l3g-baseline` 第二十九基线**：`stdout-contract` 在 `l3f` 之后校验 `l3g-baseline`（1398／2219／2219），判词含 `fail=0`；任一 mismatch 即 FAIL，不 SKIP、不重跑洗绿；旧 28 基线字节零改。
+- **`l3g-asan-manifest.tsv`（K=2）**：字段算术＋Box drop、deref 算术＋drop 2 例；独立判词；l2k 9／l2v…l3f 各 2／默认 48／41／7 零改；观测 9+2×12=33。
+
+### Changed
+
+- **Ret=0**：无新增退休 ID（仅执行面零变更；历史资产字节零改）；分代新增 L3G=18，其余不变。
+- **计数与资产**：P=24、Q=18、Ret=0；R 726→750、G 405→423、T 1148→1190、A 1152→1194、N 1356→1398、M 2149→2219；`l3g-baseline.tsv` 1398 条（1399 行含表头）、`.sha256` 2219 行。
+- **版本锚**：`compiler/Cargo.toml:3`／`compiler/Cargo.lock:7` 由 `0.3.31` 落至 `0.3.32`；`compiler/Cargo.toml:5` description 版本串同步；`Cargo.lock:3` 的 `version = 4` 零触；`CHANGELOG.md` 本节顶部纯插入；账本合并后 `--version`／`-V` 输出 `zorcc 0.3.32`。
+- **CI**：二十九基线并存；无新 job／YAML／ruleset；`stdout-contract`／`packaging-smoke` 维持 required；artifact 沿用现有日志上传。
+
+### 门禁与回归读数
+
+- GATE-L3g-01：**PASS**——集成 head `3cb17d8`（PR #247）；CI run `40719659342`（合并前）与 `008a7aee` main push；`baseline`／`stdout-contract`／`runtime-codes`／`asan-linux`／`packaging-smoke` 五 job 全 **success**。
+- 判词：`PASS|l3g-baseline|cases=1398 files=2219 unique=2219 fail=0`；`PASS|stdout-contract|runtime=750 negative=423 fail=0 ran=750/423`；`PASS|cli-contract|cases=17 fail=0 ran=17`；`PASS|packaging-smoke|cases=4 fail=0 ran=4`；`PASS|asan-l2k|cases=9 fail=0 ran=9/9`；`PASS|asan-l2v|cases=2 fail=0 ran=2/2`；`PASS|asan-l2w|cases=2 fail=0 ran=2/2`；`PASS|asan-l2x|cases=2 fail=0 ran=2/2`；`PASS|asan-l2y|cases=2 fail=0 ran=2/2`；`PASS|asan-l2z|cases=2 fail=0 ran=2/2`；`PASS|asan-l3a|cases=2 fail=0 ran=2/2`；`PASS|asan-l3b|cases=2 fail=0 ran=2/2`；`PASS|asan-l3c|cases=2 fail=0 ran=2/2`；`PASS|asan-l3d|cases=2 fail=0 ran=2/2`；`PASS|asan-l3e|cases=2 fail=0 ran=2/2`；`PASS|asan-l3f|cases=2 fail=0 ran=2/2`；`PASS|asan-l3g|cases=2 fail=0 ran=2/2`；runtime-codes `runtime_rows=39 width_rows=6 cli_rows=19 fail=0`。
+- 读数：二十九基线判词全 PASS；P 24/24、六档 `-O*` **144/144**、Q 18/18、locale **24/24 SAME**、Ret **0**（423 活动负控零翻转、零判词漂移）；断言翻转 **0**；边界 18/18；token 隔离 9/9；ASAN **33/33**（9+2×12，K=2；ASAN/LSAN 零报告）；`cargo test --release --locked` **559 passed／0 failed**（`l3g_core` 6）；E1101 编目 **30**；T-4 无 golden 更新；parser 零改；全 job `SKIP|`／`FAIL|` 0 行。
+- 计数口径：P=**24**／Q=**18**／Ret=**0**／R=**750**／G=**423**／T=**1190**／A=**1194**／N=**1398**／M=**2219**。
+- 证据：产品签署 `shared/ZOR-L3g-Stage2-S38会签-产品-v2-signed.md`（132 行／12457 B，sha256 `eb56b3bd…2b25`）；QA 终验报告 v2 `shared/ZOR-L3g-Stage2-验证报告-质量-v2.md`（123 行／8587 B，sha256 `3ddf1d7d…5f2c`）；QA S38 输入 v2（157 行／11570 B，sha256 `db69d51f…ecea`）；`l3g-baseline.tsv` `ba3e94a1…e2f3`；`l3g-baseline.sha256` `b213ce4b…e3e6`；`l3g-asan-manifest.tsv` `12075236…ff5c`；PR #247 **81 files**（核心 3、QA 72、工具链 6）。
+
+### Known issues（跟踪中，非本版拦截）
+
+- **L3g 边界**：裸字段读取、println 算术、表达式语句、函数实参／返回值、嵌套字段／字段 of deref、数组索引、非运行期宽度／浮点、复合 `*b` 均未开放；Q 已锁定。
+- **Ret=0**：本片未退休任何负控；历史 TSV／baseline 字节零改；N-135／N-158（f64 println deref 算术）维持。
+- **实现路径**：let-only；`lower_int_expr` 与全局 `int_expr_kind` 未改；表达式语句／println／复合初值 token 零漂移。
+- **平台／ASAN**：macOS 无 LSAN，不作 ASAN 终证；终证为 Linux CI 33/33；默认 manifest 与既有分代 manifest 零改。
+- **版本语境**：0.3.31 及更早节的表述按版本语境保留、不回改；历史节逐字节零改。
+- **发布**：零 tag／Release，不构成安装或环境可用性承诺；不出性能数字。
+
 ## [0.3.31] - 2026-10-28
 
 内部验证里程碑，非可用语言版本：本版为 L3f「⑤f-2b enum 构造表达式叶」——`Box<E>` 顶层负载可直接写 enum 构造表达式（`box V(x)`／`box V(1+2)`／`box E::V(x)`），以及 struct／array 字面量内**任意既有嵌套深度**的 enum 构造表达式叶（`box S{e:V(x)}`／`box [V(1+2)]`／嵌套），含重初始化。表达式在 box／重初始化语句处**求值一次**并快照到唯一临时 enum 本地（`BoxConst::EnumLive`／`ConstValue::EnumLive`），临时绑定先于 Box 物化；运行期实参复用 L3d `lower_scalar_payload_expr`（Deref 生成唯一临时），其余实参走既有 `lower_value`，`EnumInit` 复用 `build_enum_init`；`println(*b)` 与同值 enum 构造逐字节一致；重初始化沿用 `drop_dst` 释放旧 Box 一次；无递归析构；IR／emit／parser／check／`lower_int_expr`／`lower_value`／所有权零改动。**不开放**（维持 fail-closed）：非标量 enum 载荷（struct／array／tuple／unit／enum／Box）、浮点／i8／i16／u64 运行期实参（仅 i64／u8／u32）、窄宽度字段投影／deref 实参、复合 `box *b`、bool 顶层 Box、无标注、嵌套 Box／enum 含 Box（递归 drop）、`seen` 同类型重复、`println(b)`／`let v=*b`、E2301／E2101；`box x + 1`（无括号）仍 E1201；`box S{x:-1}`（i8）为既有常量路径能力。**普通枚举构造 `let e = V(x+1)`／`V(p.x)`／`V(*b0)` 与 `box e` 为既有能力，本片行为不变**。Ret=20（N-322／N-356／N-357／N-375／N-376／N-377／N-393／N-394／N-395／N-411／N-412／N-413／N-426／N-489／N-510／N-511／N-518／N-519／N-520／N-521，仅执行面；输出 `V(3)`／`V(1)`／`V(3)`／`S { e: V(1) }`／`S { e: V(3) }`／`[V(3)]`／`S { e: V(1) }`／`S { e: V(3) }`／`[V(3)]`／`O { i: I { e: V(1) } }`／`O { i: I { e: V(3) } }`／`[S { e: V(3) }]`／`[[V(3), V(2)]]`／`V(1)`／`V(1)`／`S { e: V(1) }`／`V(1)`／`S { e: V(1) }`／`[V(2)]`／`O { i: I { e: V(1) } }`）；21 条 Rust 断言翻转（`l2t expression`→`A(3)`；`l2v direct-expression／direct-arith／reinit-expression`；`l2w expression-field／expression-arith`；`l2x constructor-field／arith／array`；`l2y nested-expression／constructor-field／arith／array`；`l2z enum-ctor-expression`；`l3c box-ctor`；`l3d enum-ctor-expression／enum-expression-leaf`；`l3e enum-ctor／enum-ctor-field／enum-ctor-array／enum-ctor-nested`）；ASAN K=2（`l3f-asan-manifest.tsv` 2 例＋l2k 9／l2v 2／l2w 2／l2x 2／l2y 2／l2z 2／l3a 2／l3b 2／l3c 2／l3d 2／l3e 2 零改，观测 9+2×11=31；默认 manifest 48／41／7 零改）；`l3f-baseline` 第二十八基线（1356／2149 用例／文件）；按 D-043 发布方式，日常版本以本账本条目＋main 推送为准；本版零新增 tag、零新增 release，不构成安装或环境可用性承诺。
