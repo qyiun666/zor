@@ -1,0 +1,19 @@
+case_id	source_path	expect_rc	expect_artifact	expect_stderr_contains	expect_stderr_not_contains	notes
+N-572	tests/stdout/cases/N-572.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	i8 bare field read
+N-573	tests/stdout/cases/N-573.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	i16 bare field read
+N-574	tests/stdout/cases/N-574.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	i32 bare field read
+N-575	tests/stdout/cases/N-575.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	u64 bare field read
+N-576	tests/stdout/cases/N-576.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	u16 bare field read
+N-577	tests/stdout/cases/N-577.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	f32 bare field read
+N-578	tests/stdout/cases/N-578.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	bool bare field read
+N-579	tests/stdout/cases/N-579.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	nested field read
+N-580	tests/stdout/cases/N-580.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	field of deref read
+N-581	tests/stdout/cases/N-581.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	array index read
+N-582	tests/stdout/cases/N-582.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	array element field read
+N-583	tests/stdout/cases/N-583.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	struct-valued field read
+N-584	tests/stdout/cases/N-584.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	enum field read
+N-585	tests/stdout/cases/N-585.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	array field read
+N-586	tests/stdout/cases/N-586.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	struct literal direct field read
+N-587	tests/stdout/cases/N-587.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	Box base direct field read
+N-588	tests/stdout/cases/N-588.zor	1	none	E1201	zor: runtime error	cross-width annotation
+N-589	tests/stdout/cases/N-589.zor	1	none	let 初始化非可 codegen 形态	zor: runtime error	f64 bare field read (N-112 semantics)

@@ -1,0 +1,3 @@
+struct I { x: i64 }
+struct P { i: I }
+fn main() { let p = P { i: I { x: 1 } }; let y = p.i; println(y); }

@@ -1,0 +1,2 @@
+struct P { x: i64 }
+fn main() { let p = P { x: 5 }; let t = p.x; let z = t % 2; println(t); println(z); }

@@ -1,0 +1,2 @@
+struct P { x: u32 }
+fn main() { let a: u32 = 3000000000; let p = P { x: a }; let y = p.x; println(y); println(p.x); }

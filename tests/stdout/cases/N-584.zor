@@ -1,0 +1,3 @@
+enum E { V(i64) }
+struct P { e: E }
+fn main() { let p = P { e: V(1) }; let y = p.e; println(y); }
