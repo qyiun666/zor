@@ -1,0 +1,25 @@
+case_id	source_path	mode	expect_rc	expect_stdout	flags	notes
+S38-01	tests/stdout/cases/S38-01.zor	run	0	expected/S38-01.stdout	-	i64 bare field read (literal binding)
+S38-02	tests/stdout/cases/S38-02.zor	run	0	expected/S38-02.stdout	-	i64 bare field read (runtime binding)
+S38-03	tests/stdout/cases/S38-03.zor	run	0	expected/S38-03.stdout	-	u8 bare field read
+S38-04	tests/stdout/cases/S38-04.zor	run	0	expected/S38-04.stdout	-	u32 bare field read
+S38-05	tests/stdout/cases/S38-05.zor	run	0	expected/S38-05.stdout	-	two fields read separately
+S38-06	tests/stdout/cases/S38-06.zor	run	0	expected/S38-06.stdout	-	same field read twice
+S38-07	tests/stdout/cases/S38-07.zor	run	0	expected/S38-07.stdout	-	read then scalar arithmetic
+S38-08	tests/stdout/cases/S38-08.zor	run	0	expected/S38-08.stdout	-	read then copy
+S38-09	tests/stdout/cases/S38-09.zor	run	0	expected/S38-09.stdout	-	read then modulo
+S38-10	tests/stdout/cases/S38-10.zor	run	0	expected/S38-10.stdout	-	read then multiply
+S38-11	tests/stdout/cases/S38-11.zor	run	0	expected/S38-11.stdout	-	read then deref arithmetic
+S38-12	tests/stdout/cases/S38-12.zor	run	0	expected/S38-12.stdout	-	two structs same field
+S38-13	tests/stdout/cases/S38-13.zor	run	0	expected/S38-13.stdout	-	read does not move base struct
+S38-14	tests/stdout/cases/S38-14.zor	run	0	expected/S38-14.stdout	-	read after composite literal expression
+S38-15	tests/stdout/cases/S38-15.zor	run	0	expected/S38-15.stdout	-	u8 bare read (runtime binding)
+S38-16	tests/stdout/cases/S38-16.zor	run	0	expected/S38-16.stdout	-	u32 bare read (runtime binding)
+S38-17	tests/stdout/cases/S38-17.zor	run	0	expected/S38-17.stdout	-	i64 same-width annotation
+S38-18	tests/stdout/cases/S38-18.zor	run	0	expected/S38-18.stdout	-	u8 same-width annotation
+S38-19	tests/stdout/cases/S38-19.zor	run	0	expected/S38-19.stdout	-	u32 same-width annotation
+S38-20	tests/stdout/cases/S38-20.zor	run	0	expected/S38-20.stdout	-	read as composite literal scalar leaf
+S38-21	tests/stdout/cases/S38-21.zor	run	0	expected/S38-21.stdout	-	read as array literal scalar leaf
+S38-22	tests/stdout/cases/S38-22.zor	run	0	expected/S38-22.stdout	-	read then Box payload
+S38-23	tests/stdout/cases/S38-23.zor	run	0	expected/S38-23.stdout	-	u8 read then arithmetic
+S38-24	tests/stdout/cases/S38-24.zor	run	0	expected/S38-24.stdout	-	i64 and u8 mixed print equivalence

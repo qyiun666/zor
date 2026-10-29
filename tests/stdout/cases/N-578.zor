@@ -1,0 +1,2 @@
+struct P { x: bool }
+fn main() { let p = P { x: true }; let y = p.x; println(y); }

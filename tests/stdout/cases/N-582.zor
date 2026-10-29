@@ -1,0 +1,2 @@
+struct P { x: i64 }
+fn main() { let a = [P { x: 1 }]; let y = a[0].x; println(y); }

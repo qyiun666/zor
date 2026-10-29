@@ -1,0 +1,2 @@
+struct P { x: u8 }
+fn main() { let a: u8 = 200; let p = P { x: a }; let y = p.x; println(y); println(p.x); }
