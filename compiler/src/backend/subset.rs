@@ -546,6 +546,23 @@ fn let_init_kind(
                 Err(SubsetError::new(l, c, "let 初始化非可 codegen 形态"))
             }
         }
+        // L3h：裸字段读取绑定——基座限本地 struct Path 绑定、单层字段；
+        // 字段类型仅运行期宽度 i64／u8／u32；其余形态维持既有判词。
+        Ex::Field(base, _, _, _) => {
+            let Ex::Path(n, _, _) = base.as_ref() else {
+                return Err(SubsetError::new(l, c, "let 初始化非可 codegen 形态"));
+            };
+            if !matches!(bindings.get(n), Some(BindingKind::Composite(Ty::Named(_)))) {
+                return Err(SubsetError::new(l, c, "let 初始化非可 codegen 形态"));
+            }
+            let kind = match types.expr_ty(init) {
+                Some(Ty::Prim("i64")) => BindingKind::I64,
+                Some(Ty::Prim("u8")) => BindingKind::U8,
+                Some(Ty::Prim("u32")) => BindingKind::U32,
+                _ => return Err(SubsetError::new(l, c, "let 初始化非可 codegen 形态")),
+            };
+            unify_ann(ann.clone(), kind, init, l, c)
+        }
         Ex::Record(..) | Ex::Tup(..) | Ex::ArrLit(..) | Ex::Call(..) => {
             let t = types
                 .expr_ty(init)
