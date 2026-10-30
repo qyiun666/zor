@@ -283,11 +283,11 @@ fn print_equivalence_and_regressions() {
 
 #[test]
 fn fail_closed_boundaries() {
-    // 裸字段读取维持 fail-closed；裸 deref 读取为既有能力（见上）。
-    assert_rc1(
-        "bare-field-read",
+    // L3h：i64 裸字段读取绑定已开放（原负控翻转，显式保留子例）。
+    assert_runs(
         "struct P { x: i64 }\nfn main() {\n    let p = P { x: 1 };\n    let y = p.x;\n    println(y);\n}\n",
-        "let 初始化非可 codegen 形态",
+        "bare-field-read",
+        b"1\n",
     );
     assert_rc1(
         "i8-field",

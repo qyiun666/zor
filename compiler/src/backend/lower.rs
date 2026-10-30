@@ -338,6 +338,42 @@ pub fn lower(prog: &Prog, types: &TypeTable) -> Result<Program, SubsetError> {
                             body.push(Stmt::BindDeref { local: id, src, line: *dl, col: *dc });
                             slots.push(Slot { ty: local_ty, live: true, konst: None, bytes: None });
                         }
+                        // L3h：裸字段读取绑定——单层 struct 字段 Copy 到普通标量槽位。
+                        Ex::Field(..) => {
+                            let ty = ir_int_ty(&local_ty).ok_or_else(|| {
+                                SubsetError::new(
+                                    *l,
+                                    *c,
+                                    "lower：字段读取绑定类型不在 L2b codegen 子集",
+                                )
+                            })?;
+                            // 先占位 dst 本地／槽位（保持 LocalId 对齐不变式），再读字段。
+                            locals.push(Local {
+                                id,
+                                name: name.clone(),
+                                ty: local_ty.clone(),
+                            });
+                            slots.push(Slot {
+                                ty: local_ty.clone(),
+                                live: true,
+                                konst: None,
+                                bytes: None,
+                            });
+                            let expr = {
+                                let mut b = Build {
+                                    types,
+                                    prog,
+                                    slots: &mut slots,
+                                    locals: &mut locals,
+                                    body: &mut body,
+                                };
+                                lower_scalar_payload_expr(init, ty, &mut b, &scope, &values)?
+                            };
+                            body.push(Stmt::BindInt { local: id, ty, expr, line: *l, col: *c });
+                            scope.insert(name.clone(), id);
+                            values.remove(name);
+                            continue;
+                        }
                         Ex::Path(n, nl, nc) => {
                             let src = lookup(&scope, n, *nl, *nc)?;
                             if matches!(local_ty, Ty::Box(_)) {
